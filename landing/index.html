@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Rust-Powered, Node-RED compatible flow automation runtime. 10x less memory, WASM plugin system, single binary deployment.">
+  <meta name="theme-color" content="#111318">
+  <title>RustRED &mdash; Rust-Powered Flow Automation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="rustred.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav" role="navigation" aria-label="Main navigation">
+    <div class="container nav-inner">
+      <a href="#" class="nav-logo" aria-label="RustRED home">
+        <img src="rustred.png" alt="RustRED" class="logo-img" width="32" height="32">
+        <span class="logo-text">Rust<span class="logo-accent">RED</span></span>
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#why">Why RustRED</a></li>
+        <li><a href="#compare">Compare</a></li>
+        <li><a href="#plugins">Plugins</a></li>
+        <li><a href="#get-started">Get Started</a></li>
+        <li><a href="https://github.com/dzulfikar08/edgelinkd" rel="noopener noreferrer" target="_blank">GitHub</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode" type="button">
+          <span class="theme-icon" aria-hidden="true"></span>
+        </button>
+        <a href="#get-started" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+      <button class="nav-hamburger" id="navHamburger" aria-label="Toggle navigation menu" aria-expanded="false" type="button">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero" id="hero">
+    <div class="hero-bg" aria-hidden="true">
+      <div class="dot-grid"></div>
+      <svg class="flow-lines" viewBox="0 0 1200 600" preserveAspectRatio="none" aria-hidden="true">
+        <path class="fl fl-1" d="M0,300 Q300,100 600,300 T1200,300" />
+        <path class="fl fl-2" d="M0,350 Q300,150 600,350 T1200,250" />
+        <path class="fl fl-3" d="M0,250 Q300,450 600,250 T1200,350" />
+      </svg>
+    </div>
+    <div class="container hero-content">
+      <div class="hero-badge animate-on-scroll">Open Source &bull; AGPL-3.0</div>
+      <h1 class="hero-title animate-on-scroll">Flow automation,<br><em>rewritten in Rust</em></h1>
+      <p class="hero-subtitle animate-on-scroll">Node-RED compatible runtime with 10&times; less memory, WASM plugin security, and single-binary deployment. Drop-in replacement for your existing flows.</p>
+      <div class="hero-ctas animate-on-scroll">
+        <a href="#get-started" class="btn btn-primary btn-lg">Quick Start</a>
+        <a href="https://github.com/dzulfikar08/edgelinkd" class="btn btn-ghost btn-lg" rel="noopener noreferrer" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+      <div class="hero-terminal animate-on-scroll">
+        <div class="terminal-bar">
+          <span class="terminal-dots"><i></i><i></i><i></i></span>
+          <span class="terminal-title">terminal</span>
+        </div>
+        <div class="terminal-body">
+          <div class="term-line"><span class="prompt">$</span><span class="cmd">cargo install rust-red</span></div>
+          <div class="term-out">Compiling rust-red v0.1.0</div>
+          <div class="term-out success">&#10003; Installed. Binary: <span class="hl">~/.cargo/bin/rust-red</span> (22MB)</div>
+          <div class="term-line"><span class="prompt">$</span><span class="cmd">rust-red --import flows.json</span></div>
+          <div class="term-out success">&#10003; 47 flows loaded. Dashboard: <span class="hl">http://localhost:1880</span></div>
+          <div class="term-line"><span class="prompt">$</span><span class="cmd cursor-blink">_</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Bar -->
+  <section class="stats-bar" id="metrics">
+    <div class="container">
+      <div class="stats-grid animate-on-scroll">
+        <div class="stat-item">
+          <span class="stat-value metric-value" data-target="10" data-suffix="x">0x</span>
+          <span class="stat-label">Less Memory</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value metric-value" data-target="22" data-suffix="MB">0MB</span>
+          <span class="stat-label">Binary Size</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value metric-value" data-target="50" data-suffix="+">0+</span>
+          <span class="stat-label">Built-in Nodes</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value metric-value" data-target="100" data-suffix="%">0%</span>
+          <span class="stat-label">Flow Compatible</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why RustRED -->
+  <section class="section" id="why">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <h2 class="section-title">Why RustRED?</h2>
+        <p class="section-desc">Node-RED changed how we think about flow-based programming. RustRED takes that vision and makes it production-ready.</p>
+      </div>
+      <div class="features-grid">
+        <article class="feature-card animate-on-scroll">
+          <div class="feature-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          </div>
+          <h3 class="feature-title">Rust-Powered Performance</h3>
+          <p class="feature-desc">Zero-cost abstractions, async I/O, and no garbage collector. 10&times; throughput with 10&times; less memory than Node.js runtimes.</p>
+        </article>
+        <article class="feature-card animate-on-scroll">
+          <div class="feature-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <h3 class="feature-title">WASM Plugin Security</h3>
+          <p class="feature-desc">Custom nodes run in a sandboxed WASM runtime. No more supply-chain attacks through unrestricted npm packages.</p>
+        </article>
+        <article class="feature-card animate-on-scroll">
+          <div class="feature-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+          </div>
+          <h3 class="feature-title">Single Binary Deployment</h3>
+          <p class="feature-desc">No Node.js, no npm install, no Python. One 22MB static binary that runs on Linux, macOS, ARM, and WASI.</p>
+        </article>
+        <article class="feature-card animate-on-scroll">
+          <div class="feature-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3 class="feature-title">Node-RED Compatible</h3>
+          <p class="feature-desc">Import your existing flow JSON files directly. Compatible with the Node-RED editor and flow format.</p>
+        </article>
+        <article class="feature-card animate-on-scroll">
+          <div class="feature-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          </div>
+          <h3 class="feature-title">Feature-Gated Architecture</h3>
+          <p class="feature-desc">Compile only what you need. Disable Modbus, PostgreSQL, AI, or clustering with cargo feature flags.</p>
+        </article>
+        <article class="feature-card animate-on-scroll">
+          <div class="feature-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 class="feature-title">Built-in MQTT Broker</h3>
+          <p class="feature-desc">Topic trie with wildcard matching, QoS 0/1, and retained messages. No external Mosquitto dependency needed.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Compare -->
+  <section class="section section-dark" id="compare">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <h2 class="section-title">See the difference</h2>
+        <p class="section-desc">Side-by-side with the tools you're already using.</p>
+      </div>
+      <div class="table-wrapper animate-on-scroll">
+        <table class="compare-table" role="table">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th class="col-highlight">RustRED</th>
+              <th>Node-RED</th>
+              <th>n8n</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Runtime</td>
+              <td class="col-highlight"><strong>Native Rust</strong></td>
+              <td>Node.js</td>
+              <td>Node.js</td>
+            </tr>
+            <tr>
+              <td>Memory Usage</td>
+              <td class="col-highlight"><strong>~22MB</strong></td>
+              <td>~150MB</td>
+              <td>~300MB</td>
+            </tr>
+            <tr>
+              <td>Plugin Security</td>
+              <td class="col-highlight"><strong>WASM Sandbox</strong></td>
+              <td>Unrestricted JS</td>
+              <td>Unrestricted JS</td>
+            </tr>
+            <tr>
+              <td>Industrial Protocols</td>
+              <td class="col-highlight"><strong>Modbus, MQTT</strong></td>
+              <td>Via plugins</td>
+              <td><span class="no-check" aria-label="No">&#10005;</span></td>
+            </tr>
+            <tr>
+              <td>Edge Deployment</td>
+              <td class="col-highlight"><strong>Single binary</strong></td>
+              <td>Requires Node.js</td>
+              <td><span class="no-check" aria-label="No">&#10005;</span></td>
+            </tr>
+            <tr>
+              <td>Cold Start</td>
+              <td class="col-highlight"><strong>&lt;5ms</strong></td>
+              <td>~2s</td>
+              <td>~5s</td>
+            </tr>
+            <tr>
+              <td>License</td>
+              <td class="col-highlight"><strong>AGPL-3.0</strong></td>
+              <td>Apache 2.0</td>
+              <td>Fair-code</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Plugin System -->
+  <section class="section" id="plugins">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <h2 class="section-title">Extend with WASM Plugins</h2>
+        <p class="section-desc">Write custom nodes in Rust, Go, or C/C++. They compile to WASM and run in a secure sandbox.</p>
+      </div>
+      <div class="plugin-showcase animate-on-scroll">
+        <div class="plugin-steps">
+          <div class="plugin-step">
+            <span class="step-num">1</span>
+            <div>
+              <h4>Write your node</h4>
+              <p>Implement the <code>FlowNodeBehavior</code> trait in Rust, Go, or any language that compiles to WASM.</p>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <span class="step-num">2</span>
+            <div>
+              <h4>Compile to WASM</h4>
+              <p><code>cargo build --target wasm32-wasip1</code> &mdash; produces a tiny ~13KB binary.</p>
+            </div>
+          </div>
+          <div class="plugin-step">
+            <span class="step-num">3</span>
+            <div>
+              <h4>Drop and run</h4>
+              <p>Place the .wasm file in your plugin directory. Hot-reloaded, no restart needed.</p>
+            </div>
+          </div>
+        </div>
+        <div class="plugin-code">
+          <div class="code-block">
+            <div class="code-header">
+              <span class="code-dots"><i></i><i></i><i></i></span>
+              <span class="code-filename">my_node.rs</span>
+              <span class="code-lang">Rust</span>
+            </div>
+            <pre><code><span class="kw">use</span> rust_red_macro::*;
+
+<span class="comment">// Annotate with flow_node to register</span>
+<span class="kw">struct</span> <span class="type">MyCustomNode</span> {
+    base: BaseFlowNodeState,
+}
+
+<span class="kw">impl</span> MyCustomNode {
+    <span class="kw">fn</span> <span class="fn">build</span>(
+        flow: &Flow,
+        base: BaseFlowNodeState,
+        config: &RedFlowNodeConfig,
+    ) -> Result&lt;Box&lt;<span class="kw">dyn</span> FlowNodeBehavior&gt;&gt; {
+        Ok(Box::new(Self { base }))
+    }
+}
+
+<span class="kw">impl</span> FlowNodeBehavior <span class="kw">for</span> MyCustomNode {
+    <span class="kw">async fn</span> <span class="fn">run</span>(self: Arc&lt;Self&gt;, stop: CancellationToken) {
+        <span class="kw">while let</span> Ok(msg) = self.recv_msg(stop.clone()).<span class="kw">await</span> {
+            <span class="comment">// Process your message</span>
+        }
+    }
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Get Started -->
+  <section class="section section-dark" id="get-started">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <h2 class="section-title">Get Started in 30 Seconds</h2>
+        <p class="section-desc">Install, import your flows, and run.</p>
+      </div>
+      <div class="get-started-terminal animate-on-scroll">
+        <div class="terminal-bar">
+          <span class="terminal-dots"><i></i><i></i><i></i></span>
+          <span class="terminal-title">terminal</span>
+        </div>
+        <div class="terminal-body">
+          <div class="term-line"><span class="prompt">$</span><span class="cmd">cargo install rust-red</span></div>
+          <div class="term-out">Compiling rust-red v0.1.0 (&hellip;27s)</div>
+          <div class="term-out success">&#10003; Installed <span class="hl">rust-red</span> to ~/.cargo/bin</div>
+          <div class="term-line"><span class="prompt">$</span><span class="cmd">rust-red --import my-flows.json</span></div>
+          <div class="term-out">Imported 47 flows, 312 nodes from my-flows.json</div>
+          <div class="term-out success">&#10003; Server running at <span class="hl">http://localhost:1880</span></div>
+          <div class="term-line"><span class="prompt">$</span><span class="cmd cursor-blink">_</span></div>
+        </div>
+      </div>
+      <div class="get-started-links animate-on-scroll">
+        <a href="https://github.com/dzulfikar08/edgelinkd" class="btn btn-primary btn-lg" rel="noopener noreferrer" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          View on GitHub
+        </a>
+        <a href="#" class="btn btn-ghost btn-lg">Read the Docs</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer" role="contentinfo">
+    <div class="container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <img src="rustred.png" alt="RustRED" width="24" height="24">
+            <span class="logo-text">Rust<span class="logo-accent">RED</span></span>
+          </div>
+          <p class="footer-tagline">Rust-powered flow automation. Node-RED compatible, production ready.</p>
+          <p class="footer-company">&copy; 2026 Joyo Digitama. All rights reserved.</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-col">
+            <h4>Project</h4>
+            <ul>
+              <li><a href="#why">Why RustRED</a></li>
+              <li><a href="#compare">Compare</a></li>
+              <li><a href="#plugins">Plugins</a></li>
+              <li><a href="#get-started">Get Started</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h4>Resources</h4>
+            <ul>
+              <li><a href="#">Documentation</a></li>
+              <li><a href="#">Plugin Guide</a></li>
+              <li><a href="#">Migration Guide</a></li>
+              <li><a href="#">API Reference</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h4>Community</h4>
+            <ul>
+              <li><a href="https://github.com/dzulfikar08/edgelinkd" rel="noopener noreferrer" target="_blank">GitHub</a></li>
+              <li><a href="#">Discord <span class="badge-soon">Soon</span></a></li>
+              <li><a href="#">Twitter</a></li>
+            </ul>
+          </div>
+          <div class="footer-col">
+            <h4>Commercial</h4>
+            <ul>
+              <li><a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Voltrus Cloud</a></li>
+              <li><a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Voltrus Edge</a></li>
+              <li><a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Enterprise</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer-voltrus-hint animate-on-scroll">
+        <p>Need managed hosting, RBAC, or fleet management? <a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Explore Voltrus <span aria-hidden="true">&rarr;</span></a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
