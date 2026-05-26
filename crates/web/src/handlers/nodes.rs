@@ -147,6 +147,12 @@ fn generate_custom_nodes_html(registry: &rust_red_core::runtime::registry::Regis
         output.push_str(&format!(
             "\n<script type=\"text/html\" data-template-name=\"{node_type}\">\n{template_html}</script>\n"
         ));
+
+        // Generate help text
+        let help_html = get_node_help_html(node_type);
+        output.push_str(&format!(
+            "\n<script type=\"text/x-red\" data-help-name=\"{node_type}\">\n{help_html}</script>\n"
+        ));
     }
 
     // Generate JS registration block
@@ -160,6 +166,7 @@ fn generate_custom_nodes_html(registry: &rust_red_core::runtime::registry::Regis
         let node_type = meta.type_;
         let red_name = meta.red_name;
         let is_global = matches!(meta.kind, NodeKind::Global);
+        let palette_label = get_palette_label(node_type);
 
         let (category, color, inputs, outputs, icon, defaults, align) = get_node_editor_config(node_type, is_global);
 
@@ -172,6 +179,7 @@ fn generate_custom_nodes_html(registry: &rust_red_core::runtime::registry::Regis
              \x20       inputs: {inputs},\n\
              \x20       outputs: {outputs},\n\
              \x20       icon: \"{icon}\",\n\
+             \x20       paletteLabel: \"{palette_label}\",\n\
              \x20       align: \"{align}\",\n\
              \x20       label: function() {{ return this.name || \"{red_name}\"; }},\n\
              \x20       oneditprepare: function() {{}},\n\
@@ -182,6 +190,131 @@ fn generate_custom_nodes_html(registry: &rust_red_core::runtime::registry::Regis
 
     output.push_str("})();\n</script>\n");
     output
+}
+
+/// Short label for the palette (displayed in the node palette sidebar)
+fn get_palette_label(type_name: &str) -> String {
+    match type_name {
+        "modbus read" => "read".to_string(),
+        "modbus write" => "write".to_string(),
+        "modbus-flex-getter" => "flex getter".to_string(),
+        "modbus-flex-writer" => "flex writer".to_string(),
+        "modbus-config" => "Modbus Client".to_string(),
+        "modbus-server" => "Modbus Server".to_string(),
+        _ => type_name.to_string(),
+    }
+}
+
+/// Generate help text for a node type (shown in the info panel)
+fn get_node_help_html(type_name: &str) -> String {
+    match type_name {
+        "modbus-config" => r#"<p>Modbus client connection configuration. Defines how to connect to a Modbus TCP/UDP device.</p>
+<h3>Properties</h3>
+<dl class="message-properties">
+    <dt>Host <span class="property-type">string</span></dt><dd>IP address or hostname of the Modbus device</dd>
+    <dt>Port <span class="property-type">number</span></dt><dd>TCP port (default: 502)</dd>
+    <dt>Transport <span class="property-type">string</span></dt><dd>Connection type: TCP, UDP, or Serial RTU</dd>
+    <dt>Unit ID <span class="property-type">number</span></dt><dd>Modbus slave unit ID (default: 1)</dd>
+    <dt>Timeout <span class="property-type">number</span></dt><dd>Connection timeout in ms (default: 5000)</dd>
+</dl>
+<h3>Details</h3>
+<p>This is a configuration node shared by all Modbus flow nodes. It manages the connection lifecycle and auto-reconnects on failure.</p>"#.to_string(),
+
+        "modbus-server" => r#"<p>In-process Modbus TCP server/simulator for testing and development.</p>
+<h3>Properties</h3>
+<dl class="message-properties">
+    <dt>Host <span class="property-type">string</span></dt><dd>Bind address (default: 127.0.0.1)</dd>
+    <dt>Port <span class="property-type">number</span></dt><dd>Listen port (default: 5020)</dd>
+    <dt>Coil Count <span class="property-type">number</span></dt><dd>Number of simulated coils (default: 100)</dd>
+    <dt>Register Count <span class="property-type">number</span></dt><dd>Number of simulated holding registers (default: 100)</dd>
+</dl>
+<h3>Inputs</h3>
+<dl class="message-properties">
+    <dt>payload <span class="property-type">object</span></dt><dd>Write to simulator state: <code>{address: 0, value: true}</code> writes a coil, <code>{address: 0, value: 42}</code> writes a register</dd>
+</dl>
+<h3>Outputs</h3>
+<dl class="message-properties">
+    <dt>topic: modbus/connect</dt><dd>Emitted when a client connects. Payload contains remote address.</dd>
+    <dt>topic: modbus/request</dt><dd>Emitted for each Modbus request. Payload contains functionCode, address, quantity/value.</dd>
+    <dt>topic: modbus/disconnect</dt><dd>Emitted when a client disconnects.</dd>
+</dl>
+<h3>Details</h3>
+<p>Supports FC1-6, FC15-16 (read/write coils and registers). Connect a debug node to the output to monitor all server activity. Use with <code>modbus read</code>/<code>modbus write</code> nodes for end-to-end testing without physical hardware.</p>"#.to_string(),
+
+        "modbus read" => r#"<p>Reads data from a Modbus device. Supports polling and trigger-based reads.</p>
+<h3>Properties</h3>
+<dl class="message-properties">
+    <dt>Server <span class="property-type">modbus-config</span></dt><dd>Modbus client connection</dd>
+    <dt>Function Code <span class="property-type">string</span></dt><dd>Modbus read function</dd>
+    <dt>Address <span class="property-type">number</span></dt><dd>Starting register/coil address (0-based)</dd>
+    <dt>Quantity <span class="property-type">number</span></dt><dd>Number of values to read</dd>
+    <dt>Data Type <span class="property-type">string</span></dt><dd>Register interpretation: uint16, int16, uint32, int32, float, double, uint64, int64</dd>
+    <dt>Poll Interval <span class="property-type">number</span></dt><dd>Polling interval in ms (0 = trigger-only mode)</dd>
+</dl>
+<h3>Function Codes</h3>
+<table>
+    <tr><th>Code</th><th>Name</th></tr>
+    <tr><td>FC1</td><td>Read Coils</td></tr>
+    <tr><td>FC2</td><td>Read Discrete Inputs</td></tr>
+    <tr><td>FC3</td><td>Read Holding Registers</td></tr>
+    <tr><td>FC4</td><td>Read Input Registers</td></tr>
+</table>
+<h3>Output</h3>
+<p>Sets <code>msg.payload</code> to the read values (array or single value depending on quantity). Sets <code>msg.modbus</code> with functionCode, address, and quantity metadata.</p>"#.to_string(),
+
+        "modbus write" => r#"<p>Writes data to a Modbus device.</p>
+<h3>Properties</h3>
+<dl class="message-properties">
+    <dt>Server <span class="property-type">modbus-config</span></dt><dd>Modbus client connection</dd>
+    <dt>Function Code <span class="property-type">string</span></dt><dd>Modbus write function</dd>
+    <dt>Address <span class="property-type">number</span></dt><dd>Target register/coil address (0-based)</dd>
+    <dt>Data Type <span class="property-type">string</span></dt><dd>Register encoding: uint16, int16, uint32, int32, float, double, uint64, int64</dd>
+</dl>
+<h3>Function Codes</h3>
+<table>
+    <tr><th>Code</th><th>Name</th><th>Payload</th></tr>
+    <tr><td>FC5</td><td>Write Single Coil</td><td>boolean</td></tr>
+    <tr><td>FC6</td><td>Write Single Register</td><td>number</td></tr>
+    <tr><td>FC15</td><td>Write Multiple Coils</td><td>boolean array</td></tr>
+    <tr><td>FC16</td><td>Write Multiple Registers</td><td>number or array</td></tr>
+</table>
+<h3>Input</h3>
+<p><code>msg.payload</code> — value(s) to write. For coils use boolean. For registers use number(s) converted via Data Type.</p>
+<h3>Output</h3>
+<p>Sets <code>msg.payload</code> to the written value or count. Sets <code>msg.modbus</code> with functionCode and address.</p>"#.to_string(),
+
+        "modbus-flex-getter" => r#"<p>Dynamic Modbus reader — address, function code, and quantity are set at runtime via the incoming message.</p>
+<h3>Properties</h3>
+<dl class="message-properties">
+    <dt>Server <span class="property-type">modbus-config</span></dt><dd>Modbus client connection</dd>
+    <dt>Data Type <span class="property-type">string</span></dt><dd>Register interpretation for FC3/FC4 results</dd>
+</dl>
+<h3>Input Message</h3>
+<dl class="message-properties">
+    <dt>msg.address <span class="property-type">number</span></dt><dd>Starting register/coil address (default: 0)</dd>
+    <dt>msg.quantity <span class="property-type">number</span></dt><dd>Number of values to read (default: 1)</dd>
+    <dt>msg.functionCode <span class="property-type">string</span></dt><dd>readCoils, readDiscreteInputs, readHoldingRegisters, readInputRegisters (default: readHoldingRegisters)</dd>
+</dl>
+<h3>Output</h3>
+<p>Sets <code>msg.payload</code> to the read values. Sets <code>msg.modbus</code> with functionCode, address, and quantity.</p>"#.to_string(),
+
+        "modbus-flex-writer" => r#"<p>Dynamic Modbus writer — address, function code, and payload are set at runtime via the incoming message.</p>
+<h3>Properties</h3>
+<dl class="message-properties">
+    <dt>Server <span class="property-type">modbus-config</span></dt><dd>Modbus client connection</dd>
+    <dt>Data Type <span class="property-type">string</span></dt><dd>Register encoding for write operations</dd>
+</dl>
+<h3>Input Message</h3>
+<dl class="message-properties">
+    <dt>msg.address <span class="property-type">number</span></dt><dd>Target register/coil address (default: 0)</dd>
+    <dt>msg.functionCode <span class="property-type">string</span></dt><dd>writeSingleCoil, writeSingleRegister, writeMultipleCoils, writeMultipleRegisters (default: writeSingleRegister)</dd>
+    <dt>msg.payload <span class="property-type">any</span></dt><dd>Value(s) to write</dd>
+</dl>
+<h3>Output</h3>
+<p>Sets <code>msg.payload</code> to the written value or count. Sets <code>msg.modbus</code> with functionCode and address.</p>"#.to_string(),
+
+        _ => format!("<p>{type_name} node</p>"),
+    }
 }
 
 /// Generate the <script type="text/html" data-template-name> form HTML for a node type
@@ -229,17 +362,57 @@ fn form_row_textarea(icon: &str, label: &str, input_id: &str, placeholder: &str)
     )
 }
 
-fn form_row_config_node(_config_type: &str, label: &str) -> String {
+fn form_row_select(icon: &str, label: &str, input_id: &str, options: &[(&str, &str)]) -> String {
+    let opts: String = options
+        .iter()
+        .map(|(val, text)| format!("<option value=\"{val}\">{text}</option>"))
+        .collect();
     format!(
         "    <div class=\"form-row\">\n\
-         \x20       <label for=\"node-input-config_node\"><i class=\"fa fa-database\"></i> {label}</label>\n\
-         \x20       <input type=\"text\" id=\"node-input-config_node\" style=\"width:60%\">\n\
+         \x20       <label for=\"{input_id}\"><i class=\"fa fa-{icon}\"></i> {label}</label>\n\
+         \x20       <select id=\"{input_id}\" style=\"width:70%\">{opts}</select>\n\
+         \x20   </div>\n"
+    )
+}
+
+fn form_row_config_node(config_type: &str, label: &str) -> String {
+    // Must match the defaults key: camelCase for modbus/bacnet/opcua, snake_case for DB nodes
+    let key = match config_type {
+        "modbus read" | "modbus write" | "modbus-flex-getter" | "modbus-flex-writer"
+        | "bacnet read" | "bacnet write" | "opcua read" | "opcua write" => "configNode",
+        _ => "config_node",
+    };
+    format!(
+        "    <div class=\"form-row\">\n\
+         \x20       <label for=\"node-input-{key}\"><i class=\"fa fa-server\"></i> {label}</label>\n\
+         \x20       <input type=\"text\" id=\"node-input-{key}\" style=\"width:60%\">\n\
          \x20   </div>\n"
     )
 }
 
 fn name_row() -> String {
     form_row("tag", "Name", "node-input-name", "")
+}
+
+// Config node (global node) variants — Node-RED uses node-config-input- prefix
+fn cfg_name_row() -> String {
+    form_row("tag", "Name", "node-config-input-name", "")
+}
+
+fn cfg_form_row(icon: &str, label: &str, key: &str, placeholder: &str) -> String {
+    form_row(icon, label, &format!("node-config-input-{key}"), placeholder)
+}
+
+fn cfg_form_row_number(icon: &str, label: &str, key: &str, placeholder: &str) -> String {
+    form_row_number(icon, label, &format!("node-config-input-{key}"), placeholder)
+}
+
+fn cfg_form_row_password(icon: &str, label: &str, key: &str) -> String {
+    form_row_password(icon, label, &format!("node-config-input-{key}"))
+}
+
+fn cfg_form_row_select(icon: &str, label: &str, key: &str, options: &[(&str, &str)]) -> String {
+    form_row_select(icon, label, &format!("node-config-input-{key}"), options)
 }
 
 fn get_flow_node_template_html(type_name: &str) -> String {
@@ -282,28 +455,65 @@ fn get_flow_node_template_html(type_name: &str) -> String {
         "modbus read" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
-            html.push_str(&form_row("cog", "Function Code", "node-input-functionCode", "readHoldingRegisters"));
+            html.push_str(&form_row_select("cog", "Function Code", "node-input-functionCode", &[
+                ("readCoils", "Read Coils (FC1)"),
+                ("readDiscreteInputs", "Read Discrete Inputs (FC2)"),
+                ("readHoldingRegisters", "Read Holding Registers (FC3)"),
+                ("readInputRegisters", "Read Input Registers (FC4)"),
+            ]));
             html.push_str(&form_row_number("map-marker", "Address", "node-input-address", "0"));
             html.push_str(&form_row_number("bars", "Quantity", "node-input-quantity", "1"));
-            html.push_str(&form_row("cog", "Data Type", "node-input-dataType", "uint16"));
-            html.push_str(&form_row_number("clock", "Poll Interval (ms)", "node-input-pollIntervalMs", "5000"));
+            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
+                ("uint16", "UInt16"), ("int16", "Int16"),
+                ("uint32", "UInt32"), ("int32", "Int32"),
+                ("float", "Float"), ("double", "Double"),
+                ("uint64", "UInt64"), ("int64", "Int64"),
+            ]));
+            html.push_str(&form_row_number("clock", "Poll Interval (ms)", "node-input-pollIntervalMs", "0"));
         }
         "modbus write" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
-            html.push_str(&form_row("cog", "Function Code", "node-input-functionCode", "writeSingleRegister"));
+            html.push_str(&form_row_select("cog", "Function Code", "node-input-functionCode", &[
+                ("writeSingleCoil", "Write Single Coil (FC5)"),
+                ("writeSingleRegister", "Write Single Register (FC6)"),
+                ("writeMultipleCoils", "Write Multiple Coils (FC15)"),
+                ("writeMultipleRegisters", "Write Multiple Registers (FC16)"),
+            ]));
             html.push_str(&form_row_number("map-marker", "Address", "node-input-address", "0"));
-            html.push_str(&form_row("cog", "Data Type", "node-input-dataType", "uint16"));
+            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
+                ("uint16", "UInt16"), ("int16", "Int16"),
+                ("uint32", "UInt32"), ("int32", "Int32"),
+                ("float", "Float"), ("double", "Double"),
+                ("uint64", "UInt64"), ("int64", "Int64"),
+            ]));
         }
         "modbus-flex-getter" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
-            html.push_str(&form_row("cog", "Data Type", "node-input-dataType", "uint16"));
+            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
+                ("uint16", "UInt16"), ("int16", "Int16"),
+                ("uint32", "UInt32"), ("int32", "Int32"),
+                ("float", "Float"), ("double", "Double"),
+                ("uint64", "UInt64"), ("int64", "Int64"),
+            ]));
         }
         "modbus-flex-writer" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
-            html.push_str(&form_row("cog", "Data Type", "node-input-dataType", "uint16"));
+            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
+                ("uint16", "UInt16"), ("int16", "Int16"),
+                ("uint32", "UInt32"), ("int32", "Int32"),
+                ("float", "Float"), ("double", "Double"),
+                ("uint64", "UInt64"), ("int64", "Int64"),
+            ]));
+        }
+        "modbus-server" => {
+            html.push_str(&name_row());
+            html.push_str(&form_row("server", "Host", "node-input-host", "127.0.0.1"));
+            html.push_str(&form_row_number("cog", "Port", "node-input-port", "5020"));
+            html.push_str(&form_row_number("bars", "Coil Count", "node-input-coilCount", "100"));
+            html.push_str(&form_row_number("bars", "Register Count", "node-input-registerCount", "100"));
         }
         "opcua read" => {
             html.push_str(&name_row());
@@ -340,62 +550,57 @@ fn get_global_node_template_html(type_name: &str) -> String {
 
     match type_name {
         "postgres-config" | "timescaledb-config" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row("server", "Host", "node-input-host", "localhost"));
-            html.push_str(&form_row_number("cog", "Port", "node-input-port", "5432"));
-            html.push_str(&form_row("database", "Database", "node-input-dbname", "mydb"));
-            html.push_str(&form_row("user", "User", "node-input-user", "postgres"));
-            html.push_str(&form_row_password("lock", "Password", "node-input-password"));
-            html.push_str(&form_row_number("cog", "Pool Size", "node-input-poolMaxSize", "10"));
-            html.push_str(&form_row_number("clock", "Connect Timeout (ms)", "node-input-connectTimeoutMs", "5000"));
+            html.push_str(&cfg_name_row());
+            html.push_str(&cfg_form_row("server", "Host", "host", "localhost"));
+            html.push_str(&cfg_form_row_number("cog", "Port", "port", "5432"));
+            html.push_str(&cfg_form_row("database", "Database", "dbname", "mydb"));
+            html.push_str(&cfg_form_row("user", "User", "user", "postgres"));
+            html.push_str(&cfg_form_row_password("lock", "Password", "password"));
+            html.push_str(&cfg_form_row_number("cog", "Pool Size", "poolMaxSize", "10"));
+            html.push_str(&cfg_form_row_number("clock", "Connect Timeout (ms)", "connectTimeoutMs", "5000"));
         }
         "sqlite-config" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row("file", "Database path", "node-input-path", "data.db"));
+            html.push_str(&cfg_name_row());
+            html.push_str(&cfg_form_row("file", "Database path", "path", "data.db"));
         }
         "mssql-config" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row("server", "Host", "node-input-host", "localhost"));
-            html.push_str(&form_row_number("cog", "Port", "node-input-port", "1433"));
-            html.push_str(&form_row("database", "Database", "node-input-database", "mydb"));
-            html.push_str(&form_row("user", "User", "node-input-user", "sa"));
-            html.push_str(&form_row_password("lock", "Password", "node-input-password"));
+            html.push_str(&cfg_name_row());
+            html.push_str(&cfg_form_row("server", "Host", "host", "localhost"));
+            html.push_str(&cfg_form_row_number("cog", "Port", "port", "1433"));
+            html.push_str(&cfg_form_row("database", "Database", "database", "mydb"));
+            html.push_str(&cfg_form_row("user", "User", "user", "sa"));
+            html.push_str(&cfg_form_row_password("lock", "Password", "password"));
         }
         "influxdb-config" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row("globe", "URL", "node-input-url", "http://localhost:8086"));
-            html.push_str(&form_row_password("key", "Token", "node-input-token"));
-            html.push_str(&form_row("cog", "Organization", "node-input-org", "my-org"));
-            html.push_str(&form_row("database", "Bucket", "node-input-bucket", "my-bucket"));
+            html.push_str(&cfg_name_row());
+            html.push_str(&cfg_form_row("globe", "URL", "url", "http://localhost:8086"));
+            html.push_str(&cfg_form_row_password("key", "Token", "token"));
+            html.push_str(&cfg_form_row("cog", "Organization", "org", "my-org"));
+            html.push_str(&cfg_form_row("database", "Bucket", "bucket", "my-bucket"));
         }
         "modbus-config" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row("server", "Host", "node-input-host", "localhost"));
-            html.push_str(&form_row_number("cog", "Port", "node-input-port", "502"));
-            html.push_str(&form_row("exchange", "Transport", "node-input-transport", "tcp"));
-            html.push_str(&form_row_number("cog", "Unit ID", "node-input-unitId", "1"));
-            html.push_str(&form_row_number("clock", "Timeout (ms)", "node-input-timeoutMs", "5000"));
-        }
-        "modbus-server" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row("server", "Host", "node-input-host", "127.0.0.1"));
-            html.push_str(&form_row_number("cog", "Port", "node-input-port", "5020"));
-            html.push_str(&form_row_number("bars", "Coil Count", "node-input-coilCount", "100"));
-            html.push_str(&form_row_number("bars", "Register Count", "node-input-registerCount", "100"));
+            html.push_str(&cfg_name_row());
+            html.push_str(&cfg_form_row("server", "Host", "host", "localhost"));
+            html.push_str(&cfg_form_row_number("cog", "Port", "port", "502"));
+            html.push_str(&cfg_form_row_select("exchange", "Transport", "transport", &[
+                ("tcp", "TCP"), ("udp", "UDP"), ("rtu", "Serial RTU"),
+            ]));
+            html.push_str(&cfg_form_row_number("cog", "Unit ID", "unitId", "1"));
+            html.push_str(&cfg_form_row_number("clock", "Timeout (ms)", "timeoutMs", "5000"));
         }
         "opcua-config" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row("globe", "Endpoint", "node-input-endpoint", "opc.tcp://localhost:4840"));
+            html.push_str(&cfg_name_row());
+            html.push_str(&cfg_form_row("globe", "Endpoint", "endpoint", "opc.tcp://localhost:4840"));
         }
         "bacnet-config" => {
-            html.push_str(&name_row());
-            html.push_str(&form_row_number("cog", "Device ID", "node-input-device_id", "0"));
-            html.push_str(&form_row("server", "Target Host", "node-input-target_host", ""));
-            html.push_str(&form_row_number("cog", "Target Port", "node-input-target_port", "47808"));
+            html.push_str(&cfg_name_row());
+            html.push_str(&cfg_form_row_number("cog", "Device ID", "device_id", "0"));
+            html.push_str(&cfg_form_row("server", "Target Host", "target_host", ""));
+            html.push_str(&cfg_form_row_number("cog", "Target Port", "target_port", "47808"));
         }
         _ => {
             // Generic config template
-            html.push_str(&name_row());
+            html.push_str(&cfg_name_row());
         }
     }
 
@@ -420,7 +625,7 @@ fn categorize_node_v2(type_name: &str) -> (&'static str, &'static str, &'static 
         t if t.contains("postgres") || t.contains("timescale") => ("storage", "#e2d96e", "db.svg"),
         t if t.contains("mssql") || t.contains("sqlite") => ("storage", "#e2d96e", "db.svg"),
         t if t.contains("influxdb") => ("storage", "#dbc08e", "db.svg"),
-        t if t.contains("modbus") => ("modbus", "#E9967A", "serial.svg"),
+        t if t.contains("modbus") => ("modbus", "#D4B035", "modbus.svg"),
         t if t.contains("opcua") => ("storage", "#c1975b", "serial.svg"),
         t if t.contains("bacnet") => ("storage", "#c1975b", "serial.svg"),
         _ => ("function", "#a6bbcf", "function.svg"),
@@ -444,8 +649,15 @@ fn get_flow_node_defaults(type_name: &str) -> String {
     };
 
     if let Some(ct) = config_type {
+        // Modbus/bacnet/opcua flow JSON uses camelCase configNode;
+        // DB nodes use snake_case config_node in their existing flow data.
+        let key = match type_name {
+            "modbus read" | "modbus write" | "modbus-flex-getter" | "modbus-flex-writer"
+            | "bacnet read" | "bacnet write" | "opcua read" | "opcua write" => "configNode",
+            _ => "config_node",
+        };
         d.push_str(&format!(
-            "            config_node: {{value:\"\", type:\"{ct}\", required: true}},\n"
+            "            {key}: {{value:\"\", type:\"{ct}\", required: true}},\n"
         ));
     }
 
@@ -487,6 +699,12 @@ fn get_flow_node_defaults(type_name: &str) -> String {
         }
         "modbus-flex-getter" | "modbus-flex-writer" => {
             d.push_str("            dataType: {value:\"uint16\"},\n");
+        }
+        "modbus-server" => {
+            d.push_str("            host: {value:\"127.0.0.1\"},\n");
+            d.push_str("            port: {value:5020},\n");
+            d.push_str("            coilCount: {value:100},\n");
+            d.push_str("            registerCount: {value:100},\n");
         }
         "bacnet write" => {
             d.push_str("            address: {value:0},\n");
@@ -535,12 +753,6 @@ fn get_global_node_defaults(type_name: &str) -> String {
             d.push_str("            transport: {value:\"tcp\"},\n");
             d.push_str("            unitId: {value:1},\n");
             d.push_str("            timeoutMs: {value:5000},\n");
-        }
-        "modbus-server" => {
-            d.push_str("            host: {value:\"127.0.0.1\"},\n");
-            d.push_str("            port: {value:5020},\n");
-            d.push_str("            coilCount: {value:100},\n");
-            d.push_str("            registerCount: {value:100},\n");
         }
         "opcua-config" => {
             d.push_str("            endpoint: {value:\"opc.tcp://localhost:4840\"},\n");
