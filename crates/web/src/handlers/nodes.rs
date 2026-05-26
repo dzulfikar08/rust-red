@@ -170,6 +170,8 @@ fn generate_custom_nodes_html(registry: &rust_red_core::runtime::registry::Regis
         let palette_label = get_palette_label(node_type);
 
         let (category, color, inputs, outputs, icon, defaults, align) = get_node_editor_config(node_type, is_global);
+        let oneditprepare = get_oneditprepare(node_type, is_global);
+        let oneditsave = get_oneditsave(node_type, is_global);
 
         output.push_str(&format!(
             "    RED.nodes.registerType('{node_type}', {{\n\
@@ -183,8 +185,8 @@ fn generate_custom_nodes_html(registry: &rust_red_core::runtime::registry::Regis
              \x20       paletteLabel: \"{palette_label}\",\n\
              \x20       align: \"{align}\",\n\
              \x20       label: function() {{ return this.name || \"{red_name}\"; }},\n\
-             \x20       oneditprepare: function() {{}},\n\
-             \x20       oneditsave: function() {{}}\n\
+             \x20       oneditprepare: function() {{{oneditprepare}}},\n\
+             \x20       oneditsave: function() {{{oneditsave}}}\n\
              \x20   }});\n\n",
         ));
     }
@@ -204,6 +206,82 @@ fn get_palette_label(type_name: &str) -> String {
         "modbus-server" => "Modbus Server".to_string(),
         "mqtt broker embedded" => "MQTT Broker".to_string(),
         _ => type_name.to_string(),
+    }
+}
+
+fn get_oneditprepare(node_type: &str, _is_global: bool) -> String {
+    let mut js = String::new();
+
+    // Helper closure to add tab click handler
+    let add_tab_handler = |js: &mut String, prefix: &str| {
+        js.push_str(&format!(r##"
+                $( "#{prefix}-tabs li" ).on( "click", function() {{
+                    $( "#{prefix}-tabs li" ).css( "border-bottom", "" );
+                    $(this).css( "border-bottom", "2px solid #d9400d" );
+                    $( ".{prefix}-tab-pane" ).hide();
+                    $( "#"+$(this).data( "tab" ) ).show();
+                }});
+            "##));
+    };
+
+    match node_type {
+        "modbus-config" => {
+            add_tab_handler(&mut js, "mc");
+            js.push_str(r##"
+                $( "#node-config-input-transport" ).on( "change", function() { if($(this).val()==="rtu") { $( "#mc-serial-section" ).show(); } else { $( "#mc-serial-section" ).hide(); } });
+                $( "#node-config-input-transport" ).trigger( "change" );
+            "##);
+        }
+        "modbus read" => {
+            add_tab_handler(&mut js, "mr");
+            js.push_str(r##"
+                if(this.pollRateUnit) { $( "#node-input-pollRateUnit" ).val(this.pollRateUnit); }
+            "##);
+        }
+        "modbus write" => {
+            add_tab_handler(&mut js, "mw");
+        }
+        "modbus-server" => {
+            add_tab_handler(&mut js, "ms");
+        }
+        "mqtt broker embedded" => {
+            add_tab_handler(&mut js, "mbe");
+            js.push_str(r##"
+                $( "#node-input-wsEnabled" ).on( "change", function() { if($(this).is( ":checked" )) { $( "#mbe-ws-section" ).show(); } else { $( "#mbe-ws-section" ).hide(); } });
+                $( "#node-input-wsEnabled" ).trigger( "change" );
+            "##);
+        }
+        "postgres-config" | "timescaledb-config" => {
+            add_tab_handler(&mut js, "pc");
+            js.push_str("                $( \"#node-config-input-host\" ).typedInput({types:[\"str\",\"env\"],typeField:\"#node-config-input-hostType\"});\n");
+            js.push_str("                $( \"#node-config-input-port\" ).typedInput({types:[\"num\",\"env\"],typeField:\"#node-config-input-portType\"});\n");
+            js.push_str("                $( \"#node-config-input-dbname\" ).typedInput({types:[\"str\",\"env\"],typeField:\"#node-config-input-dbnameType\"});\n");
+        }
+        "opcua-config" => {
+            add_tab_handler(&mut js, "oc");
+            js.push_str(r##"
+                $( "#node-config-input-authMethod" ).on( "change", function() { var v=$(this).val(); $( "#oc-credentials-section" ).toggle(v==="credentials"); $( "#oc-certificate-section" ).toggle(v==="certificate"); });
+                $( "#node-config-input-authMethod" ).trigger( "change" );
+            "##);
+        }
+        "opcua read" => {
+            add_tab_handler(&mut js, "or");
+            js.push_str(r##"
+                var action=this.action||"read"; $( "#node-input-action" ).val(action);
+                function toggleOpcuaFields() { var a=$( "#node-input-action" ).val(); $( "#or-interval-section" ).toggle(a==="subscribe"||a==="monitor"); $( "#or-deadband-section" ).toggle(a==="monitor"); }
+                $( "#node-input-action" ).on( "change", toggleOpcuaFields); toggleOpcuaFields();
+            "##);
+        }
+        _ => {}
+    }
+
+    js
+}
+
+fn get_oneditsave(node_type: &str, _is_global: bool) -> String {
+    match node_type {
+        "modbus read" => r##" this.pollRateUnit = $( "#node-input-pollRateUnit" ).val(); "##.to_string(),
+        _ => String::new(),
     }
 }
 
@@ -432,6 +510,76 @@ fn cfg_form_row_select(icon: &str, label: &str, key: &str, options: &[(&str, &st
     form_row_select(icon, label, &format!("node-config-input-{key}"), options)
 }
 
+// --- Tabbed UI helpers ---
+
+fn tab_bar(prefix: &str, tabs: &[(&str, &str)]) -> String {
+    let mut s = String::new();
+    s.push_str("<div style=\"margin-bottom:10px\">");
+    s.push_str(&format!("<ul id=\"{prefix}-tabs\" style=\"list-style:none;margin:0;padding:0;border-bottom:1px solid #ccc;display:flex;gap:0\">"));
+    for (i, (id, label)) in tabs.iter().enumerate() {
+        let border_bottom = if i == 0 { "border-bottom:2px solid #d9400d;" } else { "" };
+        s.push_str(&format!(
+            "<li data-tab=\"{prefix}-{id}\" class=\"{prefix}-tab-item\" style=\"padding:6px 14px;cursor:pointer;{border_bottom}\"><a href=\"#\" onclick=\"return false\" style=\"text-decoration:none;color:inherit;font-size:12px\">{label}</a></li>"
+        ));
+    }
+    s.push_str("</ul>");
+    s.push_str(&format!("<div id=\"{prefix}-tab-content\" style=\"min-height:120px;padding-top:8px\">"));
+    s
+}
+
+fn tab_content_start(prefix: &str, id: &str, active: bool) -> String {
+    let style = if active { "" } else { "display:none;" };
+    format!("<div id=\"{prefix}-{id}\" class=\"{prefix}-tab-pane\" style=\"{style}\">")
+}
+
+fn tab_content_end() -> &'static str {
+    "</div>"
+}
+
+fn tab_bar_close() -> &'static str {
+    "</div></div>"
+}
+
+fn form_row_checkbox(icon: &str, label: &str, input_id: &str) -> String {
+    format!(
+        "<div class=\"form-row\"><label>&nbsp;</label><input type=\"checkbox\" id=\"{input_id}\" style=\"display:inline-block;width:auto;vertical-align:middle\"> <i class=\"fa fa-{icon}\"></i> <span>{label}</span></div>"
+    )
+}
+
+fn cfg_form_row_checkbox(icon: &str, label: &str, key: &str) -> String {
+    form_row_checkbox(icon, label, &format!("node-config-input-{key}"))
+}
+
+fn poll_rate_row(input_id: &str, unit_id: &str) -> String {
+    format!(
+        "<div class=\"form-row\"><label><i class=\"fa fa-clock\"></i> Poll Rate</label>\
+         <input type=\"number\" id=\"{input_id}\" style=\"width:80px;display:inline-block\" min=\"0\">\
+         <select id=\"{unit_id}\" style=\"width:70px;display:inline-block;margin-left:4px\">\
+         <option value=\"ms\">ms</option><option value=\"s\">s</option>\
+         <option value=\"m\">min</option><option value=\"h\">hr</option></select></div>"
+    )
+}
+
+fn section_divider(title: &str) -> String {
+    format!("<hr style=\"border:0;border-top:1px solid #ccc;margin:12px 0 8px\"><b style=\"font-size:11px\">{title}</b>")
+}
+
+fn conditional_section_start(id: &str) -> String {
+    format!("<div id=\"{id}\" style=\"display:none\">")
+}
+
+fn conditional_section_end() -> &'static str {
+    "</div>"
+}
+
+fn typed_input_row(icon: &str, label: &str, input_id: &str, type_field_id: &str) -> String {
+    format!(
+        "<div class=\"form-row\"><label for=\"{input_id}\"><i class=\"fa fa-{icon}\"></i> {label}</label>\
+         <input type=\"text\" id=\"{input_id}\">\
+         <input type=\"hidden\" id=\"{type_field_id}\"></div>"
+    )
+}
+
 fn get_flow_node_template_html(type_name: &str) -> String {
     let mut html = String::new();
 
@@ -439,7 +587,9 @@ fn get_flow_node_template_html(type_name: &str) -> String {
         "postgres-query" | "sqlite-query" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
+            html.push_str(&section_divider("Query"));
             html.push_str(&form_row_textarea("file-code-o", "Query", "node-input-query", "SELECT * FROM table"));
+            html.push_str(&section_divider("Output"));
             html.push_str(&form_row_number("clock-o", "Timeout (ms)", "node-input-timeout_ms", "30000"));
             html.push_str(&form_row("cog", "Output Mode", "node-input-output_mode", "rows"));
         }
@@ -472,6 +622,8 @@ fn get_flow_node_template_html(type_name: &str) -> String {
         "modbus read" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
+            html.push_str(&tab_bar("mr", &[("settings", "Settings"), ("options", "Options")]));
+            html.push_str(&tab_content_start("mr", "settings", true));
             html.push_str(&form_row_select("cog", "Function Code", "node-input-functionCode", &[
                 ("readCoils", "Read Coils (FC1)"),
                 ("readDiscreteInputs", "Read Discrete Inputs (FC2)"),
@@ -480,17 +632,23 @@ fn get_flow_node_template_html(type_name: &str) -> String {
             ]));
             html.push_str(&form_row_number("map-marker", "Address", "node-input-address", "0"));
             html.push_str(&form_row_number("bars", "Quantity", "node-input-quantity", "1"));
+            html.push_str(&poll_rate_row("node-input-pollRate", "node-input-pollRateUnit"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("mr", "options", false));
             html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
                 ("uint16", "UInt16"), ("int16", "Int16"),
                 ("uint32", "UInt32"), ("int32", "Int32"),
                 ("float", "Float"), ("double", "Double"),
                 ("uint64", "UInt64"), ("int64", "Int64"),
             ]));
-            html.push_str(&form_row_number("clock", "Poll Interval (ms)", "node-input-pollIntervalMs", "0"));
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "modbus write" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
+            html.push_str(&tab_bar("mw", &[("settings", "Settings"), ("options", "Options")]));
+            html.push_str(&tab_content_start("mw", "settings", true));
             html.push_str(&form_row_select("cog", "Function Code", "node-input-functionCode", &[
                 ("writeSingleCoil", "Write Single Coil (FC5)"),
                 ("writeSingleRegister", "Write Single Register (FC6)"),
@@ -498,12 +656,16 @@ fn get_flow_node_template_html(type_name: &str) -> String {
                 ("writeMultipleRegisters", "Write Multiple Registers (FC16)"),
             ]));
             html.push_str(&form_row_number("map-marker", "Address", "node-input-address", "0"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("mw", "options", false));
             html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
                 ("uint16", "UInt16"), ("int16", "Int16"),
                 ("uint32", "UInt32"), ("int32", "Int32"),
                 ("float", "Float"), ("double", "Double"),
                 ("uint64", "UInt64"), ("int64", "Int64"),
             ]));
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "modbus-flex-getter" => {
             html.push_str(&name_row());
@@ -527,21 +689,59 @@ fn get_flow_node_template_html(type_name: &str) -> String {
         }
         "modbus-server" => {
             html.push_str(&name_row());
+            html.push_str(&tab_bar("ms", &[("settings", "Settings"), ("options", "Options")]));
+            html.push_str(&tab_content_start("ms", "settings", true));
             html.push_str(&form_row("server", "Host", "node-input-host", "127.0.0.1"));
             html.push_str(&form_row_number("cog", "Port", "node-input-port", "5020"));
             html.push_str(&form_row_number("bars", "Coil Count", "node-input-coilCount", "100"));
             html.push_str(&form_row_number("bars", "Register Count", "node-input-registerCount", "100"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("ms", "options", false));
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "mqtt broker embedded" => {
             html.push_str(&name_row());
+            html.push_str(&tab_bar("mbe", &[("connection", "Connection"), ("persistence", "Persistence"), ("security", "Security")]));
+            html.push_str(&tab_content_start("mbe", "connection", true));
             html.push_str(&form_row("server", "Host", "node-input-host", "127.0.0.1"));
             html.push_str(&form_row_number("cog", "Port", "node-input-port", "1883"));
             html.push_str(&form_row_number("users", "Max Connections", "node-input-max_connections", "100"));
+            html.push_str(&form_row_checkbox("fa-link", "Enable WebSocket", "node-input-wsEnabled"));
+            html.push_str(&conditional_section_start("mbe-ws-section"));
+            html.push_str(&form_row("sign-in", "WebSocket Path", "node-input-wsPath", "/mqtt"));
+            html.push_str(conditional_section_end());
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("mbe", "persistence", false));
+            html.push_str(&form_row_select("database", "Type", "node-input-persistence", &[
+                ("memory", "In-Memory"),
+            ]));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("mbe", "security", false));
+            html.push_str(&form_row("user", "Username", "node-input-username", ""));
+            html.push_str(&form_row_password("lock", "Password", "node-input-password"));
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "opcua read" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
+            html.push_str(&tab_bar("or", &[("settings", "Settings"), ("options", "Options")]));
+            html.push_str(&tab_content_start("or", "settings", true));
+            html.push_str(&form_row_select("cog", "Action", "node-input-action", &[
+                ("read", "Read"), ("subscribe", "Subscribe"), ("monitor", "Monitor"),
+            ]));
             html.push_str(&form_row("crosshairs", "Node ID", "node-input-node_id", "ns=2;s=Temperature"));
+            html.push_str(&conditional_section_start("or-interval-section"));
+            html.push_str(&form_row_number("clock", "Interval (ms)", "node-input-intervalMs", "1000"));
+            html.push_str(conditional_section_end());
+            html.push_str(&conditional_section_start("or-deadband-section"));
+            html.push_str(&form_row_number("sliders", "Deadband", "node-input-deadband", "0"));
+            html.push_str(conditional_section_end());
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("or", "options", false));
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "opcua write" => {
             html.push_str(&name_row());
@@ -574,13 +774,24 @@ fn get_global_node_template_html(type_name: &str) -> String {
     match type_name {
         "postgres-config" | "timescaledb-config" => {
             html.push_str(&cfg_name_row());
-            html.push_str(&cfg_form_row("server", "Host", "host", "localhost"));
-            html.push_str(&cfg_form_row_number("cog", "Port", "port", "5432"));
-            html.push_str(&cfg_form_row("database", "Database", "dbname", "mydb"));
+            html.push_str(&tab_bar("pc", &[("connection", "Connection"), ("security", "Security"), ("pool", "Pool")]));
+            html.push_str(&tab_content_start("pc", "connection", true));
+            html.push_str(&typed_input_row("server", "Host", "node-config-input-host", "node-config-input-hostType"));
+            html.push_str(&typed_input_row("cog", "Port", "node-config-input-port", "node-config-input-portType"));
+            html.push_str(&typed_input_row("database", "Database", "node-config-input-dbname", "node-config-input-dbnameType"));
+            html.push_str(&cfg_form_row_checkbox("lock", "SSL", "ssl"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("pc", "security", false));
             html.push_str(&cfg_form_row("user", "User", "user", "postgres"));
             html.push_str(&cfg_form_row_password("lock", "Password", "password"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("pc", "pool", false));
             html.push_str(&cfg_form_row_number("cog", "Pool Size", "poolMaxSize", "10"));
             html.push_str(&cfg_form_row_number("clock", "Connect Timeout (ms)", "connectTimeoutMs", "5000"));
+            html.push_str(&cfg_form_row_number("clock", "Idle Timeout (ms)", "idleTimeoutMs", "30000"));
+            html.push_str(&cfg_form_row("cog", "Application Name", "applicationName", "rust-red"));
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "sqlite-config" => {
             html.push_str(&cfg_name_row());
@@ -603,17 +814,69 @@ fn get_global_node_template_html(type_name: &str) -> String {
         }
         "modbus-config" => {
             html.push_str(&cfg_name_row());
-            html.push_str(&cfg_form_row("server", "Host", "host", "localhost"));
-            html.push_str(&cfg_form_row_number("cog", "Port", "port", "502"));
+            html.push_str(&tab_bar("mc", &[("settings", "Settings"), ("queue", "Queue"), ("options", "Options")]));
+            html.push_str(&tab_content_start("mc", "settings", true));
             html.push_str(&cfg_form_row_select("exchange", "Transport", "transport", &[
                 ("tcp", "TCP"), ("udp", "UDP"), ("rtu", "Serial RTU"),
             ]));
+            html.push_str(&cfg_form_row("server", "Host", "host", "localhost"));
+            html.push_str(&cfg_form_row_number("cog", "Port", "port", "502"));
+            html.push_str(&conditional_section_start("mc-serial-section"));
+            html.push_str(&cfg_form_row("serial", "Serial Port", "serialPort", "/dev/ttyUSB0"));
+            html.push_str(&cfg_form_row_number("cog", "Baud Rate", "baudRate", "9600"));
+            html.push_str(&cfg_form_row_select("cog", "Data Bits", "dataBits", &[
+                ("7", "7"), ("8", "8"),
+            ]));
+            html.push_str(&cfg_form_row_select("cog", "Stop Bits", "stopBits", &[
+                ("1", "1"), ("2", "2"),
+            ]));
+            html.push_str(&cfg_form_row_select("cog", "Parity", "parity", &[
+                ("none", "None"), ("even", "Even"), ("odd", "Odd"),
+            ]));
+            html.push_str(conditional_section_end());
             html.push_str(&cfg_form_row_number("cog", "Unit ID", "unitId", "1"));
             html.push_str(&cfg_form_row_number("clock", "Timeout (ms)", "timeoutMs", "5000"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("mc", "queue", false));
+            html.push_str(&cfg_form_row_checkbox("list", "Parallel Unit IDs", "parallelUnitIds"));
+            html.push_str(&cfg_form_row_checkbox("file-text", "Queue Log", "queueLogEnabled"));
+            html.push_str(&cfg_form_row_checkbox("database", "Buffer Commands", "bufferCommands"));
+            html.push_str(&cfg_form_row_number("clock", "Command Delay (ms)", "commandDelay", "0"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("mc", "options", false));
+            html.push_str(&cfg_form_row_checkbox("heartbeat", "Keep Alive", "keepAlive"));
+            html.push_str(&cfg_form_row_number("clock", "Reconnect Timeout (ms)", "reconnectTimeout", "5000"));
+            html.push_str(&cfg_form_row_checkbox("plug", "Auto Connect", "autoConnect"));
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "opcua-config" => {
             html.push_str(&cfg_name_row());
+            html.push_str(&tab_bar("oc", &[("connection", "Connection"), ("security", "Security")]));
+            html.push_str(&tab_content_start("oc", "connection", true));
             html.push_str(&cfg_form_row("globe", "Endpoint", "endpoint", "opc.tcp://localhost:4840"));
+            html.push_str(tab_content_end());
+            html.push_str(&tab_content_start("oc", "security", false));
+            html.push_str(&cfg_form_row_select("shield", "Security Policy", "securityPolicy", &[
+                ("None", "None"), ("Basic128Rsa15", "Basic128Rsa15"),
+                ("Basic256", "Basic256"), ("Basic256Sha256", "Basic256Sha256"),
+            ]));
+            html.push_str(&cfg_form_row_select("lock", "Security Mode", "securityMode", &[
+                ("None", "None"), ("Sign", "Sign"), ("SignAndEncrypt", "SignAndEncrypt"),
+            ]));
+            html.push_str(&cfg_form_row_select("user", "Auth Method", "authMethod", &[
+                ("anonymous", "Anonymous"), ("credentials", "Credentials"), ("certificate", "Certificate"),
+            ]));
+            html.push_str(&conditional_section_start("oc-credentials-section"));
+            html.push_str(&cfg_form_row("user", "Username", "username", ""));
+            html.push_str(&cfg_form_row_password("lock", "Password", "password"));
+            html.push_str(conditional_section_end());
+            html.push_str(&conditional_section_start("oc-certificate-section"));
+            html.push_str(&cfg_form_row("file", "Certificate Path", "certificatePath", ""));
+            html.push_str(&cfg_form_row("key", "Private Key Path", "privateKeyPath", ""));
+            html.push_str(conditional_section_end());
+            html.push_str(tab_content_end());
+            html.push_str(tab_bar_close());
         }
         "bacnet-config" => {
             html.push_str(&cfg_name_row());
@@ -648,8 +911,8 @@ fn categorize_node_v2(type_name: &str) -> (&'static str, &'static str, &'static 
         t if t.contains("postgres") || t.contains("timescale") => ("storage", "#e2d96e", "db.svg"),
         t if t.contains("mssql") || t.contains("sqlite") => ("storage", "#e2d96e", "db.svg"),
         t if t.contains("influxdb") => ("storage", "#dbc08e", "db.svg"),
-        t if t.contains("modbus") => ("modbus", "#D4B035", "modbus.svg"),
-        t if t.contains("opcua") => ("storage", "#c1975b", "serial.svg"),
+        t if t.contains("modbus") => ("modbus", "#E9967A", "modbus.svg"),
+        t if t.contains("opcua") => ("opcua", "#3FADB5", "serial.svg"),
         t if t.contains("bacnet") => ("storage", "#c1975b", "serial.svg"),
         _ => ("function", "#a6bbcf", "function.svg"),
     }
@@ -709,7 +972,8 @@ fn get_flow_node_defaults(type_name: &str) -> String {
             d.push_str("            address: {value:0},\n");
             d.push_str("            quantity: {value:1},\n");
             d.push_str("            dataType: {value:\"uint16\"},\n");
-            d.push_str("            pollIntervalMs: {value:5000},\n");
+            d.push_str("            pollRate: {value:5000},\n");
+            d.push_str("            pollRateUnit: {value:\"ms\"},\n");
         }
         "bacnet read" => {
             d.push_str("            address: {value:0},\n");
@@ -733,11 +997,22 @@ fn get_flow_node_defaults(type_name: &str) -> String {
             d.push_str("            host: {value:\"127.0.0.1\"},\n");
             d.push_str("            port: {value:1883},\n");
             d.push_str("            max_connections: {value:100},\n");
+            d.push_str("            wsEnabled: {value:false},\n");
+            d.push_str("            wsPath: {value:\"/mqtt\"},\n");
+            d.push_str("            persistence: {value:\"memory\"},\n");
+            d.push_str("            username: {value:\"\"},\n");
+            d.push_str("            password: {value:\"\"},\n");
         }
         "bacnet write" => {
             d.push_str("            address: {value:0},\n");
         }
-        "opcua read" | "opcua write" => {
+        "opcua read" => {
+            d.push_str("            node_id: {value:\"\", required: true},\n");
+            d.push_str("            action: {value:\"read\"},\n");
+            d.push_str("            intervalMs: {value:1000},\n");
+            d.push_str("            deadband: {value:0},\n");
+        }
+        "opcua write" => {
             d.push_str("            node_id: {value:\"\", required: true},\n");
         }
         _ => {}
@@ -752,12 +1027,18 @@ fn get_global_node_defaults(type_name: &str) -> String {
     match type_name {
         "postgres-config" | "timescaledb-config" => {
             d.push_str("            host: {value:\"localhost\"},\n");
+            d.push_str("            hostType: {value:\"str\"},\n");
             d.push_str("            port: {value:5432},\n");
+            d.push_str("            portType: {value:\"num\"},\n");
             d.push_str("            dbname: {value:\"\"},\n");
+            d.push_str("            dbnameType: {value:\"str\"},\n");
             d.push_str("            user: {value:\"\"},\n");
             d.push_str("            password: {value:\"\"},\n");
+            d.push_str("            ssl: {value:false},\n");
             d.push_str("            poolMaxSize: {value:10},\n");
             d.push_str("            connectTimeoutMs: {value:5000},\n");
+            d.push_str("            idleTimeoutMs: {value:30000},\n");
+            d.push_str("            applicationName: {value:\"rust-red\"},\n");
         }
         "sqlite-config" => {
             d.push_str("            path: {value:\"data.db\"},\n");
@@ -781,9 +1062,28 @@ fn get_global_node_defaults(type_name: &str) -> String {
             d.push_str("            transport: {value:\"tcp\"},\n");
             d.push_str("            unitId: {value:1},\n");
             d.push_str("            timeoutMs: {value:5000},\n");
+            d.push_str("            serialPort: {value:\"/dev/ttyUSB0\"},\n");
+            d.push_str("            baudRate: {value:9600},\n");
+            d.push_str("            dataBits: {value:\"8\"},\n");
+            d.push_str("            stopBits: {value:\"1\"},\n");
+            d.push_str("            parity: {value:\"none\"},\n");
+            d.push_str("            parallelUnitIds: {value:false},\n");
+            d.push_str("            queueLogEnabled: {value:false},\n");
+            d.push_str("            bufferCommands: {value:false},\n");
+            d.push_str("            commandDelay: {value:0},\n");
+            d.push_str("            keepAlive: {value:true},\n");
+            d.push_str("            reconnectTimeout: {value:5000},\n");
+            d.push_str("            autoConnect: {value:true},\n");
         }
         "opcua-config" => {
             d.push_str("            endpoint: {value:\"opc.tcp://localhost:4840\"},\n");
+            d.push_str("            securityPolicy: {value:\"None\"},\n");
+            d.push_str("            securityMode: {value:\"None\"},\n");
+            d.push_str("            authMethod: {value:\"anonymous\"},\n");
+            d.push_str("            username: {value:\"\"},\n");
+            d.push_str("            password: {value:\"\"},\n");
+            d.push_str("            certificatePath: {value:\"\"},\n");
+            d.push_str("            privateKeyPath: {value:\"\"},\n");
         }
         "bacnet-config" => {
             d.push_str("            device_id: {value:0},\n");
