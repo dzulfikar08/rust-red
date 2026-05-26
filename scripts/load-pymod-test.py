@@ -7,10 +7,10 @@ import importlib.util
 current_script_path = os.path.abspath(__file__)
 current_directory = os.path.dirname(current_script_path)
 target_directory = os.path.normpath(os.path.join(current_directory, '..', 'target', 'debug'))
-module_path = os.path.join(target_directory, "libedgelink_pymod.so")
-spec = importlib.util.spec_from_file_location("edgelink_pymod", module_path)
-edgelink = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(edgelink)
+module_path = os.path.join(target_directory, "librust-red_pymod.so")
+spec = importlib.util.spec_from_file_location("rust-red_pymod", module_path)
+rust-red = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(rust-red)
 
 
 async def main():
@@ -24,7 +24,7 @@ async def main():
     ]
     config = {}
     #fn run_flows_once<'a>(py: Python<'a>, _expected_msgs: usize, _timeout: f64, py_json: &'a PyAny) -> PyResult<&'a PyAny> {
-    msgs = await edgelink.run_flows_once(1, 0.2, flows_json, msgs, config)
+    msgs = await rust-red.run_flows_once(1, 0.2, flows_json, msgs, config)
     print(msgs)
 
 # should sleep for 1s

@@ -21,4 +21,4 @@ rust-red-core = { path = "../../crates/core", default-features = true, features 
     "pymod", "default"
 ] }
 # Node plug-ins:
-rust-red-nodes-dummy = { path = "../../node-plugins/edgelink-nodes-dummy" }
+rust-red-nodes-dummy = { path = "../../node-plugins/rust-red-nodes-dummy" }

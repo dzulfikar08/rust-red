@@ -3,7 +3,7 @@ name = "rust-red-cluster"
 version = "0.1.99"
 edition = "2024"
 description = "Clustering and high-availability support for Rust-Red"
-authors = ["Li Wei <oldrev@gmail.com>"]
+authors = ["Dzulfikar Ats Tsauri"]
 license = "Apache 2.0"
 
 [lib]

@@ -187,7 +187,7 @@ server {
 
 If you discover a security vulnerability in Rust-Red, please report it
 responsibly by opening a GitHub issue at:
-https://github.com/oldrev/edgelinkd/issues
+https://github.com/dzulfikar08/rust-red/issues
 
 Please do not publicly disclose security vulnerabilities before they have
 been addressed.

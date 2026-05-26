@@ -4,11 +4,11 @@ version = "0.1.99"
 edition = "2021"
 rust-version = "1.77.2"
 readme = "README.md"
-homepage = "https://github.com/oldrev/edgelinkd"
+homepage = "https://github.com/dzulfikar08/rust-red"
 description = "Rust-Red is a Node-RED compatible run-time engine in Rust."
 build = "build.rs"
 license = "Apache 2.0"
-authors = ["Li Wei <oldrev@gmail.com>"]
+authors = ["Dzulfikar Ats Tsauri"]
 
 
 [[bin]]
@@ -224,7 +224,7 @@ members = [
 exclude = ["crates/pymod"]
 
 [package.metadata.bundle]
-identifier = "com.github.oldrev.rust-red"
+identifier = "com.github.dzulfikar08.rust-red"
 
 [features]
 full = ["default", "rqjs_bindgen", "wasm_plugins", "cluster"]

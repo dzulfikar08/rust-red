@@ -5,9 +5,9 @@ Rust-Red Daemon Program
 
 Rust-Red is a Node-RED compatible back-end engine implemented in Rust.
 
-Copyright (C) 2023-TODAY Li Wei and contributors. All rights reserved.
+Copyright (C) 2023-TODAY The rust-red contributors. All rights reserved.
 
-For more information, visit the website: https://github.com/oldrev/edgelink
+For more information, visit the website: https://github.com/dzulfikar08/rust-red
 "#;
 
 #[derive(Parser, Debug, Clone)]

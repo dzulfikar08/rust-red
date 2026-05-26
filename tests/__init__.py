@@ -32,7 +32,7 @@ class EdgelinkError(Exception):
         return f'EdgeLink Error: {self.message}, output: \n{self.output}'
 
 
-def load_edgelink_mod():
+def load_rust-red_mod():
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     target = os.getenv('EDGELINK_BUILD_TARGET', '')
@@ -45,8 +45,8 @@ def load_edgelink_mod():
     if platform.system() == 'Windows':
         # On Windows, Python extensions must have .pyd extension
         # Copy .dll to .pyd only if .pyd is older than .dll
-        pyd_path = os.path.join(target_directory, 'edgelink_pymod.pyd')
-        dll_path = os.path.join(target_directory, 'edgelink_pymod.dll')
+        pyd_path = os.path.join(target_directory, 'rust-red_pymod.pyd')
+        dll_path = os.path.join(target_directory, 'rust-red_pymod.dll')
         
         if os.path.exists(dll_path):
             should_copy = False
@@ -77,31 +77,31 @@ def load_edgelink_mod():
             raise IOError(f"Module file not found. Tried: {dll_path}, {pyd_path}")
     else:
         # On Unix-like systems
-        module_path = os.path.join(target_directory, 'libedgelink_pymod.so')
+        module_path = os.path.join(target_directory, 'librust-red_pymod.so')
         if not os.path.exists(module_path):
             raise IOError(f"Module file not found: {module_path}")
 
-    spec = importlib.util.spec_from_file_location("edgelink_pymod", module_path)
+    spec = importlib.util.spec_from_file_location("rust-red_pymod", module_path)
     if spec == None:
         raise RuntimeError(f"Bad Python module!")
-    edgelink = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(edgelink)
-    return edgelink
+    rust-red = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rust-red)
+    return rust-red
 
 
-edgelink = load_edgelink_mod()
+rust-red = load_rust-red_mod()
 
 """
-async def start_edgelink_process(el_args: list[str]):
+async def start_rust-red_process(el_args: list[str]):
     script_dir = os.path.dirname(os.path.abspath(__file__))
 
     # Determine the operating system and choose the appropriate executable name
     if platform.system() == 'Windows':
         createion_flags = subprocess.CREATE_NEW_PROCESS_GROUP
-        myprog_name = 'edgelinkd.exe'
+        myprog_name = 'rust-redd.exe'
     else:
         createion_flags = 0
-        myprog_name = 'edgelinkd'
+        myprog_name = 'rust-redd'
 
     target = os.getenv('EDGELINK_BUILD_TARGET', '')
     profile = os.getenv('EDGELINK_BUILD_PROFILE', 'debug')
@@ -166,14 +166,14 @@ async def read_json_from_process(process, nexpected: int, timeout=5):
                 break
 
 
-async def _run_edgelink_with_stdin(input_data: bytes, nexpected: int, timeout=5) -> tuple[bytes, list[dict]]:
+async def _run_rust-red_with_stdin(input_data: bytes, nexpected: int, timeout=5) -> tuple[bytes, list[dict]]:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     el_home_dir = os.path.join(script_dir, 'home')
     el_args = ['-v', '0', '--stdin', '--home', el_home_dir]
     msgs = []
     all_output = bytearray()
     try:
-        process = await start_edgelink_process(el_args)
+        process = await start_rust-red_process(el_args)
         process.stdin.write(input_data)
         process.stdin.close()
         async for msg in read_json_from_process(process, nexpected, timeout):
@@ -187,18 +187,18 @@ async def _run_edgelink_with_stdin(input_data: bytes, nexpected: int, timeout=5)
         await process.wait()
 
 
-async def run_edgelink_with_stdin(input_data: bytes, nexpected: int, timeout=5) -> list[dict]:
-    result = await asyncio.wait_for(_run_edgelink_with_stdin(input_data, nexpected, timeout), timeout)
+async def run_rust-red_with_stdin(input_data: bytes, nexpected: int, timeout=5) -> list[dict]:
+    result = await asyncio.wait_for(_run_rust-red_with_stdin(input_data, nexpected, timeout), timeout)
     return result[1]
 
 
-async def run_edgelink(flows_path: str, nexpected: int, timeout: float = 5) -> list[dict]:
+async def run_rust-red(flows_path: str, nexpected: int, timeout: float = 5) -> list[dict]:
     script_dir = os.path.dirname(os.path.abspath(__file__))
     el_home_dir = os.path.join(script_dir, 'home')
     el_args = ['-v', '0', flows_path, '--home', el_home_dir]
     msgs = []
     try:
-        process = await start_edgelink_process(el_args)
+        process = await start_rust-red_process(el_args)
         async with asyncio.timeout(timeout):
             async for i in read_json_from_process(process, nexpected, timeout):
                 msgs.append(i)
@@ -245,7 +245,7 @@ async def run_with_single_node_ntimes(payload_type: str | None, payload, node_js
     console_node = {"id": "3", "type": "test-once", "z": "0"}
     final_flows_json = [{"id": "0", "type": "tab"},
                         inject, user_node, console_node]
-    msgs = await edgelink.run_flows_once(nexpected, 3.0, final_flows_json, [], TEST_EDGELINLKD_CONFIG)
+    msgs = await rust-red.run_flows_once(nexpected, 3.0, final_flows_json, [], TEST_EDGELINLKD_CONFIG)
     return msgs
 
 
@@ -260,7 +260,7 @@ async def run_flow_with_msgs_ntimes(flows_obj: list[object],
         else:
             msg_injection = (injectee_node_id, msg)
         msgs_to_inject.append(msg_injection)
-    msgs = await edgelink.run_flows_once(nexpected, timeout, flows_obj, msgs_to_inject, TEST_EDGELINLKD_CONFIG)
+    msgs = await rust-red.run_flows_once(nexpected, timeout, flows_obj, msgs_to_inject, TEST_EDGELINLKD_CONFIG)
     return msgs
 
 

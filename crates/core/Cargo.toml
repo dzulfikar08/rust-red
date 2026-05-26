@@ -3,7 +3,7 @@ name = "rust-red-core"
 version = "0.1.99"
 edition = "2024"
 readme = "README.md"
-authors = ["Li Wei <oldrev@gmail.com>"]
+authors = ["Dzulfikar Ats Tsauri"]
 
 [lib]
 name = "rust_red_core"

@@ -11,10 +11,10 @@ from pathlib import Path
 import zipfile
 
 EXCLUDE_PREFIXES = [
-    "libedgelink_pymod.so",
-    "libedgelink_macro.so",
-    "edgelink_pymod.dll",
-    "edgelink_macro.dll"
+    "librust_red_pymod.so",
+    "librust_red_macro.so",
+    "rust_red_pymod.dll",
+    "rust_red_macro.dll"
 ]
 
 try:
@@ -66,7 +66,7 @@ def copytree(src, dst):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Package EdgeLinkd for multiple targets")
+    parser = argparse.ArgumentParser(description="Package Rust-Red for multiple targets")
     parser.add_argument(
         "--target",
         default="x86_64-pc-windows-msvc",
@@ -96,9 +96,9 @@ def main():
     is_windows = args.target.startswith("x86_64-pc-windows") or args.target.startswith("x86_64-pc-windows-gnu")
     is_linux = "linux" in args.target
     if is_nightly:
-        base_name = f"edgelinkd-dist-{args.target}-nightly-{dt_str}"
+        base_name = f"rust-red-dist-{args.target}-nightly-{dt_str}"
     else:
-        base_name = f"edgelinkd-dist-{args.target}-{dt_str}"
+        base_name = f"rust-red-dist-{args.target}-{dt_str}"
     if is_windows:
         out_name = base_name + ".zip"
     elif is_linux:
@@ -110,8 +110,8 @@ def main():
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
             # 2. Merge configuration files
-            merged_toml = tmp / "edgelinkd.toml"
-            merge_toml_files(ROOT / "edgelinkd.toml", ROOT / "edgelinkd.prod.toml", merged_toml)
+            merged_toml = tmp / "rust-red.toml"
+            merge_toml_files(ROOT / "rust-red.toml", ROOT / "rust-red.prod.toml", merged_toml)
 
             # 3. Copy README and LICENSE
             shutil.copy(ROOT / "README.md", tmp / "README.md")
@@ -122,7 +122,7 @@ def main():
             bin_dir.mkdir()
             # Executable and DLLs
             target_dir = ROOT / "target" / args.target / args.mode
-            for f in target_dir.glob("edgelinkd.exe"):
+            for f in target_dir.glob("rust-red.exe"):
                 shutil.copy(f, bin_dir / f.name)
             for dll in target_dir.glob("*.dll"):
                 if any(dll.name.startswith(prefix) for prefix in EXCLUDE_PREFIXES):
