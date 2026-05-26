@@ -512,3 +512,37 @@ fn validate_flow_config_nodes(flows: &[Value]) -> Result<(), Vec<Value>> {
         Err(errors)
     }
 }
+
+/// `GET /credentials/{type}/{id}`
+///
+/// Node-RED's editor calls this when opening a config node edit dialog for types that
+/// declare `credentials` in their `registerType()`. Node-RED embeds credential values
+/// as a nested `credentials` property on each config node in the flows array. We extract
+/// and return them here, or `{}` if not found (e.g. new node).
+pub async fn get_credentials(
+    Extension(state): Extension<Arc<WebState>>,
+    Path((_node_type, node_id)): Path<(String, String)>,
+) -> Result<Json<Value>, StatusCode> {
+    let flows_path_guard = state.flows_file_path.read().await;
+    let flows = match flows_path_guard.as_ref() {
+        Some(path) => match load_flows_from_file(path).await {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!("Failed to load flows for credentials: {e}");
+                return Ok(Json(serde_json::json!({})));
+            }
+        },
+        None => return Ok(Json(serde_json::json!({}))),
+    };
+
+    // Find the config node by ID and return its nested credentials object
+    for node in &flows {
+        if node.get("id").and_then(|v| v.as_str()) == Some(&node_id) {
+            if let Some(creds) = node.get("credentials").cloned() {
+                return Ok(Json(creds));
+            }
+        }
+    }
+
+    Ok(Json(serde_json::json!({})))
+}

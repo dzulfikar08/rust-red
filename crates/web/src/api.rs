@@ -82,6 +82,8 @@ fn create_node_red_api_routes() -> Router {
         // Flows management (Node-RED compatible paths)
         .route("/flows", get(get_flows).post(post_flows))
         .route("/flows/state", get(get_flows_state).post(post_flows_state))
+        // Credentials (Node-RED editor loads these for config nodes with credentials)
+        .route("/credentials/{type}/{id}", get(get_credentials))
         // Single flow management
         .route("/flow/{id}", get(get_flow).put(put_flow).delete(delete_flow))
         .route("/flow", post(post_flow))
