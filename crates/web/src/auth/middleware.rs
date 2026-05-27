@@ -57,11 +57,11 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthenticatedUser {
 impl AuthenticatedUser {
     /// Check whether the authenticated user holds the given permission.
     /// Returns an HTTP 403 response if not.
-    pub fn require_permission(&self, perm: Permission) -> Result<(), Response> {
+    pub fn require_permission(&self, perm: Permission) -> Result<(), Box<Response>> {
         if self.role.has_permission(perm) {
             Ok(())
         } else {
-            Err((
+            Err(Box::new((
                 StatusCode::FORBIDDEN,
                 serde_json::json!({
                     "error": "forbidden",
@@ -69,7 +69,7 @@ impl AuthenticatedUser {
                 })
                 .to_string(),
             )
-                .into_response())
+                .into_response()))
         }
     }
 }

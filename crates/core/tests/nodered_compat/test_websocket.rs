@@ -63,10 +63,11 @@ async fn websocket_in_connect_mode() {
         use futures_util::StreamExt;
         use tokio_tungstenite::accept_async;
 
-        if let Ok((stream, _)) = listener.accept().await {
-            if let Ok(mut ws_stream) = accept_async(stream).await {
-                // Echo loop: read a message and send it back
-                while let Some(msg) = ws_stream.next().await {
+        if let Ok((stream, _)) = listener.accept().await
+            && let Ok(mut ws_stream) = accept_async(stream).await
+        {
+            // Echo loop: read a message and send it back
+            while let Some(msg) = ws_stream.next().await {
                     match msg {
                         Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
                             use futures_util::SinkExt;
@@ -77,7 +78,6 @@ async fn websocket_in_connect_mode() {
                     }
                 }
             }
-        }
     });
 
     let flow = json!([
@@ -121,17 +121,17 @@ async fn websocket_out_connect_and_send() {
         use futures_util::{SinkExt, StreamExt};
         use tokio_tungstenite::accept_async;
 
-        if let Ok((stream, _)) = listener.accept().await {
-            if let Ok(mut ws_stream) = accept_async(stream).await {
-                while let Some(msg) = ws_stream.next().await {
-                    match msg {
-                        Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                            // Echo back
-                            let _ = ws_stream.send(tokio_tungstenite::tungstenite::Message::Text(text)).await;
-                        }
-                        Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => break,
-                        _ => break,
+        if let Ok((stream, _)) = listener.accept().await
+            && let Ok(mut ws_stream) = accept_async(stream).await
+        {
+            while let Some(msg) = ws_stream.next().await {
+                match msg {
+                    Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                        // Echo back
+                        let _ = ws_stream.send(tokio_tungstenite::tungstenite::Message::Text(text)).await;
                     }
+                    Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => break,
+                    _ => break,
                 }
             }
         }

@@ -313,6 +313,7 @@ where
     match node.recv_msg(cancel.clone()).await {
         Ok(msg) => {
             let node_type = node.type_str().to_string();
+            #[cfg(feature = "otel")]
             let node_id = node.id().to_string();
 
             // Telemetry: record message counter and measure processing duration

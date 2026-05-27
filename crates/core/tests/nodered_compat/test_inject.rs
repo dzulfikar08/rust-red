@@ -12,7 +12,7 @@ use rust_red_core::runtime::model::Variant;
 /// Inject with string payload.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn inject_string_payload() {
-    let flow = FlowBuilder::new().inject_once("1", "hello world", "str", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().inject_once("1", "hello world", "str", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.run(1).await;
@@ -24,7 +24,7 @@ async fn inject_string_payload() {
 /// Inject with numeric payload.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn inject_numeric_payload() {
-    let flow = FlowBuilder::new().inject_once("1", "42", "num", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().inject_once("1", "42", "num", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.run(1).await;
@@ -146,7 +146,7 @@ async fn inject_timestamp_payload() {
 /// Inject should generate a _msgid.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn inject_generates_msgid() {
-    let flow = FlowBuilder::new().inject_once("1", "test", "str", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().inject_once("1", "test", "str", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.run(1).await;

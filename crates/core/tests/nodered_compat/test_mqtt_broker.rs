@@ -17,9 +17,11 @@ use super::harness::TestHarness;
 /// Start an embedded MQTT broker on an OS-assigned port and return the address.
 /// The broker runs in a background task for the lifetime of the test.
 async fn start_embedded_broker() -> std::net::SocketAddr {
-    let mut config = rust_red_mqtt_broker::config::BrokerConfig::default();
-    config.bind = "127.0.0.1:0".to_string();
-    config.enabled = true;
+    let config = rust_red_mqtt_broker::config::BrokerConfig {
+        bind: "127.0.0.1:0".to_string(),
+        enabled: true,
+        ..Default::default()
+    };
     let broker = Arc::new(rust_red_mqtt_broker::broker::MqttBroker::new(config));
     let addr = broker.clone().start_background().await.expect("embedded broker start");
     // Give the broker a moment to be ready

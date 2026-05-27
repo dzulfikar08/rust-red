@@ -87,8 +87,7 @@ async fn tcp_out_client_sends_data() {
         let (mut stream, _) = listener.accept().await.unwrap();
         let mut buf = vec![0u8; 1024];
         let n = tokio::io::AsyncReadExt::read(&mut stream, &mut buf).await.unwrap();
-        let received = String::from_utf8_lossy(&buf[..n]).to_string();
-        received
+        String::from_utf8_lossy(&buf[..n]).to_string()
     });
 
     let flow = json!([

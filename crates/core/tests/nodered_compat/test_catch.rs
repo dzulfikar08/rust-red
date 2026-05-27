@@ -103,7 +103,7 @@ async fn complete_node_fires_on_completion() {
     // We expect 2 messages: one from the function output, one from the complete node
     let msgs = harness.inject_and_collect("1", json!({"payload": "input"}), 2).await;
 
-    assert!(msgs.len() >= 1, "Should receive at least one message from complete or function");
+    assert!(!msgs.is_empty(), "Should receive at least one message from complete or function");
 }
 
 /// Catch node: uncaught errors are captured by uncaught=true catch node.

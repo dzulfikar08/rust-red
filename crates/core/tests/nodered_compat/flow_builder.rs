@@ -10,6 +10,7 @@ pub struct FlowBuilder {
     nodes: Vec<Value>,
 }
 
+#[allow(dead_code)]
 impl FlowBuilder {
     /// Create a new flow builder with a default tab node.
     pub fn new() -> Self {
@@ -322,15 +323,15 @@ impl FlowBuilder {
         self
     }
 
-    /// Convert the builder into a JSON array value suitable for `Engine::with_json`.
-    pub fn to_json(self) -> Value {
+    /// Convert the builder into a JSON array value suitable for `Engine::with_json`, consuming it.
+    pub fn into_json(self) -> Value {
         Value::Array(self.nodes)
     }
 
-    /// Convert the builder into a JSON string.
+    /// Convert the builder into a JSON string, consuming it.
     #[allow(dead_code)]
-    pub fn to_json_string(self) -> String {
-        serde_json::to_string(&self.to_json()).unwrap()
+    pub fn into_json_string(self) -> String {
+        serde_json::to_string(&self.into_json()).unwrap()
     }
 }
 

@@ -51,7 +51,7 @@ pub fn verify_wasm_plugin(wasm_bytes: &[u8]) -> Result<VerificationReport, Marke
     // 2. Check required exports
     let export_names: Vec<&str> = module.exports().map(|e| e.name()).collect();
     for req in REQUIRED_EXPORTS {
-        if !export_names.contains(&req) {
+        if !export_names.contains(req) {
             return Err(MarketplaceError::VerificationFailed(format!("missing required export: {req}")));
         }
     }

@@ -16,9 +16,11 @@ use super::harness::TestHarness;
 // ---------------------------------------------------------------------------
 
 async fn start_embedded_broker() -> std::net::SocketAddr {
-    let mut config = rust_red_mqtt_broker::config::BrokerConfig::default();
-    config.bind = "127.0.0.1:0".to_string();
-    config.enabled = true;
+    let config = rust_red_mqtt_broker::config::BrokerConfig {
+        bind: "127.0.0.1:0".to_string(),
+        enabled: true,
+        ..Default::default()
+    };
     let broker = Arc::new(rust_red_mqtt_broker::broker::MqttBroker::new(config));
     let addr = broker.clone().start_background().await.expect("embedded broker start");
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -532,11 +534,7 @@ async fn mqtt_retained_message_delivery() {
 
     // Drain the event loop
     let _ = tokio::time::timeout(Duration::from_secs(1), async {
-        loop {
-            match pub_el.poll().await {
-                Ok(_) | Err(_) => break,
-            }
-        }
+        let _ = pub_el.poll().await;
     })
     .await;
 

@@ -28,28 +28,26 @@ mod tests {
     /// ClusterConfig::validate should reject invalid bind address.
     #[test]
     fn test_cluster_config_validate_rejects_bad_bind() {
-        let mut cfg = ClusterConfig::default();
-        cfg.enabled = true;
-        cfg.bind = "not-an-address".to_string();
+        let cfg = ClusterConfig { enabled: true, bind: "not-an-address".to_string(), ..Default::default() };
         assert!(cfg.validate().is_err());
     }
 
     /// ClusterConfig::validate should accept a valid config.
     #[test]
     fn test_cluster_config_validate_ok() {
-        let mut cfg = ClusterConfig::default();
-        cfg.enabled = true;
-        cfg.bind = "0.0.0.0:7980".to_string();
-        cfg.peers = vec!["127.0.0.1:7981".to_string()];
+        let cfg = ClusterConfig {
+            enabled: true,
+            bind: "0.0.0.0:7980".to_string(),
+            peers: vec!["127.0.0.1:7981".to_string()],
+            ..Default::default()
+        };
         assert!(cfg.validate().is_ok());
     }
 
     /// ClusterConfig::validate should reject zero heartbeat.
     #[test]
     fn test_cluster_config_validate_rejects_zero_heartbeat() {
-        let mut cfg = ClusterConfig::default();
-        cfg.enabled = true;
-        cfg.heartbeat_interval_ms = 0;
+        let cfg = ClusterConfig { enabled: true, heartbeat_interval_ms: 0, ..Default::default() };
         assert!(cfg.validate().is_err());
     }
 

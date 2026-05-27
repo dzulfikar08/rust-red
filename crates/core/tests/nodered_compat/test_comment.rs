@@ -62,7 +62,7 @@ async fn comment_minimal() {
         .raw_node(json!({"id": "c1", "z": "100", "type": "comment"}))
         .inject_once("1", "minimal", "str", json!([["99"]]))
         .test_sink("99")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.run(1).await;

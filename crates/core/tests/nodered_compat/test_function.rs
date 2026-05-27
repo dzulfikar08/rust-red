@@ -193,7 +193,7 @@ async fn function_date_object_creation() {
     let payload = msgs[0].get("payload").expect("Missing payload");
     let year = payload.as_f64().unwrap_or_else(|| panic!("Payload should be a number, got {:?}", payload));
     // Year should be current year (2020-2030 range for a safe test)
-    assert!(year >= 2020.0 && year <= 2035.0, "getFullYear() should return current year, got {year}");
+    assert!((2020.0..=2035.0).contains(&year), "getFullYear() should return current year, got {year}");
 }
 
 // ---------------------------------------------------------------------------

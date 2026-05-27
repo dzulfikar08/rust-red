@@ -394,7 +394,7 @@ async fn http_redirect_follow() {
     let flow = build_flow_with_url("http://127.0.0.1:1/redirect", "GET");
     let _harness = TestHarness::from_flow_json(flow);
     // Placeholder assertion -- real test would verify redirected content.
-    assert!(true);
+    let _ = ();
 }
 
 /// Test 10: Missing URL produces an error.

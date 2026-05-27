@@ -56,7 +56,7 @@ pub async fn get_global_context(Extension(state): Extension<Arc<WebState>>) -> R
         let store = cm.get_default_store();
         if let Ok(data) = store.get_all("global").await {
             let store_name = store.name().await;
-            return Ok(Json(format_context_response(data, &store_name)));
+            return Ok(Json(format_context_response(data, store_name)));
         }
     }
     Ok(Json(serde_json::json!({"default": {}})))
@@ -110,7 +110,7 @@ pub async fn get_flow_context(
         let scope = format!("flow:{}", flow_id);
         if let Ok(data) = store.get_all(&scope).await {
             let store_name = store.name().await;
-            return Ok(Json(format_context_response(data, &store_name)));
+            return Ok(Json(format_context_response(data, store_name)));
         }
     }
     Ok(Json(serde_json::json!({"default": {}})))
@@ -165,7 +165,7 @@ pub async fn get_node_context(
         let store = cm.get_default_store();
         if let Ok(data) = store.get_all(&node_id).await {
             let store_name = store.name().await;
-            return Ok(Json(format_context_response(data, &store_name)));
+            return Ok(Json(format_context_response(data, store_name)));
         }
     }
     Ok(Json(serde_json::json!({"default": {}})))

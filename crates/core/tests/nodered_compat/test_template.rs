@@ -17,7 +17,7 @@ async fn template_basic_mustache() {
     let flow = FlowBuilder::new()
         .template("1", "Hello {{payload}}!", "payload", "str", json!([["99"]]))
         .test_sink("99")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect("1", json!({"payload": "World"}), 1).await;
@@ -32,7 +32,7 @@ async fn template_with_topic() {
     let flow = FlowBuilder::new()
         .template("1", "Topic: {{topic}}, Data: {{payload}}", "payload", "str", json!([["99"]]))
         .test_sink("99")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect("1", json!({"payload": "hello", "topic": "greeting"}), 1).await;
@@ -47,7 +47,7 @@ async fn template_custom_field() {
     let flow = FlowBuilder::new()
         .template("1", "Value: {{payload}}", "result", "str", json!([["99"]]))
         .test_sink("99")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect("1", json!({"payload": "42"}), 1).await;
@@ -63,7 +63,7 @@ async fn template_json_output() {
     let flow = FlowBuilder::new()
         .template("1", "{\"greeting\": \"Hello {{payload}}\"}", "result", "json", json!([["99"]]))
         .test_sink("99")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect("1", json!({"payload": "World"}), 1).await;
@@ -95,7 +95,7 @@ async fn template_plain_syntax() {
 /// Template: empty template string does not crash.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn template_empty_template() {
-    let flow = FlowBuilder::new().template("1", "", "payload", "str", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().template("1", "", "payload", "str", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "foo"}), 1, Duration::from_millis(200)).await;
@@ -109,7 +109,7 @@ async fn template_numeric_payload() {
     let flow = FlowBuilder::new()
         .template("1", "The answer is {{payload}}", "payload", "str", json!([["99"]]))
         .test_sink("99")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect("1", json!({"payload": 42}), 1).await;

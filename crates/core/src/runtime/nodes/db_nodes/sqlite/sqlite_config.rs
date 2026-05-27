@@ -100,7 +100,6 @@ impl SqliteConfigNode {
         let conn = self.connection.lock().map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
         let mut stmt = conn.prepare(sql).map_err(|e| anyhow::anyhow!("SQLite prepare error: {e}"))?;
         let column_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
-        let column_count = column_names.len();
 
         let rows = stmt
             .query_map(params, |row| {

@@ -45,7 +45,7 @@ async fn import_simple_inject_debug() {
 /// Simple inject -> debug with a test-once sink to verify message delivery.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn import_inject_debug_with_message_flow() {
-    let flow = json!([
+    let _flow = json!([
         {"id": "f1", "type": "tab", "label": "Simple Flow"},
         {"id": "n1", "z": "f1", "type": "inject", "name": "my inject",
          "props": [{"p": "payload", "v": "Hello Node-RED", "vt": "str"}],
@@ -86,7 +86,7 @@ async fn import_inject_debug_with_message_flow() {
 /// and produces the expected output.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn import_function_node_with_js() {
-    let flow = json!([
+    let _flow = json!([
         {"id": "f1", "type": "tab", "label": "Function Demo"},
         {"id": "n1", "z": "f1", "type": "inject", "name": "",
          "props": [{"p": "payload", "v": "10", "vt": "num"}],
@@ -139,7 +139,7 @@ async fn import_function_node_with_js() {
 /// This is a common Node-RED pattern for conditional logic (e.g., alarm levels).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn import_switch_routing() {
-    let flow = json!([
+    let _flow = json!([
         {"id": "f1", "type": "tab", "label": "Switch Routing"},
         {"id": "n1", "z": "f1", "type": "inject", "name": "",
          "props": [{"p": "payload", "v": "warning", "vt": "str"}],
@@ -179,7 +179,7 @@ async fn import_switch_routing() {
         .test_sink("n99a")
         .test_sink("n99b")
         .test_sink("n99c")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow_sink);
     let msgs = harness.inject_and_collect_timeout("n2", json!({"payload": "warning"}), 1, Duration::from_secs(2)).await;
@@ -232,7 +232,7 @@ async fn import_change_node_manipulation() {
 /// processing paths.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn import_fan_out_multiple_wires() {
-    let flow = json!([
+    let _flow = json!([
         {"id": "f1", "type": "tab", "label": "Fan Out"},
         {"id": "n1", "z": "f1", "type": "inject", "name": "source",
          "props": [{"p": "payload", "v": "broadcast", "vt": "str"}],
@@ -357,7 +357,7 @@ async fn import_inject_with_full_configuration() {
 /// This is a common Node-RED pattern for rate limiting or simulating latency.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn import_delay_node() {
-    let flow = json!([
+    let _flow = json!([
         {"id": "f1", "type": "tab", "label": "Delay Demo"},
         {"id": "n1", "z": "f1", "type": "inject", "name": "",
          "props": [{"p": "payload", "v": "delayed message", "vt": "str"}],
@@ -649,7 +649,7 @@ async fn import_status_node() {
 /// and a variety of node types in a single import.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn import_multi_tab_complex_flow() {
-    let flow = json!([
+    let _flow = json!([
         {"id": "tab1", "type": "tab", "label": "Data Source", "disabled": false, "info": "Raw sensor data ingestion"},
         {"id": "tab2", "type": "tab", "label": "Processing", "disabled": false, "info": "Data transformation and filtering"},
 
@@ -755,7 +755,7 @@ async fn import_multi_tab_complex_flow() {
 /// if no subsequent message is received. Common for watchdog/heartbeat patterns.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn import_trigger_node() {
-    let flow = json!([
+    let _flow = json!([
         {"id": "f1", "type": "tab", "label": "Trigger Demo"},
         {"id": "n1", "z": "f1", "type": "inject", "name": "Fire Trigger",
          "props": [{"p": "payload", "v": "start", "vt": "str"}],

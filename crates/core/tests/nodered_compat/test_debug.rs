@@ -145,7 +145,7 @@ async fn debug_via_flow_builder() {
         .inject_once("1", "builder-test", "str", json!([["99"]]))
         .debug("2")
         .test_sink("99")
-        .to_json();
+        .into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.run(1).await;

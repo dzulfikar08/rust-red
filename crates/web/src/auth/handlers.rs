@@ -223,7 +223,7 @@ pub async fn list_users(
     Extension(auth_state): Extension<Arc<AuthState>>,
 ) -> impl IntoResponse {
     if let Err(resp) = user.require_permission(Permission::ManageUsers) {
-        return resp;
+        return *resp;
     }
 
     let users = auth_state.user_store.list_users().await;
@@ -242,7 +242,7 @@ pub async fn create_user(
     Json(body): Json<CreateUserRequest>,
 ) -> impl IntoResponse {
     if let Err(resp) = user.require_permission(Permission::ManageUsers) {
-        return resp;
+        return *resp;
     }
 
     match auth_state.user_store.create_user(&body.username, &body.password, body.role).await {
@@ -273,7 +273,7 @@ pub async fn delete_user(
     Path(target_id): Path<String>,
 ) -> impl IntoResponse {
     if let Err(resp) = user.require_permission(Permission::ManageUsers) {
-        return resp;
+        return *resp;
     }
 
     // Prevent self-deletion
@@ -309,7 +309,7 @@ pub async fn update_user_role(
     Json(body): Json<UpdateRoleRequest>,
 ) -> impl IntoResponse {
     if let Err(resp) = user.require_permission(Permission::ManageUsers) {
-        return resp;
+        return *resp;
     }
 
     match auth_state.user_store.set_role(&target_id, body.role).await {

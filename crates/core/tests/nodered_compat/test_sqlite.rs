@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{TestHarness, assert_msg_has, assert_msg_not_has, assert_msg_num, assert_msg_str};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_not_has, assert_msg_num};
 
 // ---------------------------------------------------------------------------
 // Helpers

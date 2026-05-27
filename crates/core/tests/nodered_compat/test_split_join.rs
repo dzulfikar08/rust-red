@@ -14,7 +14,7 @@ use rust_red_core::runtime::model::Variant;
 /// Split: split an array into individual messages.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn split_array_into_messages() {
-    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs =
@@ -29,7 +29,7 @@ async fn split_array_into_messages() {
 /// Split: each output message has a parts property with index.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn split_array_has_parts() {
-    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect_timeout("1", json!({"payload": [10, 20]}), 2, Duration::from_secs(2)).await;
@@ -200,7 +200,7 @@ async fn join_into_string() {
 /// Split: single element array produces one message.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn split_single_element_array() {
-    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect_timeout("1", json!({"payload": ["only"]}), 1, Duration::from_secs(2)).await;
@@ -212,7 +212,7 @@ async fn split_single_element_array() {
 /// Split: empty array produces no messages.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn split_empty_array() {
-    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").to_json();
+    let flow = FlowBuilder::new().split("1", json!([["99"]])).test_sink("99").into_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness.inject_and_collect_timeout("1", json!({"payload": []}), 1, Duration::from_millis(300)).await;
