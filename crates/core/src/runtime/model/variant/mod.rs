@@ -324,6 +324,42 @@ impl Variant {
         }
     }
 
+    /// Convert to serde_json::Value for API responses
+    pub fn to_json_value(&self) -> serde_json::Value {
+        match self {
+            Variant::Null => serde_json::Value::Null,
+            Variant::Number(n) => serde_json::Value::Number(n.clone()),
+            Variant::String(s) => serde_json::Value::String(s.clone()),
+            Variant::Bool(b) => serde_json::Value::Bool(*b),
+            Variant::Array(arr) => {
+                serde_json::Value::Array(arr.iter().map(|v| v.to_json_value()).collect())
+            }
+            Variant::Object(map) => {
+                serde_json::Value::Object(
+                    map.iter()
+                        .map(|(k, v)| (k.clone(), v.to_json_value()))
+                        .collect(),
+                )
+            }
+            Variant::Bytes(b) => {
+                serde_json::Value::Array(b.iter().map(|&byte| serde_json::Value::Number(byte.into())).collect())
+            }
+            Variant::Date(_) => serde_json::Value::String(self.format_date()),
+            Variant::Regexp(r) => serde_json::Value::String(r.to_string()),
+        }
+    }
+
+    fn format_date(&self) -> String {
+        if let Variant::Date(t) = self {
+            let duration = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+            let secs = duration.as_secs();
+            // Simple ISO-ish format
+            format!("{secs}")
+        } else {
+            String::new()
+        }
+    }
+
     pub fn to_cow_str(&self) -> crate::Result<Cow<'_, str>> {
         match self {
             Variant::String(s) => Ok(Cow::Borrowed(s.as_str())),

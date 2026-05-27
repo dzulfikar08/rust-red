@@ -34,7 +34,7 @@ pub struct CommsManager {
 }
 
 /// Connection information
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ConnectionInfo {
     /// Connection-specific sender
     pub tx: broadcast::Sender<String>,
@@ -42,6 +42,8 @@ pub struct ConnectionInfo {
     pub subscriptions: Arc<RwLock<HashSet<String>>>,
     /// Last activity time
     pub last_activity: Arc<RwLock<std::time::Instant>>,
+    /// Active context polling tasks (topic -> JoinHandle)
+    pub context_pollers: Arc<tokio::sync::Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>,
 }
 
 impl Default for CommsManager {
@@ -137,16 +139,22 @@ impl CommsManager {
             tx,
             subscriptions: Arc::new(RwLock::new(HashSet::new())),
             last_activity: Arc::new(RwLock::new(std::time::Instant::now())),
+            context_pollers: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
         };
 
         let mut connections = self.connections.write().await;
         connections.insert(id, connection_info);
     }
 
-    /// Remove connection
+    /// Remove connection and cancel all context pollers
     pub async fn remove_connection(&self, id: &str) {
         let mut connections = self.connections.write().await;
-        connections.remove(id);
+        if let Some(conn) = connections.remove(id) {
+            let mut pollers = conn.context_pollers.lock().await;
+            for (_, handle) in pollers.drain() {
+                handle.abort();
+            }
+        }
     }
 
     /// Update connection activity time
@@ -167,12 +175,111 @@ impl CommsManager {
         }
     }
 
-    /// Unsubscribe from topic
+    /// Unsubscribe from topic and cancel context poller if applicable
     pub async fn unsubscribe(&self, connection_id: &str, topic: &str) {
         let connections = self.connections.read().await;
         if let Some(connection) = connections.get(connection_id) {
             let mut subscriptions = connection.subscriptions.write().await;
             subscriptions.remove(topic);
+            // Cancel context poller if this was a context/live topic
+            if topic.starts_with("context/live/") {
+                let mut pollers = connection.context_pollers.lock().await;
+                if let Some(handle) = pollers.remove(topic) {
+                    handle.abort();
+                }
+            }
+        }
+    }
+
+    /// Start a context live polling task for a connection
+    pub async fn start_context_poller(
+        &self,
+        connection_id: &str,
+        topic: String,
+        engine: Arc<rust_red_core::runtime::engine::Engine>,
+    ) {
+        let connections = self.connections.read().await;
+        if let Some(connection) = connections.get(connection_id) {
+            let tx = connection.tx.clone();
+            let pollers = connection.context_pollers.clone();
+
+            // Parse topic: context/live/{type}/{id}
+            let parts: Vec<&str> = topic.split('/').collect();
+            if parts.len() < 4 {
+                return;
+            }
+            let ctx_type = parts[2]; // "global", "flow", "node"
+            let ctx_id = parts[3..].join("/"); // everything after type is the id
+
+            let scope = match ctx_type {
+                "global" => "global".to_string(),
+                "flow" => format!("flow:{}", ctx_id),
+                "node" => ctx_id.clone(),
+                _ => return,
+            };
+
+            let topic_clone = topic.clone();
+            let poller_topic = topic.clone();
+            let handle = tokio::spawn(async move {
+                let mut prev_snapshot: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+                let mut tick = tokio::time::interval(Duration::from_millis(500));
+                loop {
+                    tick.tick().await;
+                    let cm = engine.get_context_manager();
+                    let store = cm.get_default_store();
+                    match store.get_all(&scope).await {
+                        Ok(data) => {
+                            let mut current: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+                            for (key, variant) in &data {
+                                let json_val = variant.to_json_value();
+                                current.insert(key.clone(), serde_json::to_string(&json_val).unwrap_or_default());
+                            }
+                            // Detect changes
+                            let mut changed = serde_json::Map::new();
+                            for (key, val) in &current {
+                                if let Some(prev_val) = prev_snapshot.get(key) {
+                                    if prev_val != val {
+                                        changed.insert(key.clone(), serde_json::json!({
+                                            "value": val,
+                                            "status": "changed"
+                                        }));
+                                    }
+                                } else {
+                                    changed.insert(key.clone(), serde_json::json!({
+                                        "value": val,
+                                        "status": "new"
+                                    }));
+                                }
+                            }
+                            // Detect removed keys
+                            for key in prev_snapshot.keys() {
+                                if !current.contains_key(key) {
+                                    changed.insert(key.clone(), serde_json::json!({
+                                        "status": "removed"
+                                    }));
+                                }
+                            }
+                            prev_snapshot = current;
+                            if !changed.is_empty() {
+                                let msg = NodeRedMessage {
+                                    topic: poller_topic.clone(),
+                                    data: serde_json::Value::Object(changed),
+                                };
+                                let batch = vec![msg];
+                                let msg_str = CommsManager::serialize_batch(&batch);
+                                let _ = tx.send(msg_str);
+                            }
+                        }
+                        Err(_) => {}
+                    }
+                }
+            });
+
+            let mut pollers_guard = pollers.lock().await;
+            // Cancel existing poller for same topic if any
+            if let Some(old) = pollers_guard.insert(topic_clone, handle) {
+                old.abort();
+            }
         }
     }
 
@@ -552,7 +659,7 @@ async fn handle_websocket(socket: WebSocket, state: Arc<WebState>) {
                             if let Ok(parsed) = serde_json::from_str::<Value>(&text) {
                                 // Lock engine for read, pass as Option<&Engine>
                                 let engine_guard = state2.engine.read().await;
-                                handle_websocket_message(parsed, &tx_clone, &connection_id_clone, &comms_manager_clone, engine_guard.as_deref()).await;
+                                handle_websocket_message(parsed, &tx_clone, &connection_id_clone, &comms_manager_clone, engine_guard.as_deref(), engine_guard.as_ref()).await;
                             }
                         }
                         Some(Ok(axum::extract::ws::Message::Pong(_))) => {
@@ -615,6 +722,7 @@ async fn handle_websocket_message(
     connection_id: &str,
     comms_manager: &CommsManager,
     engine: Option<&rust_red_core::runtime::engine::Engine>,
+    engine_arc: Option<&Arc<rust_red_core::runtime::engine::Engine>>,
 ) {
     log::debug!("Handling WebSocket message: {message:?}");
 
@@ -667,6 +775,12 @@ async fn handle_websocket_message(
             }
             topic if topic.starts_with("notification/") => {
                 // Other notification topics - no initial data needed
+            }
+            topic if topic.starts_with("context/live/") => {
+                // Context live monitoring - spawn polling task
+                if let Some(engine_arc) = engine_arc {
+                    comms_manager.start_context_poller(connection_id, topic.to_string(), engine_arc.clone()).await;
+                }
             }
             _ => {}
         }

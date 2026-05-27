@@ -72,6 +72,16 @@ impl ContextStore for MemoryContextStore {
         Err(RustRedError::OutOfRange.into())
     }
 
+    async fn get_all(&self, scope: &str) -> Result<std::collections::HashMap<String, Variant>> {
+        let scopes = self.scopes.read().await;
+        if let Some(scope_map) = scopes.get(scope) {
+            if let Some(obj) = scope_map.as_object() {
+                return Ok(obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
+            }
+        }
+        Ok(std::collections::HashMap::new())
+    }
+
     async fn set_one(&self, scope: &str, path: &[PropexSegment], value: Variant) -> Result<()> {
         let mut scopes = self.scopes.write().await;
         let scope_map = scopes.entry(scope.to_string()).or_insert_with(Variant::empty_object);

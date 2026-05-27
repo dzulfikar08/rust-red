@@ -202,6 +202,17 @@ impl ContextStore for FileContextStore {
         Err(RustRedError::OutOfRange.into())
     }
 
+    async fn get_all(&self, scope: &str) -> Result<std::collections::HashMap<String, Variant>> {
+        self.ensure_scope_loaded(scope).await;
+        let scopes = self.state.scopes.read().await;
+        if let Some(scope_map) = scopes.get(scope) {
+            if let Some(obj) = scope_map.as_object() {
+                return Ok(obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
+            }
+        }
+        Ok(std::collections::HashMap::new())
+    }
+
     async fn set_one(&self, scope: &str, path: &[PropexSegment], value: Variant) -> Result<()> {
         self.ensure_scope_loaded(scope).await;
         {

@@ -61,6 +61,9 @@ pub trait ContextStore: Send + Sync {
     async fn get_many(&self, scope: &str, keys: &[&str]) -> Result<Vec<Variant>>;
     async fn get_keys(&self, scope: &str) -> Result<Vec<String>>;
 
+    /// Get all key-value pairs for a scope as a JSON-compatible map
+    async fn get_all(&self, scope: &str) -> Result<std::collections::HashMap<String, Variant>>;
+
     async fn set_one(&self, scope: &str, path: &[PropexSegment], value: Variant) -> Result<()>;
     async fn set_many(&self, scope: &str, pairs: Vec<(String, Variant)>) -> Result<()>;
 
