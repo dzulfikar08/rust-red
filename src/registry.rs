@@ -3,6 +3,8 @@ use rust_red_core::runtime::registry::{RegistryBuilder, RegistryHandle};
 use std::collections::BTreeMap;
 
 #[cfg(feature = "wasm_plugins")]
+use std::path::PathBuf;
+#[cfg(feature = "wasm_plugins")]
 use rust_red_wasm_host::{PluginManager, PluginManagerConfig};
 
 // Type aliases to simplify complex nested types

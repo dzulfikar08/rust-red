@@ -14,6 +14,8 @@ use crate::flows::ensure_flows_file_exists;
 use crate::registry::create_registry;
 
 #[cfg(feature = "wasm_plugins")]
+use std::path::PathBuf;
+#[cfg(feature = "wasm_plugins")]
 use crate::registry::create_registry_with_plugins;
 #[cfg(feature = "wasm_plugins")]
 use rust_red_wasm_host::PluginManager;
