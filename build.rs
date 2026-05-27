@@ -99,6 +99,9 @@ fn build_static_files() {
             println!("cargo:warning=Building Node-RED editor...");
             build_node_red(&node_red_root);
         }
+
+        // Rebuild editor JS bundle if source files are newer than built output
+        rebuild_editor_if_stale(&node_red_root);
     }
 
     // Only build if source directories exist
@@ -227,6 +230,64 @@ fn build_node_red(node_red_root: &Path) {
     }
 
     println!("cargo:warning=Node-RED build complete!");
+}
+
+/// Check if editor-client source JS files are newer than the built red.min.js.
+/// If so, run `npx grunt concat uglify` to rebuild the bundle.
+fn rebuild_editor_if_stale(node_red_root: &Path) {
+    let built_js = node_red_root.join(
+        "packages/node_modules/@node-red/editor-client/public/red/red.min.js",
+    );
+    let src_js_dir = node_red_root.join("packages/node_modules/@node-red/editor-client/src/js");
+
+    if !src_js_dir.exists() || !built_js.exists() {
+        return;
+    }
+
+    let built_time = match fs::metadata(&built_js).and_then(|m| m.modified()) {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+
+    // Find the most recently modified source file
+    let newest_src = newest_mtime_in_dir(&src_js_dir);
+    if newest_src > built_time {
+        println!("cargo:warning=Editor source files changed, rebuilding JS bundle...");
+        let npx_cmd = if cfg!(target_os = "windows") { "npx.cmd" } else { "npx" };
+        let result = Command::new(npx_cmd)
+            .args(["grunt", "concat", "uglify"])
+            .current_dir(node_red_root)
+            .status();
+
+        match result {
+            Ok(s) if s.success() => println!("cargo:warning=Editor JS bundle rebuilt."),
+            Ok(s) => eprintln!("cargo:warning=grunt concat uglify failed with status: {s}"),
+            Err(e) => eprintln!("cargo:warning=Failed to run grunt: {e}"),
+        }
+    }
+}
+
+/// Recursively find the newest modification time in a directory.
+fn newest_mtime_in_dir(dir: &Path) -> std::time::SystemTime {
+    let mut newest = std::time::SystemTime::UNIX_EPOCH;
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let dir_newest = newest_mtime_in_dir(&path);
+                if dir_newest > newest {
+                    newest = dir_newest;
+                }
+            } else if let Ok(meta) = fs::metadata(&path) {
+                if let Ok(mtime) = meta.modified() {
+                    if mtime > newest {
+                        newest = mtime;
+                    }
+                }
+            }
+        }
+    }
+    newest
 }
 
 /// Copy Node-RED icon files to static/icons directory for proper icon serving
