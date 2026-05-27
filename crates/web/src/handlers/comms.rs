@@ -229,7 +229,8 @@ impl CommsManager {
                     let store = cm.get_default_store();
                     match store.get_all(&scope).await {
                         Ok(data) => {
-                            let mut current: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+                            let mut current: std::collections::HashMap<String, String> =
+                                std::collections::HashMap::new();
                             for (key, variant) in &data {
                                 let json_val = variant.to_json_value();
                                 current.insert(key.clone(), serde_json::to_string(&json_val).unwrap_or_default());
@@ -239,24 +240,33 @@ impl CommsManager {
                             for (key, val) in &current {
                                 if let Some(prev_val) = prev_snapshot.get(key) {
                                     if prev_val != val {
-                                        changed.insert(key.clone(), serde_json::json!({
-                                            "value": val,
-                                            "status": "changed"
-                                        }));
+                                        changed.insert(
+                                            key.clone(),
+                                            serde_json::json!({
+                                                "value": val,
+                                                "status": "changed"
+                                            }),
+                                        );
                                     }
                                 } else {
-                                    changed.insert(key.clone(), serde_json::json!({
-                                        "value": val,
-                                        "status": "new"
-                                    }));
+                                    changed.insert(
+                                        key.clone(),
+                                        serde_json::json!({
+                                            "value": val,
+                                            "status": "new"
+                                        }),
+                                    );
                                 }
                             }
                             // Detect removed keys
                             for key in prev_snapshot.keys() {
                                 if !current.contains_key(key) {
-                                    changed.insert(key.clone(), serde_json::json!({
-                                        "status": "removed"
-                                    }));
+                                    changed.insert(
+                                        key.clone(),
+                                        serde_json::json!({
+                                            "status": "removed"
+                                        }),
+                                    );
                                 }
                             }
                             prev_snapshot = current;
