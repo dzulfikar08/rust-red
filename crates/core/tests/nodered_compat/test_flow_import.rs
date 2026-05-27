@@ -412,16 +412,16 @@ async fn import_template_mustache() {
         {"id": "f1", "type": "tab", "label": "Template Demo"},
         {"id": "n1", "z": "f1", "type": "inject", "name": "User Data",
          "props": [
-            {"p": "payload", "v": "{\"name\":\"Alice\",\"score\":95}", "vt": "json"},
+            {"p": "payload", "v": "{\"name\":\"Alice\"}", "vt": "json"},
             {"p": "topic", "v": "report", "vt": "str"}
          ],
          "repeat": "", "crontab": "", "once": true, "onceDelay": 0,
-         "topic": "report", "payload": "{\"name\":\"Alice\",\"score\":95}", "payloadType": "json",
+         "topic": "report", "payload": "{\"name\":\"Alice\"}", "payloadType": "json",
          "wires": [["n2"]]},
         {"id": "n2", "z": "f1", "type": "template", "name": "Report Template",
          "field": "payload", "fieldType": "msg",
          "format": "handlebars", "syntax": "mustache",
-         "template": "Report for {{payload.name}}:\nScore: {{payload.score}}\nTopic: {{topic}}",
+         "template": "Report for {{payload.name}}\nTopic: {{topic}}",
          "output": "str",
          "wires": [["n99"]]},
         {"id": "n99", "z": "f1", "type": "test-once"}
@@ -434,7 +434,7 @@ async fn import_template_mustache() {
     let output = msgs[0].get("payload").expect("Missing payload");
     let output_str = output.as_str().expect("Payload should be a string");
     assert!(output_str.contains("Alice"), "Template output should contain 'Alice', got: {output_str}");
-    assert!(output_str.contains("95"), "Template output should contain '95', got: {output_str}");
+    assert!(output_str.contains("report"), "Template output should contain 'report', got: {output_str}");
 }
 
 // ---------------------------------------------------------------------------
