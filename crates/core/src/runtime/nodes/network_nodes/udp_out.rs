@@ -6,6 +6,7 @@ use base64::prelude::*;
 use serde::Deserialize;
 
 use crate::runtime::flow::Flow;
+#[allow(ambiguous_glob_imports)]
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 

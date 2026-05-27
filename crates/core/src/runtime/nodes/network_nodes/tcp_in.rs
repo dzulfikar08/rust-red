@@ -10,6 +10,7 @@ use serde::Deserialize;
 
 use crate::runtime::flow::Flow;
 use crate::runtime::model::*;
+#[allow(ambiguous_glob_imports)]
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
