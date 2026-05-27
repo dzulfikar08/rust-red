@@ -13,6 +13,7 @@ use rust_red_macro::*;
 use super::opcua_config::OpcUaConfigNode;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct OpcUaReadConfig {
     #[serde(default, alias = "configNode")]
     config_node: String,

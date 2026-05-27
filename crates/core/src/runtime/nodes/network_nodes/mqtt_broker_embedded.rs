@@ -14,6 +14,7 @@ use rust_red_mqtt_broker::broker::MqttBroker;
 use rust_red_mqtt_broker::config::BrokerConfig;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct MqttBrokerNodeConfig {
     #[serde(default = "default_host")]
     host: String,

@@ -13,6 +13,7 @@ use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct TimescaleDbConfig {
     #[serde(default = "default_host")]
     host: String,
@@ -108,6 +109,7 @@ impl TimescaleDbConfigNode {
 
     /// Ensure a hypertable exists for the given table and time column.
     /// Executes `SELECT create_hypertable(...)` if the table is not already a hypertable.
+    #[allow(dead_code)]
     pub async fn ensure_hypertable(&self, table: &str, time_column: &str) -> crate::Result<()> {
         let pool_obj = self.get_pool().await?;
 
@@ -136,6 +138,7 @@ impl TimescaleDbConfigNode {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub fn dbname(&self) -> &str {
         &self.config.dbname
     }

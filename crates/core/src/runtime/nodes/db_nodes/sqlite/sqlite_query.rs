@@ -15,6 +15,7 @@ use rust_red_macro::*;
 use super::sqlite_config::SqliteConfigNode;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct SqliteQueryConfig {
     #[serde(default, alias = "configNode")]
     config_node: String,

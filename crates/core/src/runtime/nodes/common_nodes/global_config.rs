@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -11,6 +10,7 @@ use rust_red_macro::*;
 
 #[derive(Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GlobalConfigEnv {
     name: String,
     value: String,
@@ -18,6 +18,7 @@ struct GlobalConfigEnv {
 
 #[derive(Deserialize, Debug, Clone, Default)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct GlobalConfigNodeConfig {
     #[serde(default)]
     env: Vec<GlobalConfigEnv>,
@@ -25,8 +26,10 @@ struct GlobalConfigNodeConfig {
 
 #[derive(Debug)]
 #[global_node("global-config", red_name = "global-config", module = "node-red")]
+#[allow(dead_code)]
 struct GlobalConfigNode {
     base: BaseGlobalNodeState,
+    #[allow(dead_code)]
     env_vars: BTreeMap<String, String>,
 }
 

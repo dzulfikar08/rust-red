@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use runtime::engine::Engine;
@@ -97,7 +96,7 @@ impl App {
             }
         };
         #[cfg(not(feature = "cluster"))]
-        let cluster_manager: Option<()> = None;
+        let _cluster_manager: Option<()> = None;
 
         Ok(App {
             _registry: reg,

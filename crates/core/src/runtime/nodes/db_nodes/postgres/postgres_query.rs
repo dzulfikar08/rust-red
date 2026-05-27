@@ -14,6 +14,7 @@ use rust_red_macro::*;
 use super::postgres_config::PostgresConfigNode;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct PostgresQueryConfig {
     #[serde(default, alias = "configNode")]
     config_node: String,

@@ -8,6 +8,7 @@ use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct GroupStyle {
     #[serde(default)]
     fill: Option<String>,
@@ -24,6 +25,7 @@ struct GroupStyle {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct GroupConfig {
     #[serde(default)]
     name: String,

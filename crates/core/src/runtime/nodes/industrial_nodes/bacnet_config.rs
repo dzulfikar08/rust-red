@@ -11,7 +11,8 @@ use rust_red_macro::*;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-struct BacnetConfig {
+#[allow(dead_code)]
+pub(crate) struct BacnetConfig {
     device_id: u32,
     target_host: Option<String>,
     #[serde(default = "default_target_port")]
@@ -64,6 +65,7 @@ impl std::fmt::Debug for BacnetConnection {
     }
 }
 
+#[allow(dead_code)]
 impl BacnetConnection {
     pub(crate) fn new(config: BacnetConfig) -> Self {
         Self { config }
@@ -106,6 +108,7 @@ pub(crate) struct BacnetConfigNode {
     pub(crate) connection: Arc<Mutex<BacnetConnection>>,
 }
 
+#[allow(dead_code)]
 impl BacnetConfigNode {
     pub fn build(
         engine: &Engine,

@@ -10,6 +10,7 @@ use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct SqliteConfig {
     #[serde(default = "default_path")]
     path: String,
@@ -85,6 +86,7 @@ impl SqliteConfigNode {
 
     /// Execute a non-query statement (INSERT, UPDATE, DELETE, etc.) and return rows affected.
     /// Runs synchronously -- caller should wrap in `spawn_blocking` if needed from async context.
+    #[allow(dead_code)]
     pub fn execute_sync(&self, sql: &str, params: &[&dyn ToSql]) -> crate::Result<usize> {
         let conn = self.connection.lock().map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
         let affected = conn.execute(sql, params).map_err(|e| anyhow::anyhow!("SQLite execute error: {e}"))?;
@@ -93,6 +95,7 @@ impl SqliteConfigNode {
 
     /// Execute a SELECT query and return rows as Vec<Variant>.
     /// Runs synchronously -- caller should wrap in `spawn_blocking` if needed from async context.
+    #[allow(dead_code)]
     pub fn query_sync(&self, sql: &str, params: &[&dyn ToSql]) -> crate::Result<Vec<Variant>> {
         let conn = self.connection.lock().map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
         let mut stmt = conn.prepare(sql).map_err(|e| anyhow::anyhow!("SQLite prepare error: {e}"))?;

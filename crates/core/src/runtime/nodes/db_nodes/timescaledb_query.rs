@@ -14,6 +14,7 @@ use rust_red_macro::*;
 use super::timescaledb_config::TimescaleDbConfigNode;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct TimescaleDbQueryConfig {
     #[serde(default, alias = "configNode")]
     config_node: String,

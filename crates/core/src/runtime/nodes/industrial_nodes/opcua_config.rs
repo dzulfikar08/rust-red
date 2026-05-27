@@ -6,12 +6,12 @@ use serde::Deserialize;
 use tokio::sync::RwLock;
 
 use crate::runtime::engine::Engine;
-use crate::runtime::model::Variant;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct OpcUaConfig {
     endpoint: String,
     #[serde(default = "default_security_mode")]
@@ -48,6 +48,7 @@ fn default_session_timeout_ms() -> u32 {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub(crate) struct OpcUaConnection {
     endpoint: String,
     security_mode: String,
@@ -55,6 +56,7 @@ pub(crate) struct OpcUaConnection {
     connected: bool,
 }
 
+#[allow(dead_code)]
 impl OpcUaConnection {
     pub fn endpoint(&self) -> &str {
         &self.endpoint
@@ -73,6 +75,7 @@ pub(crate) struct OpcUaConfigNode {
     pub(crate) connection: Arc<RwLock<Option<OpcUaConnection>>>,
 }
 
+#[allow(dead_code)]
 impl OpcUaConfigNode {
     pub fn build(
         engine: &Engine,

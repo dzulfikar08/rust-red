@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use async_trait::async_trait;
 use deadpool_postgres::{Config, Pool};
@@ -14,6 +13,7 @@ use rust_red_macro::*;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct PostgresConfig {
     host: String,
     #[serde(default = "default_port")]

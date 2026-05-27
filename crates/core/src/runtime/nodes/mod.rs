@@ -311,7 +311,7 @@ where
     match node.recv_msg(cancel.clone()).await {
         Ok(msg) => {
             let node_type = node.type_str().to_string();
-            let node_id = node.id().to_string();
+            let _node_id = node.id().to_string();
 
             // Telemetry: record message counter and measure processing duration
             super::telemetry::record_message(&node_type);

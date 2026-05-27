@@ -27,6 +27,7 @@ const OUTPUT_MSGS_CAP: usize = 4;
 type OutputMsgs = smallvec::SmallVec<[(usize, Msg); OUTPUT_MSGS_CAP]>;
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct FunctionNodeConfig {
     #[serde(default)]
     initialize: Option<String>,

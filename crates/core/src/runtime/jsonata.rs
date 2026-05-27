@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use crate::runtime::model::*;
-use crate::*;
 
 pub fn evaluate(expression: &str, data: &serde_json::Value) -> crate::Result<serde_json::Value> {
     let arena = bumpalo::Bump::new();

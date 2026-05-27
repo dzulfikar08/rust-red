@@ -117,9 +117,9 @@ jobs:
           cache-targets: true
           cache-on-failure: true
       - name: Run tests
-        run: cargo nextest run --workspace --features default
+        run: cargo nextest run --workspace --features default,internal-testing
       - name: Run doc tests
-        run: cargo test --workspace --features default --doc
+        run: cargo test --workspace --features default,internal-testing --doc
 
   build-release:
     name: Release Build

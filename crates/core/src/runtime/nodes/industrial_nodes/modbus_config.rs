@@ -13,6 +13,7 @@ use rust_red_macro::*;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct ModbusConfig {
     #[serde(default = "default_transport")]
     transport: String,
@@ -339,6 +340,7 @@ impl ModbusConnection {
     }
 
     /// Returns true if the connection appears to be alive.
+    #[allow(dead_code)]
     pub(crate) fn is_connected(&self) -> bool {
         self.context.is_some()
     }
@@ -533,6 +535,7 @@ pub(crate) struct ModbusConfigNode {
     #[allow(dead_code)]
     config: ModbusConfig,
     pub(crate) connection: Arc<Mutex<ModbusConnection>>,
+    #[allow(dead_code)]
     pub(crate) queue: Arc<ModbusRequestQueue>,
 }
 

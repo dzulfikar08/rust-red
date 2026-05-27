@@ -26,6 +26,7 @@ impl ModbusRequestQueue {
 
     /// Acquire a permit, waiting for `command_delay` if needed.
     /// Returns a guard that releases the permit on drop.
+    #[allow(dead_code)]
     pub async fn acquire(&self) -> crate::Result<SemaphorePermit<'_>> {
         let permit = self.semaphore.acquire().await.map_err(|_| anyhow::anyhow!("Queue closed"))?;
 
@@ -44,6 +45,7 @@ impl ModbusRequestQueue {
     }
 
     /// Record that a request just completed. Called before releasing the permit.
+    #[allow(dead_code)]
     pub async fn record_completion(&self) {
         let mut last = self.last_request.lock().await;
         *last = Some(tokio::time::Instant::now());
