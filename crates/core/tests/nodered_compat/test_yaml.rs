@@ -2,7 +2,6 @@
 //!
 //! Verifies that the YAML node parses YAML strings to objects and
 /// converts objects back to YAML strings, matching Node-RED behavior.
-
 use serde_json::json;
 
 use super::harness::TestHarness;
@@ -20,9 +19,7 @@ async fn yaml_parse_to_object() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "key: value\nnum: 42"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "key: value\nnum: 42"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -44,21 +41,13 @@ async fn yaml_stringify() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": {"name": "test", "count": 5}}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {"name": "test", "count": 5}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
     let yaml_str = payload.as_str().expect("Payload should be a string");
-    assert!(
-        yaml_str.contains("name: test"),
-        "YAML output should contain 'name: test', got: {yaml_str}"
-    );
-    assert!(
-        yaml_str.contains("count: 5"),
-        "YAML output should contain 'count: 5', got: {yaml_str}"
-    );
+    assert!(yaml_str.contains("name: test"), "YAML output should contain 'name: test', got: {yaml_str}");
+    assert!(yaml_str.contains("count: 5"), "YAML output should contain 'count: 5', got: {yaml_str}");
 }
 
 /// YAML: parse a YAML array.
@@ -74,9 +63,7 @@ async fn yaml_parse_array() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "- one\n- two\n- three"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "- one\n- two\n- three"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");

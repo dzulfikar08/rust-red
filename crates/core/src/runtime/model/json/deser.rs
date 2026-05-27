@@ -756,8 +756,7 @@ fn preprocess_merge_subflow_env(flows: &mut JsonValue) -> crate::Result<()> {
 }
 
 fn merge_env(target_envs: &mut JsonValue, ref_envs: &JsonValue) -> crate::Result<()> {
-    let target_vec: &mut Vec<JsonValue> =
-        target_envs.as_array_mut().ok_or(RustRedError::BadArgument("target_envs"))?;
+    let target_vec: &mut Vec<JsonValue> = target_envs.as_array_mut().ok_or(RustRedError::BadArgument("target_envs"))?;
     let ref_vec: &Vec<JsonValue> = ref_envs.as_array().ok_or(RustRedError::BadArgument("ref_envs"))?;
 
     let target_names: HashSet<String> =

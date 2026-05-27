@@ -212,10 +212,9 @@ impl Engine {
                 // register all nodes
                 for fnode in flow.get_all_flow_nodes().iter() {
                     if self.inner.all_flow_nodes.contains_key(&fnode.id()) {
-                        return Err(RustRedError::InvalidOperation(format!(
-                            "This flow node already existed: {fnode}"
-                        ))
-                        .into());
+                        return Err(
+                            RustRedError::InvalidOperation(format!("This flow node already existed: {fnode}")).into()
+                        );
                     }
                     self.inner.all_flow_nodes.insert(fnode.id(), fnode.clone());
                 }

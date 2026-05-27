@@ -3,15 +3,8 @@
 //! This module contains the default set of frontend plugins that ship with
 //! EdgeLinkd.  Each plugin is registered at compile time via `inventory`.
 
-use axum::{
-    Router,
-    extract::Extension,
-    response::IntoResponse,
-    routing::get,
-};
-use rust_red_core::web::frontend_plugin::{
-    FrontendPlugin, FrontendPluginEntry, PluginDescriptor,
-};
+use axum::{Router, extract::Extension, response::IntoResponse, routing::get};
+use rust_red_core::web::frontend_plugin::{FrontendPlugin, FrontendPluginEntry, PluginDescriptor};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -29,19 +22,12 @@ pub struct FlowEditorPlugin {
 
 impl FlowEditorPlugin {
     pub fn new() -> Self {
-        let static_dir = std::env::var("RUST_RED_EDITOR_STATIC_DIR")
-            .ok()
-            .map(PathBuf::from)
-            .or_else(|| {
-                // Default: look for the frontend dist relative to the binary
-                let base = rust_red_core::runtime::paths::ui_static_dir();
-                let editor_dir = base.join("editor");
-                if editor_dir.is_dir() {
-                    Some(editor_dir)
-                } else {
-                    None
-                }
-            });
+        let static_dir = std::env::var("RUST_RED_EDITOR_STATIC_DIR").ok().map(PathBuf::from).or_else(|| {
+            // Default: look for the frontend dist relative to the binary
+            let base = rust_red_core::runtime::paths::ui_static_dir();
+            let editor_dir = base.join("editor");
+            if editor_dir.is_dir() { Some(editor_dir) } else { None }
+        });
 
         Self {
             descriptor: PluginDescriptor {
@@ -71,8 +57,7 @@ impl FrontendPlugin for FlowEditorPlugin {
         // Note: /api/plugins listing is available via the authenticated
         // endpoint GET /api/frontend/plugins (defined in api.rs).
         // Only health/status endpoints are exposed here (no auth required).
-        Router::new()
-            .route("/api/status", get(editor_status))
+        Router::new().route("/api/status", get(editor_status))
     }
 
     fn static_dir(&self) -> Option<&PathBuf> {
@@ -85,9 +70,7 @@ impl FrontendPlugin for FlowEditorPlugin {
 // ---------------------------------------------------------------------------
 
 /// `GET /editor/api/status` - basic editor status.
-async fn editor_status(
-    Extension(state): Extension<Arc<WebState>>,
-) -> impl IntoResponse {
+async fn editor_status(Extension(state): Extension<Arc<WebState>>) -> impl IntoResponse {
     let engine_guard = state.engine.read().await;
     let running = engine_guard.as_ref().is_some_and(|e| e.is_running());
     let engine_status = if running { "running" } else { "stopped" };

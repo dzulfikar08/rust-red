@@ -19,7 +19,11 @@ static PACKET_ID_COUNTER: AtomicU16 = AtomicU16::new(1);
 pub fn next_packet_id() -> u16 {
     // Wrap safely: skip 0 (invalid packet ID in MQTT)
     let val = PACKET_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    if val == 0 { 1 } else { val }
+    if val == 0 {
+        1
+    } else {
+        val
+    }
 }
 
 pub struct Session {
@@ -31,22 +35,19 @@ pub struct Session {
 }
 
 impl Session {
-    pub fn new(
-        client_id: String,
-        keep_alive: u16,
-        outbound_tx: mpsc::Sender<RawPacket>,
-    ) -> Self {
-        Self {
-            client_id,
-            keep_alive,
-            connected_at: chrono::Utc::now(),
-            outbound_tx,
-        }
+    pub fn new(client_id: String, keep_alive: u16, outbound_tx: mpsc::Sender<RawPacket>) -> Self {
+        Self { client_id, keep_alive, connected_at: chrono::Utc::now(), outbound_tx }
     }
 
-    pub fn client_id(&self) -> &str { &self.client_id }
-    pub fn keep_alive(&self) -> u16 { self.keep_alive }
-    pub fn connected_at(&self) -> chrono::DateTime<chrono::Utc> { self.connected_at }
+    pub fn client_id(&self) -> &str {
+        &self.client_id
+    }
+    pub fn keep_alive(&self) -> u16 {
+        self.keep_alive
+    }
+    pub fn connected_at(&self) -> chrono::DateTime<chrono::Utc> {
+        self.connected_at
+    }
 
     /// Try to send a raw encoded packet to this session's TCP stream.
     /// Returns false if the channel is closed or full (client likely disconnected).

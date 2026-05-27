@@ -13,14 +13,12 @@ use axum::{
     extract::Query,
     http::StatusCode,
     response::{
-        sse::{Event, KeepAlive, Sse},
         IntoResponse, Json,
+        sse::{Event, KeepAlive, Sse},
     },
 };
 use futures_util::stream::Stream;
-use rust_red_core::runtime::ai::provider::{
-    AiProvider, ChatChunk, ChatMessage,
-};
+use rust_red_core::runtime::ai::provider::{AiProvider, ChatChunk, ChatMessage};
 use serde::{Deserialize, Serialize};
 use tokio::sync::RwLock;
 
@@ -40,19 +38,11 @@ pub struct AiState {
 
 impl AiState {
     pub fn new() -> Arc<Self> {
-        Arc::new(Self {
-            provider: RwLock::new(None),
-            chat_history: RwLock::new(Vec::new()),
-            enabled: false,
-        })
+        Arc::new(Self { provider: RwLock::new(None), chat_history: RwLock::new(Vec::new()), enabled: false })
     }
 
     pub fn with_provider(provider: Box<dyn AiProvider>, enabled: bool) -> Arc<Self> {
-        Arc::new(Self {
-            provider: RwLock::new(Some(provider)),
-            chat_history: RwLock::new(Vec::new()),
-            enabled,
-        })
+        Arc::new(Self { provider: RwLock::new(Some(provider)), chat_history: RwLock::new(Vec::new()), enabled })
     }
 
     pub async fn set_provider(&self, provider: Box<dyn AiProvider>) {
@@ -160,14 +150,9 @@ pub async fn chat(
     }
 
     let provider_guard = ai_state.provider.read().await;
-    let provider = provider_guard
-        .as_ref()
-        .ok_or_else(|| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": "No AI provider configured"})),
-            )
-        })?;
+    let provider = provider_guard.as_ref().ok_or_else(|| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({"error": "No AI provider configured"})))
+    })?;
 
     // Build system prompt with flow context
     let system_prompt = build_system_prompt(body.flow_context.as_deref());
@@ -175,10 +160,7 @@ pub async fn chat(
     // Append user message to history
     {
         let mut history = ai_state.chat_history.write().await;
-        history.push(ChatMessage {
-            role: "user".to_string(),
-            content: body.message.clone(),
-        });
+        history.push(ChatMessage { role: "user".to_string(), content: body.message.clone() });
         // Keep history bounded
         if history.len() > 50 {
             let drain = history.len() - 50;
@@ -233,24 +215,16 @@ pub async fn chat_stream(
     }
 
     let provider_guard = ai_state.provider.read().await;
-    let provider = provider_guard
-        .as_ref()
-        .ok_or_else(|| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": "No AI provider configured"})),
-            )
-        })?;
+    let provider = provider_guard.as_ref().ok_or_else(|| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({"error": "No AI provider configured"})))
+    })?;
 
     let system_prompt = build_system_prompt(body.flow_context.as_deref());
 
     // Append user message to history
     {
         let mut history = ai_state.chat_history.write().await;
-        history.push(ChatMessage {
-            role: "user".to_string(),
-            content: body.message.clone(),
-        });
+        history.push(ChatMessage { role: "user".to_string(), content: body.message.clone() });
         if history.len() > 50 {
             let drain = history.len() - 50;
             history.drain(..drain);
@@ -267,11 +241,7 @@ pub async fn chat_stream(
             let ai_state_clone = ai_state.clone();
             let stream_stream = convert_stream_to_sse(stream, ai_state_clone);
 
-            Ok(
-                Sse::new(stream_stream)
-                    .keep_alive(KeepAlive::default())
-                    .into_response(),
-            )
+            Ok(Sse::new(stream_stream).keep_alive(KeepAlive::default()).into_response())
         }
         Err(e) => {
             log::error!("AI chat stream error: {e}");
@@ -296,14 +266,9 @@ pub async fn suggest(
     }
 
     let provider_guard = ai_state.provider.read().await;
-    let provider = provider_guard
-        .as_ref()
-        .ok_or_else(|| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": "No AI provider configured"})),
-            )
-        })?;
+    let provider = provider_guard.as_ref().ok_or_else(|| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({"error": "No AI provider configured"})))
+    })?;
 
     let flow_json = body.flow_json.as_deref().unwrap_or("{}");
 
@@ -320,9 +285,7 @@ pub async fn suggest(
                 })
                 .collect();
 
-            Ok(Json(SuggestResponse {
-                suggestions: resp_suggestions,
-            }))
+            Ok(Json(SuggestResponse { suggestions: resp_suggestions }))
         }
         Err(e) => {
             log::error!("AI suggest error: {e}");
@@ -347,14 +310,9 @@ pub async fn explain(
     }
 
     let provider_guard = ai_state.provider.read().await;
-    let provider = provider_guard
-        .as_ref()
-        .ok_or_else(|| {
-            (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": "No AI provider configured"})),
-            )
-        })?;
+    let provider = provider_guard.as_ref().ok_or_else(|| {
+        (StatusCode::SERVICE_UNAVAILABLE, Json(serde_json::json!({"error": "No AI provider configured"})))
+    })?;
 
     let flow_context = body.flow_context.as_deref().unwrap_or("");
 
@@ -377,10 +335,9 @@ pub async fn providers(
     let provider_guard = ai_state.provider.read().await;
 
     let (default_name, available) = match provider_guard.as_ref() {
-        Some(p) => (p.name().to_string(), vec![ProviderInfo {
-            name: p.name().to_string(),
-            available: p.is_available(),
-        }]),
+        Some(p) => {
+            (p.name().to_string(), vec![ProviderInfo { name: p.name().to_string(), available: p.is_available() }])
+        }
         None => (String::new(), Vec::new()),
     };
 
@@ -424,7 +381,9 @@ fn build_system_prompt(flow_context: Option<&str>) -> String {
 
 /// Convert a provider stream into an axum SSE stream.
 fn convert_stream_to_sse(
-    stream: std::pin::Pin<Box<dyn Stream<Item = Result<ChatChunk, rust_red_core::runtime::ai::provider::AiError>> + Send>>,
+    stream: std::pin::Pin<
+        Box<dyn Stream<Item = Result<ChatChunk, rust_red_core::runtime::ai::provider::AiError>> + Send>,
+    >,
     ai_state: Arc<AiState>,
 ) -> std::pin::Pin<Box<dyn Stream<Item = Result<Event, std::convert::Infallible>> + Send>> {
     use futures_util::StreamExt;
@@ -439,26 +398,27 @@ fn convert_stream_to_sse(
                     }
                     if chunk.done {
                         // Append final assistant message to history
-                        let msg = ChatMessage {
-                            role: "assistant".to_string(),
-                            content: collected.clone(),
-                        };
+                        let msg = ChatMessage { role: "assistant".to_string(), content: collected.clone() };
                         let mut history = ai_state.chat_history.write().await;
                         history.push(msg);
                     }
-                    let event = Event::default()
-                        .data(serde_json::json!({
+                    let event = Event::default().data(
+                        serde_json::json!({
                             "delta": chunk.delta,
                             "done": chunk.done
-                        }).to_string());
+                        })
+                        .to_string(),
+                    );
                     Some((Ok(event), (stream, ai_state, collected)))
                 }
                 Some(Err(e)) => {
-                    let event = Event::default()
-                        .data(serde_json::json!({
+                    let event = Event::default().data(
+                        serde_json::json!({
                             "error": e.to_string(),
                             "done": true
-                        }).to_string());
+                        })
+                        .to_string(),
+                    );
                     Some((Ok(event), (stream, ai_state, collected)))
                 }
                 None => None,

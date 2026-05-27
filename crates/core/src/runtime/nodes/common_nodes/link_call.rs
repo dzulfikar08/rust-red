@@ -244,8 +244,7 @@ impl LinkCallNodeBehavior for LinkCallNode {
             drop(event);
             Ok(())
         } else {
-            Err(RustRedError::InvalidOperation(format!("Cannot find and(or) remove the event id: '{stack_id}'"))
-                .into())
+            Err(RustRedError::InvalidOperation(format!("Cannot find and(or) remove the event id: '{stack_id}'")).into())
         }
     }
 }

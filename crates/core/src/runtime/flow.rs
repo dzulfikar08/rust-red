@@ -301,18 +301,19 @@ impl Flow {
         // Adding root groups
         let root_group_configs = flow_config.groups.iter().filter(|gc| gc.z == self.id());
         for gc in root_group_configs {
-            let group = match &gc.g {
-                // Subgroup
-                Some(parent_id) => Group::new_subgroup(
-                    gc,
-                    &self.inner.groups.get(parent_id).map(|x| x.value().clone()).ok_or(
-                        RustRedError::InvalidOperation(format!("cannot found parent group id `{parent_id}`")),
+            let group =
+                match &gc.g {
+                    // Subgroup
+                    Some(parent_id) => Group::new_subgroup(
+                        gc,
+                        &self.inner.groups.get(parent_id).map(|x| x.value().clone()).ok_or(
+                            RustRedError::InvalidOperation(format!("cannot found parent group id `{parent_id}`")),
+                        )?,
                     )?,
-                )?,
 
-                // Root group
-                None => Group::new_flow_group(gc, self)?,
-            };
+                    // Root group
+                    None => Group::new_flow_group(gc, self)?,
+                };
             self.inner.groups.insert(group.id(), group);
         }
         Ok(())
@@ -549,8 +550,8 @@ impl Flow {
         // across an await point.
         #[cfg(feature = "otel")]
         let mut _otel_span = {
-            use opentelemetry::trace::{Span, SpanKind, Tracer};
             use opentelemetry::KeyValue;
+            use opentelemetry::trace::{Span, SpanKind, Tracer};
             let tracer = opentelemetry::global::tracer("rust-red");
             tracer
                 .span_builder("flow_start")

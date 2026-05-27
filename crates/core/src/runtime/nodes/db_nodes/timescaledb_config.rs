@@ -64,21 +64,14 @@ impl TimescaleDbConfigNode {
             context: engine.get_context_manager().new_context(engine.context(), config.id.to_string()),
             disabled: config.disabled,
         };
-        Ok(Box::new(TimescaleDbConfigNode {
-            base: state,
-            config: ts_config,
-            pool: Arc::new(RwLock::new(None)),
-        }))
+        Ok(Box::new(TimescaleDbConfigNode { base: state, config: ts_config, pool: Arc::new(RwLock::new(None)) }))
     }
 
     pub async fn get_pool(&self) -> crate::Result<deadpool_postgres::Object> {
         {
             let guard = self.pool.read().await;
             if let Some(pool) = guard.as_ref() {
-                let obj = pool
-                    .get()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Pool get error: {e}"))?;
+                let obj = pool.get().await.map_err(|e| anyhow::anyhow!("Pool get error: {e}"))?;
                 return Ok(obj);
             }
         }
@@ -109,9 +102,7 @@ impl TimescaleDbConfigNode {
                 );
             }
             let pool = guard.as_ref().unwrap();
-            pool.get()
-                .await
-                .map_err(|e| anyhow::anyhow!("Pool get error: {e}"))
+            pool.get().await.map_err(|e| anyhow::anyhow!("Pool get error: {e}"))
         }
     }
 
@@ -122,21 +113,14 @@ impl TimescaleDbConfigNode {
 
         // Check if the table is already a hypertable
         let check_sql = "SELECT EXISTS (SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = $1)";
-        let rows = pool_obj
-            .query(check_sql, &[&table])
-            .await
-            .map_err(|e| anyhow::anyhow!("Hypertable check failed: {e}"))?;
+        let rows =
+            pool_obj.query(check_sql, &[&table]).await.map_err(|e| anyhow::anyhow!("Hypertable check failed: {e}"))?;
 
-        let already_hypertable: bool = rows
-            .first()
-            .and_then(|r| r.try_get::<_, bool>(0).ok())
-            .unwrap_or(false);
+        let already_hypertable: bool = rows.first().and_then(|r| r.try_get::<_, bool>(0).ok()).unwrap_or(false);
 
         if !already_hypertable {
-            let create_sql = format!(
-                "SELECT create_hypertable('\"{}\"', '{}', migrate_data => true)",
-                table, time_column
-            );
+            let create_sql =
+                format!("SELECT create_hypertable('\"{}\"', '{}', migrate_data => true)", table, time_column);
             pool_obj
                 .query(&create_sql, &[])
                 .await

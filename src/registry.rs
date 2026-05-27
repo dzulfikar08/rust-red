@@ -22,7 +22,9 @@ pub fn create_registry() -> rust_red_core::Result<RegistryHandle> {
 /// Create registry with WASM plugin support.
 /// Scans the plugin directory for .wasm files and registers them.
 #[cfg(feature = "wasm_plugins")]
-pub async fn create_registry_with_plugins(plugin_dir: Option<PathBuf>) -> rust_red_core::Result<(RegistryHandle, Option<PluginManager>)> {
+pub async fn create_registry_with_plugins(
+    plugin_dir: Option<PathBuf>,
+) -> rust_red_core::Result<(RegistryHandle, Option<PluginManager>)> {
     log::info!("Discovering all nodes...");
     log::info!("Loading node registry...");
 
@@ -30,10 +32,7 @@ pub async fn create_registry_with_plugins(plugin_dir: Option<PathBuf>) -> rust_r
 
     let plugin_mgr = if let Some(dir) = plugin_dir {
         log::info!("Loading WASM plugins from: {:?}", dir);
-        let config = PluginManagerConfig {
-            plugin_dir: dir.clone(),
-            ..Default::default()
-        };
+        let config = PluginManagerConfig { plugin_dir: dir.clone(), ..Default::default() };
         match PluginManager::new(&config) {
             Ok(mgr) => {
                 match mgr.load_all(&dir).await {
@@ -45,8 +44,9 @@ pub async fn create_registry_with_plugins(plugin_dir: Option<PathBuf>) -> rust_r
                     }
                     Err(e) => log::error!("Failed to load WASM plugins: {e}"),
                 }
-                mgr.register_into(&mut builder)
-                    .map_err(|e| rust_red_core::RustRedError::InvalidOperation(format!("WASM plugin registration failed: {e}")))?;
+                mgr.register_into(&mut builder).map_err(|e| {
+                    rust_red_core::RustRedError::InvalidOperation(format!("WASM plugin registration failed: {e}"))
+                })?;
                 Some(mgr)
             }
             Err(e) => {

@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_has, assert_msg_not_has, assert_msg_num, assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_not_has, assert_msg_num, assert_msg_str};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,19 +45,10 @@ fn build_sqlite_flow(query: &str) -> serde_json::Value {
 /// Create a simple table and verify no error is produced.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn sqlite_create_table() {
-    let flow = build_sqlite_flow(
-        "CREATE TABLE test_users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, age INTEGER);"
-    );
+    let flow = build_sqlite_flow("CREATE TABLE test_users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, age INTEGER);");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "create"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "create"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "sqlite-query should forward message after CREATE TABLE");
     assert_msg_not_has(&msgs[0], "error");
@@ -84,21 +75,17 @@ async fn sqlite_insert_and_select() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "init"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "init"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "chained flow should produce output from second node");
     assert_msg_not_has(&msgs[0], "error");
     // Table is empty, so payload should be an empty array
     let payload = msgs[0].get("payload").expect("should have payload");
-    assert!(payload.as_array().map(|a| a.is_empty()).unwrap_or(false),
-        "Empty table should return empty array, got: {:?}", payload);
+    assert!(
+        payload.as_array().map(|a| a.is_empty()).unwrap_or(false),
+        "Empty table should return empty array, got: {:?}",
+        payload
+    );
 }
 
 /// Insert a row using a chained flow and verify we can read it back.
@@ -121,14 +108,7 @@ async fn sqlite_insert_row_and_query() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "start"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "start"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "should get output from select node");
     assert_msg_not_has(&msgs[0], "error");
@@ -165,9 +145,7 @@ async fn sqlite_select_multiple_rows() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "should get output from select");
     assert_msg_not_has(&msgs[0], "error");
@@ -198,12 +176,7 @@ async fn sqlite_select_with_where_param() {
     let harness = TestHarness::from_flow_json(flow);
 
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "go", "queryParams": [2]}),
-            1,
-            Duration::from_secs(5),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "go", "queryParams": [2]}), 1, Duration::from_secs(5))
         .await;
 
     assert!(!msgs.is_empty(), "should get filtered output");
@@ -301,14 +274,8 @@ async fn sqlite_error_invalid_sql() {
     let flow = build_sqlite_flow("SELECT * FROM nonexistent_table;");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "bad_query"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "bad_query"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "node should forward message even on error");
     assert_msg_has(&msgs[0], "error");
@@ -316,7 +283,8 @@ async fn sqlite_error_invalid_sql() {
     let error_str = error_val.as_str().expect("error should be string");
     assert!(
         error_str.to_lowercase().contains("no such table") || error_str.contains("error"),
-        "Error should mention table not found, got: {}", error_str
+        "Error should mention table not found, got: {}",
+        error_str
     );
 }
 
@@ -326,14 +294,8 @@ async fn sqlite_error_syntax_error() {
     let flow = build_sqlite_flow("INVALID SQL STATEMENT HERE;");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "syntax_error"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "syntax_error"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "node should forward message even on syntax error");
     assert_msg_has(&msgs[0], "error");
@@ -356,14 +318,7 @@ async fn sqlite_error_missing_config() {
 
     // With a missing config node, the query node can't run. It reports an error status
     // and waits for cancellation. So we expect no messages at the sink.
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(2)).await;
 
     assert!(msgs.is_empty(), "No message should arrive when config node is missing");
 }
@@ -378,14 +333,7 @@ async fn sqlite_configured_query_used() {
     let flow = build_sqlite_flow("SELECT 1 AS value;");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "should get output");
     assert_msg_not_has(&msgs[0], "error");
@@ -418,9 +366,7 @@ async fn sqlite_column_type_mapping() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "should get typed output");
     assert_msg_not_has(&msgs[0], "error");
@@ -434,31 +380,19 @@ async fn sqlite_column_type_mapping() {
 
     // int_col should be a number (i64)
     let int_val = row_obj.get("int_col").expect("should have int_col");
-    assert!(
-        int_val.as_i64().is_some() || int_val.as_f64().is_some(),
-        "int_col should be numeric, got: {:?}", int_val
-    );
+    assert!(int_val.as_i64().is_some() || int_val.as_f64().is_some(), "int_col should be numeric, got: {:?}", int_val);
 
     // real_col should be a number (f64)
     let real_val = row_obj.get("real_col").expect("should have real_col");
-    assert!(
-        real_val.as_f64().is_some(),
-        "real_col should be f64, got: {:?}", real_val
-    );
+    assert!(real_val.as_f64().is_some(), "real_col should be f64, got: {:?}", real_val);
 
     // text_col should be a string
     let text_val = row_obj.get("text_col").expect("should have text_col");
-    assert!(
-        text_val.as_str().is_some(),
-        "text_col should be string, got: {:?}", text_val
-    );
+    assert!(text_val.as_str().is_some(), "text_col should be string, got: {:?}", text_val);
 
     // null_col should be Null variant
     let null_val = row_obj.get("null_col").expect("should have null_col");
-    assert!(
-        null_val.is_null(),
-        "null_col should be Null, got: {:?}", null_val
-    );
+    assert!(null_val.is_null(), "null_col should be Null, got: {:?}", null_val);
 }
 
 // ---------------------------------------------------------------------------
@@ -481,19 +415,14 @@ async fn sqlite_empty_result_set() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "should get output even for empty result");
     assert_msg_not_has(&msgs[0], "error");
     assert_msg_num(&msgs[0], "rowCount", 0);
 
     let payload = msgs[0].get("payload").expect("should have payload");
-    assert!(
-        payload.as_array().map(|a| a.is_empty()).unwrap_or(false),
-        "Empty table should return empty array"
-    );
+    assert!(payload.as_array().map(|a| a.is_empty()).unwrap_or(false), "Empty table should return empty array");
 }
 
 // ---------------------------------------------------------------------------
@@ -522,9 +451,7 @@ async fn sqlite_aggregate_query() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "go"}), 1, Duration::from_secs(5)).await;
 
     assert!(!msgs.is_empty(), "should get aggregate output");
     assert_msg_not_has(&msgs[0], "error");

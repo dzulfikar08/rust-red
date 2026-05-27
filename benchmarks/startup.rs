@@ -59,11 +59,8 @@ fn generate_chain_flow(n_nodes: usize) -> String {
 
     for i in 0..n_nodes {
         let node_id = format!("{:016x}", 0xd100000000000001u64 + i as u64);
-        let next_id = if i < n_nodes - 1 {
-            format!("{:016x}", 0xd100000000000001u64 + i as u64 + 1)
-        } else {
-            debug_id.clone()
-        };
+        let next_id =
+            if i < n_nodes - 1 { format!("{:016x}", 0xd100000000000001u64 + i as u64 + 1) } else { debug_id.clone() };
 
         nodes.push(json!({
             "id": node_id,
@@ -127,8 +124,7 @@ fn measure_startup(label: &str, flow_json: &str, n_nodes: usize) -> StartupMetri
 
         // Measure flow loading
         let t_load = Instant::now();
-        let engine = Engine::with_json_string(&reg, flow_json.to_string(), None)
-            .expect("engine build failed");
+        let engine = Engine::with_json_string(&reg, flow_json.to_string(), None).expect("engine build failed");
         let load_time = t_load.elapsed();
 
         // Measure engine start

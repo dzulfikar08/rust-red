@@ -22,9 +22,7 @@ async fn csv_parse_with_headers() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "a,b\n1,2"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "a,b\n1,2"}), 1).await;
 
     assert_eq!(msgs.len(), 1, "Expected 1 output message");
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -48,9 +46,7 @@ async fn csv_parse_without_headers() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "hello,world\nfoo,bar"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "hello,world\nfoo,bar"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -74,23 +70,15 @@ async fn csv_stringify() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": [{"a": "1", "b": "2"}]}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": [{"a": "1", "b": "2"}]}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
     let csv_str = payload.as_str().expect("Payload should be a string");
 
     // Should contain header line and data line
-    assert!(
-        csv_str.contains("a,b"),
-        "CSV output should contain header 'a,b', got: {csv_str}"
-    );
-    assert!(
-        csv_str.contains("1,2"),
-        "CSV output should contain data '1,2', got: {csv_str}"
-    );
+    assert!(csv_str.contains("a,b"), "CSV output should contain header 'a,b', got: {csv_str}");
+    assert!(csv_str.contains("1,2"), "CSV output should contain data '1,2', got: {csv_str}");
 }
 
 /// CSV: multi-part message (parts/sequence) handling.
@@ -120,11 +108,7 @@ async fn csv_multi_part() {
         .await;
 
     // First part should produce no output (accumulating)
-    assert!(
-        msgs.is_empty(),
-        "First part should produce no output, got {} msgs",
-        msgs.len()
-    );
+    assert!(msgs.is_empty(), "First part should produce no output, got {} msgs", msgs.len());
 }
 
 /// CSV: empty string input produces empty output.
@@ -136,18 +120,13 @@ async fn csv_empty_input() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": ""}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": ""}), 1, Duration::from_secs(2)).await;
 
     // Empty CSV should produce an empty array payload (or no output)
     if !msgs.is_empty() {
         let payload = msgs[0].get("payload").expect("Missing payload");
         let arr = payload.as_array();
-        assert!(
-            arr.is_none() || arr.unwrap().is_empty(),
-            "Expected empty array or no output for empty CSV"
-        );
+        assert!(arr.is_none() || arr.unwrap().is_empty(), "Expected empty array or no output for empty CSV");
     }
 }
 
@@ -160,9 +139,7 @@ async fn csv_parse_numbers() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "x,y\n42,3.14"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "x,y\n42,3.14"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");

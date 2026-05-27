@@ -25,12 +25,7 @@ pub struct PendingOutput {
 
 impl WasmNodeState {
     pub fn new(node_id: &str) -> Self {
-        Self {
-            pending_outputs: Vec::new(),
-            status: None,
-            errors: Vec::new(),
-            node_scope: format!("node:{}", node_id),
-        }
+        Self { pending_outputs: Vec::new(), status: None, errors: Vec::new(), node_scope: format!("node:{}", node_id) }
     }
 
     /// Push a pending output from `host_send_msg`.

@@ -56,7 +56,10 @@ impl std::fmt::Debug for BacnetConnection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("BacnetConnection")
             .field("device_id", &self.config.device_id)
-            .field("target", &format!("{}:{}", self.config.target_host.as_deref().unwrap_or("-"), self.config.target_port))
+            .field(
+                "target",
+                &format!("{}:{}", self.config.target_host.as_deref().unwrap_or("-"), self.config.target_port),
+            )
             .finish()
     }
 }

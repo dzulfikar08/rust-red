@@ -81,7 +81,9 @@ pub async fn get_nodes(
 }
 
 /// Generate HTML config for all nodes
-pub async fn generate_nodes_html_with_registry(registry: Option<&rust_red_core::runtime::registry::RegistryHandle>) -> String {
+pub async fn generate_nodes_html_with_registry(
+    registry: Option<&rust_red_core::runtime::registry::RegistryHandle>,
+) -> String {
     // Dynamically generate node HTML at runtime - read and merge all HTML files under Node-RED node directory
     let node_red_nodes_dir = paths::ui_static_dir().join("nodes");
 
@@ -115,10 +117,18 @@ pub async fn generate_nodes_html_with_registry(registry: Option<&rust_red_core::
 
 /// Custom node types that lack static HTML files and need auto-generated templates
 const CUSTOM_NODE_TYPES: &[&str] = &[
-    "modbus-config", "modbus read", "modbus write",
-    "modbus-flex-getter", "modbus-flex-writer", "modbus-server",
-    "opcua-config", "opcua read", "opcua write",
-    "bacnet-config", "bacnet read", "bacnet write",
+    "modbus-config",
+    "modbus read",
+    "modbus write",
+    "modbus-flex-getter",
+    "modbus-flex-writer",
+    "modbus-server",
+    "opcua-config",
+    "opcua read",
+    "opcua write",
+    "bacnet-config",
+    "bacnet read",
+    "bacnet write",
     "mqtt broker embedded",
 ];
 
@@ -214,14 +224,16 @@ fn get_oneditprepare(node_type: &str, _is_global: bool) -> String {
 
     // Helper closure to add tab click handler
     let add_tab_handler = |js: &mut String, prefix: &str| {
-        js.push_str(&format!(r##"
+        js.push_str(&format!(
+            r##"
                 $( "#{prefix}-tabs li" ).on( "click", function() {{
                     $( "#{prefix}-tabs li" ).css( "border-bottom", "" );
                     $(this).css( "border-bottom", "2px solid #d9400d" );
                     $( ".{prefix}-tab-pane" ).hide();
                     $( "#"+$(this).data( "tab" ) ).show();
                 }});
-            "##));
+            "##
+        ));
     };
 
     match node_type {
@@ -234,9 +246,11 @@ fn get_oneditprepare(node_type: &str, _is_global: bool) -> String {
         }
         "modbus read" => {
             add_tab_handler(&mut js, "mr");
-            js.push_str(r##"
+            js.push_str(
+                r##"
                 if(this.pollRateUnit) { $( "#node-input-pollRateUnit" ).val(this.pollRateUnit); }
-            "##);
+            "##,
+            );
         }
         "modbus write" => {
             add_tab_handler(&mut js, "mw");
@@ -414,11 +428,7 @@ fn get_node_help_html(type_name: &str) -> String {
 
 /// Generate the <script type="text/html" data-template-name> form HTML for a node type
 fn get_node_template_html(type_name: &str, is_global: bool) -> String {
-    if is_global {
-        get_global_node_template_html(type_name)
-    } else {
-        get_flow_node_template_html(type_name)
-    }
+    if is_global { get_global_node_template_html(type_name) } else { get_flow_node_template_html(type_name) }
 }
 
 fn form_row(icon: &str, label: &str, input_id: &str, placeholder: &str) -> String {
@@ -458,10 +468,7 @@ fn form_row_textarea(icon: &str, label: &str, input_id: &str, placeholder: &str)
 }
 
 fn form_row_select(icon: &str, label: &str, input_id: &str, options: &[(&str, &str)]) -> String {
-    let opts: String = options
-        .iter()
-        .map(|(val, text)| format!("<option value=\"{val}\">{text}</option>"))
-        .collect();
+    let opts: String = options.iter().map(|(val, text)| format!("<option value=\"{val}\">{text}</option>")).collect();
     format!(
         "    <div class=\"form-row\">\n\
          \x20       <label for=\"{input_id}\"><i class=\"fa fa-{icon}\"></i> {label}</label>\n\
@@ -473,8 +480,8 @@ fn form_row_select(icon: &str, label: &str, input_id: &str, options: &[(&str, &s
 fn form_row_config_node(config_type: &str, label: &str) -> String {
     // Must match the defaults key: camelCase for modbus/bacnet/opcua, snake_case for DB nodes
     let key = match config_type {
-        "modbus read" | "modbus write" | "modbus-flex-getter" | "modbus-flex-writer"
-        | "bacnet read" | "bacnet write" | "opcua read" | "opcua write" => "configNode",
+        "modbus read" | "modbus write" | "modbus-flex-getter" | "modbus-flex-writer" | "bacnet read"
+        | "bacnet write" | "opcua read" | "opcua write" => "configNode",
         _ => "config_node",
     };
     format!(
@@ -561,7 +568,9 @@ fn poll_rate_row(input_id: &str, unit_id: &str) -> String {
 }
 
 fn section_divider(title: &str) -> String {
-    format!("<hr style=\"border:0;border-top:1px solid #ccc;margin:12px 0 8px\"><b style=\"font-size:11px\">{title}</b>")
+    format!(
+        "<hr style=\"border:0;border-top:1px solid #ccc;margin:12px 0 8px\"><b style=\"font-size:11px\">{title}</b>"
+    )
 }
 
 fn conditional_section_start(id: &str) -> String {
@@ -624,23 +633,37 @@ fn get_flow_node_template_html(type_name: &str) -> String {
             html.push_str(&form_row_config_node(type_name, "Server"));
             html.push_str(&tab_bar("mr", &[("settings", "Settings"), ("options", "Options")]));
             html.push_str(&tab_content_start("mr", "settings", true));
-            html.push_str(&form_row_select("cog", "Function Code", "node-input-functionCode", &[
-                ("readCoils", "Read Coils (FC1)"),
-                ("readDiscreteInputs", "Read Discrete Inputs (FC2)"),
-                ("readHoldingRegisters", "Read Holding Registers (FC3)"),
-                ("readInputRegisters", "Read Input Registers (FC4)"),
-            ]));
+            html.push_str(&form_row_select(
+                "cog",
+                "Function Code",
+                "node-input-functionCode",
+                &[
+                    ("readCoils", "Read Coils (FC1)"),
+                    ("readDiscreteInputs", "Read Discrete Inputs (FC2)"),
+                    ("readHoldingRegisters", "Read Holding Registers (FC3)"),
+                    ("readInputRegisters", "Read Input Registers (FC4)"),
+                ],
+            ));
             html.push_str(&form_row_number("map-marker", "Address", "node-input-address", "0"));
             html.push_str(&form_row_number("bars", "Quantity", "node-input-quantity", "1"));
             html.push_str(&poll_rate_row("node-input-pollRate", "node-input-pollRateUnit"));
             html.push_str(tab_content_end());
             html.push_str(&tab_content_start("mr", "options", false));
-            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
-                ("uint16", "UInt16"), ("int16", "Int16"),
-                ("uint32", "UInt32"), ("int32", "Int32"),
-                ("float", "Float"), ("double", "Double"),
-                ("uint64", "UInt64"), ("int64", "Int64"),
-            ]));
+            html.push_str(&form_row_select(
+                "cog",
+                "Data Type",
+                "node-input-dataType",
+                &[
+                    ("uint16", "UInt16"),
+                    ("int16", "Int16"),
+                    ("uint32", "UInt32"),
+                    ("int32", "Int32"),
+                    ("float", "Float"),
+                    ("double", "Double"),
+                    ("uint64", "UInt64"),
+                    ("int64", "Int64"),
+                ],
+            ));
             html.push_str(tab_content_end());
             html.push_str(tab_bar_close());
         }
@@ -649,43 +672,75 @@ fn get_flow_node_template_html(type_name: &str) -> String {
             html.push_str(&form_row_config_node(type_name, "Server"));
             html.push_str(&tab_bar("mw", &[("settings", "Settings"), ("options", "Options")]));
             html.push_str(&tab_content_start("mw", "settings", true));
-            html.push_str(&form_row_select("cog", "Function Code", "node-input-functionCode", &[
-                ("writeSingleCoil", "Write Single Coil (FC5)"),
-                ("writeSingleRegister", "Write Single Register (FC6)"),
-                ("writeMultipleCoils", "Write Multiple Coils (FC15)"),
-                ("writeMultipleRegisters", "Write Multiple Registers (FC16)"),
-            ]));
+            html.push_str(&form_row_select(
+                "cog",
+                "Function Code",
+                "node-input-functionCode",
+                &[
+                    ("writeSingleCoil", "Write Single Coil (FC5)"),
+                    ("writeSingleRegister", "Write Single Register (FC6)"),
+                    ("writeMultipleCoils", "Write Multiple Coils (FC15)"),
+                    ("writeMultipleRegisters", "Write Multiple Registers (FC16)"),
+                ],
+            ));
             html.push_str(&form_row_number("map-marker", "Address", "node-input-address", "0"));
             html.push_str(tab_content_end());
             html.push_str(&tab_content_start("mw", "options", false));
-            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
-                ("uint16", "UInt16"), ("int16", "Int16"),
-                ("uint32", "UInt32"), ("int32", "Int32"),
-                ("float", "Float"), ("double", "Double"),
-                ("uint64", "UInt64"), ("int64", "Int64"),
-            ]));
+            html.push_str(&form_row_select(
+                "cog",
+                "Data Type",
+                "node-input-dataType",
+                &[
+                    ("uint16", "UInt16"),
+                    ("int16", "Int16"),
+                    ("uint32", "UInt32"),
+                    ("int32", "Int32"),
+                    ("float", "Float"),
+                    ("double", "Double"),
+                    ("uint64", "UInt64"),
+                    ("int64", "Int64"),
+                ],
+            ));
             html.push_str(tab_content_end());
             html.push_str(tab_bar_close());
         }
         "modbus-flex-getter" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
-            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
-                ("uint16", "UInt16"), ("int16", "Int16"),
-                ("uint32", "UInt32"), ("int32", "Int32"),
-                ("float", "Float"), ("double", "Double"),
-                ("uint64", "UInt64"), ("int64", "Int64"),
-            ]));
+            html.push_str(&form_row_select(
+                "cog",
+                "Data Type",
+                "node-input-dataType",
+                &[
+                    ("uint16", "UInt16"),
+                    ("int16", "Int16"),
+                    ("uint32", "UInt32"),
+                    ("int32", "Int32"),
+                    ("float", "Float"),
+                    ("double", "Double"),
+                    ("uint64", "UInt64"),
+                    ("int64", "Int64"),
+                ],
+            ));
         }
         "modbus-flex-writer" => {
             html.push_str(&name_row());
             html.push_str(&form_row_config_node(type_name, "Server"));
-            html.push_str(&form_row_select("cog", "Data Type", "node-input-dataType", &[
-                ("uint16", "UInt16"), ("int16", "Int16"),
-                ("uint32", "UInt32"), ("int32", "Int32"),
-                ("float", "Float"), ("double", "Double"),
-                ("uint64", "UInt64"), ("int64", "Int64"),
-            ]));
+            html.push_str(&form_row_select(
+                "cog",
+                "Data Type",
+                "node-input-dataType",
+                &[
+                    ("uint16", "UInt16"),
+                    ("int16", "Int16"),
+                    ("uint32", "UInt32"),
+                    ("int32", "Int32"),
+                    ("float", "Float"),
+                    ("double", "Double"),
+                    ("uint64", "UInt64"),
+                    ("int64", "Int64"),
+                ],
+            ));
         }
         "modbus-server" => {
             html.push_str(&name_row());
@@ -702,7 +757,10 @@ fn get_flow_node_template_html(type_name: &str) -> String {
         }
         "mqtt broker embedded" => {
             html.push_str(&name_row());
-            html.push_str(&tab_bar("mbe", &[("connection", "Connection"), ("persistence", "Persistence"), ("security", "Security")]));
+            html.push_str(&tab_bar(
+                "mbe",
+                &[("connection", "Connection"), ("persistence", "Persistence"), ("security", "Security")],
+            ));
             html.push_str(&tab_content_start("mbe", "connection", true));
             html.push_str(&form_row("server", "Host", "node-input-host", "127.0.0.1"));
             html.push_str(&form_row_number("cog", "Port", "node-input-port", "1883"));
@@ -713,9 +771,7 @@ fn get_flow_node_template_html(type_name: &str) -> String {
             html.push_str(conditional_section_end());
             html.push_str(tab_content_end());
             html.push_str(&tab_content_start("mbe", "persistence", false));
-            html.push_str(&form_row_select("database", "Type", "node-input-persistence", &[
-                ("memory", "In-Memory"),
-            ]));
+            html.push_str(&form_row_select("database", "Type", "node-input-persistence", &[("memory", "In-Memory")]));
             html.push_str(tab_content_end());
             html.push_str(&tab_content_start("mbe", "security", false));
             html.push_str(&form_row("user", "Username", "node-input-username", ""));
@@ -728,9 +784,12 @@ fn get_flow_node_template_html(type_name: &str) -> String {
             html.push_str(&form_row_config_node(type_name, "Server"));
             html.push_str(&tab_bar("or", &[("settings", "Settings"), ("options", "Options")]));
             html.push_str(&tab_content_start("or", "settings", true));
-            html.push_str(&form_row_select("cog", "Action", "node-input-action", &[
-                ("read", "Read"), ("subscribe", "Subscribe"), ("monitor", "Monitor"),
-            ]));
+            html.push_str(&form_row_select(
+                "cog",
+                "Action",
+                "node-input-action",
+                &[("read", "Read"), ("subscribe", "Subscribe"), ("monitor", "Monitor")],
+            ));
             html.push_str(&form_row("crosshairs", "Node ID", "node-input-nodeId", "ns=2;s=Temperature"));
             html.push_str(&conditional_section_start("or-interval-section"));
             html.push_str(&form_row_number("clock", "Interval (ms)", "node-input-intervalMs", "1000"));
@@ -778,7 +837,12 @@ fn get_global_node_template_html(type_name: &str) -> String {
             html.push_str(&tab_content_start("pc", "connection", true));
             html.push_str(&typed_input_row("server", "Host", "node-config-input-host", "node-config-input-hostType"));
             html.push_str(&typed_input_row("cog", "Port", "node-config-input-port", "node-config-input-portType"));
-            html.push_str(&typed_input_row("database", "Database", "node-config-input-dbname", "node-config-input-dbnameType"));
+            html.push_str(&typed_input_row(
+                "database",
+                "Database",
+                "node-config-input-dbname",
+                "node-config-input-dbnameType",
+            ));
             html.push_str(&cfg_form_row_checkbox("lock", "SSL", "ssl"));
             html.push_str(tab_content_end());
             html.push_str(&tab_content_start("pc", "security", false));
@@ -816,23 +880,25 @@ fn get_global_node_template_html(type_name: &str) -> String {
             html.push_str(&cfg_name_row());
             html.push_str(&tab_bar("mc", &[("settings", "Settings"), ("queue", "Queue"), ("options", "Options")]));
             html.push_str(&tab_content_start("mc", "settings", true));
-            html.push_str(&cfg_form_row_select("exchange", "Transport", "transport", &[
-                ("tcp", "TCP"), ("udp", "UDP"), ("rtu", "Serial RTU"),
-            ]));
+            html.push_str(&cfg_form_row_select(
+                "exchange",
+                "Transport",
+                "transport",
+                &[("tcp", "TCP"), ("udp", "UDP"), ("rtu", "Serial RTU")],
+            ));
             html.push_str(&cfg_form_row("server", "Host", "host", "localhost"));
             html.push_str(&cfg_form_row_number("cog", "Port", "port", "502"));
             html.push_str(&conditional_section_start("mc-serial-section"));
             html.push_str(&cfg_form_row("serial", "Serial Port", "serialPort", "/dev/ttyUSB0"));
             html.push_str(&cfg_form_row_number("cog", "Baud Rate", "baudRate", "9600"));
-            html.push_str(&cfg_form_row_select("cog", "Data Bits", "dataBits", &[
-                ("7", "7"), ("8", "8"),
-            ]));
-            html.push_str(&cfg_form_row_select("cog", "Stop Bits", "stopBits", &[
-                ("1", "1"), ("2", "2"),
-            ]));
-            html.push_str(&cfg_form_row_select("cog", "Parity", "parity", &[
-                ("none", "None"), ("even", "Even"), ("odd", "Odd"),
-            ]));
+            html.push_str(&cfg_form_row_select("cog", "Data Bits", "dataBits", &[("7", "7"), ("8", "8")]));
+            html.push_str(&cfg_form_row_select("cog", "Stop Bits", "stopBits", &[("1", "1"), ("2", "2")]));
+            html.push_str(&cfg_form_row_select(
+                "cog",
+                "Parity",
+                "parity",
+                &[("none", "None"), ("even", "Even"), ("odd", "Odd")],
+            ));
             html.push_str(conditional_section_end());
             html.push_str(&cfg_form_row_number("cog", "Unit ID", "unitId", "1"));
             html.push_str(&cfg_form_row_number("clock", "Timeout (ms)", "timeoutMs", "5000"));
@@ -857,16 +923,29 @@ fn get_global_node_template_html(type_name: &str) -> String {
             html.push_str(&cfg_form_row("globe", "Endpoint", "endpoint", "opc.tcp://localhost:4840"));
             html.push_str(tab_content_end());
             html.push_str(&tab_content_start("oc", "security", false));
-            html.push_str(&cfg_form_row_select("shield", "Security Policy", "securityPolicy", &[
-                ("None", "None"), ("Basic128Rsa15", "Basic128Rsa15"),
-                ("Basic256", "Basic256"), ("Basic256Sha256", "Basic256Sha256"),
-            ]));
-            html.push_str(&cfg_form_row_select("lock", "Security Mode", "securityMode", &[
-                ("None", "None"), ("Sign", "Sign"), ("SignAndEncrypt", "SignAndEncrypt"),
-            ]));
-            html.push_str(&cfg_form_row_select("user", "Auth Method", "authMethod", &[
-                ("anonymous", "Anonymous"), ("credentials", "Credentials"), ("certificate", "Certificate"),
-            ]));
+            html.push_str(&cfg_form_row_select(
+                "shield",
+                "Security Policy",
+                "securityPolicy",
+                &[
+                    ("None", "None"),
+                    ("Basic128Rsa15", "Basic128Rsa15"),
+                    ("Basic256", "Basic256"),
+                    ("Basic256Sha256", "Basic256Sha256"),
+                ],
+            ));
+            html.push_str(&cfg_form_row_select(
+                "lock",
+                "Security Mode",
+                "securityMode",
+                &[("None", "None"), ("Sign", "Sign"), ("SignAndEncrypt", "SignAndEncrypt")],
+            ));
+            html.push_str(&cfg_form_row_select(
+                "user",
+                "Auth Method",
+                "authMethod",
+                &[("anonymous", "Anonymous"), ("credentials", "Credentials"), ("certificate", "Certificate")],
+            ));
             html.push_str(&conditional_section_start("oc-credentials-section"));
             html.push_str(&cfg_form_row("user", "Username", "username", ""));
             html.push_str(&cfg_form_row_password("lock", "Password", "password"));
@@ -894,7 +973,10 @@ fn get_global_node_template_html(type_name: &str) -> String {
 }
 
 /// Get full editor config for a node type: (category, color, inputs, outputs, icon, defaults_js, align)
-fn get_node_editor_config(type_name: &str, is_global: bool) -> (&'static str, &'static str, usize, usize, &'static str, String, &'static str) {
+fn get_node_editor_config(
+    type_name: &str,
+    is_global: bool,
+) -> (&'static str, &'static str, usize, usize, &'static str, String, &'static str) {
     if is_global {
         let defaults = get_global_node_defaults(type_name);
         return ("config", "#C0DEED", 0, 0, "cog.svg", defaults, "");
@@ -938,13 +1020,11 @@ fn get_flow_node_defaults(type_name: &str) -> String {
         // Modbus/bacnet/opcua flow JSON uses camelCase configNode;
         // DB nodes use snake_case config_node in their existing flow data.
         let key = match type_name {
-            "modbus read" | "modbus write" | "modbus-flex-getter" | "modbus-flex-writer"
-            | "bacnet read" | "bacnet write" | "opcua read" | "opcua write" => "configNode",
+            "modbus read" | "modbus write" | "modbus-flex-getter" | "modbus-flex-writer" | "bacnet read"
+            | "bacnet write" | "opcua read" | "opcua write" => "configNode",
             _ => "config_node",
         };
-        d.push_str(&format!(
-            "            {key}: {{value:\"\", type:\"{ct}\", required: true}},\n"
-        ));
+        d.push_str(&format!("            {key}: {{value:\"\", type:\"{ct}\", required: true}},\n"));
     }
 
     match type_name {

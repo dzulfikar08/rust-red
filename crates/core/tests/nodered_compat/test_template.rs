@@ -8,7 +8,7 @@ use std::time::Duration;
 use serde_json::json;
 
 use super::flow_builder::FlowBuilder;
-use super::harness::{assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_str};
 use rust_red_core::runtime::model::Variant;
 
 /// Template: basic mustache substitution with payload.
@@ -20,9 +20,7 @@ async fn template_basic_mustache() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "World"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "World"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "Hello World!");
@@ -37,13 +35,7 @@ async fn template_with_topic() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": "hello", "topic": "greeting"}),
-            1,
-        )
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "hello", "topic": "greeting"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "Topic: greeting, Data: hello");
@@ -58,9 +50,7 @@ async fn template_custom_field() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "42"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "42"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "42");
@@ -71,28 +61,17 @@ async fn template_custom_field() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn template_json_output() {
     let flow = FlowBuilder::new()
-        .template(
-            "1",
-            "{\"greeting\": \"Hello {{payload}}\"}",
-            "result",
-            "json",
-            json!([["99"]]),
-        )
+        .template("1", "{\"greeting\": \"Hello {{payload}}\"}", "result", "json", json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "World"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "World"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let result = msgs[0].get("result").expect("Missing result field");
     let obj = result.as_object().expect("Result should be an object");
-    assert_eq!(
-        obj.get("greeting"),
-        Some(&Variant::from("Hello World"))
-    );
+    assert_eq!(obj.get("greeting"), Some(&Variant::from("Hello World")));
 }
 
 /// Template: plain syntax (no substitution).
@@ -107,9 +86,7 @@ async fn template_plain_syntax() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "foo"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "foo"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "payload={{payload}}");
@@ -118,15 +95,10 @@ async fn template_plain_syntax() {
 /// Template: empty template string does not crash.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn template_empty_template() {
-    let flow = FlowBuilder::new()
-        .template("1", "", "payload", "str", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().template("1", "", "payload", "str", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "foo"}), 1, Duration::from_millis(200))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "foo"}), 1, Duration::from_millis(200)).await;
 
     assert!(msgs.is_empty());
 }
@@ -140,9 +112,7 @@ async fn template_numeric_payload() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 42}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 42}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "The answer is 42");
@@ -160,13 +130,7 @@ async fn template_nested_property() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": {"name": "Alice", "age": "30"}}),
-            1,
-        )
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {"name": "Alice", "age": "30"}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "result", "Name: Alice, Age: 30");

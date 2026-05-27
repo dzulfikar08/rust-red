@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_has, assert_msg_not_has, assert_msg_num, TestHarness};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_not_has, assert_msg_num};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,9 +63,7 @@ async fn postgres_connect_and_select() {
     let flow = build_pg_flow("SELECT 1 AS value;");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "should get output from select");
     assert_msg_not_has(&msgs[0], "error");
@@ -102,9 +100,7 @@ async fn postgres_create_insert_select() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "start"}), 1, Duration::from_secs(15))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "start"}), 1, Duration::from_secs(15)).await;
 
     assert!(!msgs.is_empty(), "should get output from select");
     assert_msg_not_has(&msgs[0], "error");
@@ -134,12 +130,7 @@ async fn postgres_parameterized_query() {
     let harness = TestHarness::from_flow_json(flow);
 
     let msgs = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": "query", "queryParams": [15.0]}),
-            1,
-            Duration::from_secs(10),
-        )
+        .inject_and_collect_timeout("2", json!({"payload": "query", "queryParams": [15.0]}), 1, Duration::from_secs(10))
         .await;
 
     assert!(!msgs.is_empty(), "should get parameterized output");
@@ -154,9 +145,7 @@ async fn postgres_error_invalid_sql() {
     let flow = build_pg_flow("SELECT * FROM nonexistent_table_xyz;");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "bad"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "bad"}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "node should forward message even on error");
     assert_msg_has(&msgs[0], "error");
@@ -202,9 +191,7 @@ async fn postgres_connection_error() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(10)).await;
 
     // The node should still forward the message but with an error property
     assert!(!msgs.is_empty(), "should get message with pool error");

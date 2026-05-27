@@ -296,14 +296,7 @@ async fn websocket_in_disconnect_command() {
 
     let harness = TestHarness::from_flow_json(flow);
 
-    let _msgs = harness
-        .inject_and_collect_timeout(
-            "7",
-            json!({"disconnect": true}),
-            0,
-            Duration::from_secs(2),
-        )
-        .await;
+    let _msgs = harness.inject_and_collect_timeout("7", json!({"disconnect": true}), 0, Duration::from_secs(2)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -333,14 +326,7 @@ async fn websocket_out_disconnect_command() {
 
     let harness = TestHarness::from_flow_json(flow);
 
-    let _msgs = harness
-        .inject_and_collect_timeout(
-            "8",
-            json!({"disconnect": true}),
-            0,
-            Duration::from_secs(2),
-        )
-        .await;
+    let _msgs = harness.inject_and_collect_timeout("8", json!({"disconnect": true}), 0, Duration::from_secs(2)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -371,12 +357,7 @@ async fn websocket_listener_broadcast() {
 
     // Inject a message to broadcast
     let _msgs = harness
-        .inject_and_collect_timeout(
-            "9",
-            json!({"payload": "broadcast message"}),
-            0,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("9", json!({"payload": "broadcast message"}), 0, Duration::from_secs(2))
         .await;
 }
 
@@ -456,14 +437,8 @@ async fn websocket_echo_roundtrip() {
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Send a message via WebSocket out
-    let _msgs = harness
-        .inject_and_collect_timeout(
-            "ws_out",
-            json!({"payload": "echo test"}),
-            0,
-            Duration::from_secs(3),
-        )
-        .await;
+    let _msgs =
+        harness.inject_and_collect_timeout("ws_out", json!({"payload": "echo test"}), 0, Duration::from_secs(3)).await;
 
     // In a complete test, we would verify that sink "99" received
     // {"payload": "echo test"} from the WebSocket in node after the

@@ -45,11 +45,7 @@ async fn read_fixed_header_stream(stream: &mut TcpStream) -> std::io::Result<Fix
 
     let remaining_length = read_remaining_length_stream(stream).await?;
 
-    Ok(FixedHeader {
-        packet_type,
-        flags,
-        remaining_length,
-    })
+    Ok(FixedHeader { packet_type, flags, remaining_length })
 }
 
 async fn read_remaining_length_stream(stream: &mut TcpStream) -> std::io::Result<usize> {
@@ -123,11 +119,7 @@ async fn read_fixed_header_half(read_half: &mut tokio::io::ReadHalf<TcpStream>) 
         }
     }
 
-    Ok(FixedHeader {
-        packet_type,
-        flags,
-        remaining_length,
-    })
+    Ok(FixedHeader { packet_type, flags, remaining_length })
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +159,9 @@ pub fn decode_connect(buf: &mut BytesMut) -> std::io::Result<ConnectPacket> {
     let (will_topic, will_payload) = if has_will {
         if proto_level == 5 {
             let wp_len = decode_variable_length(buf);
-            if wp_len > 0 { buf.advance(wp_len); }
+            if wp_len > 0 {
+                buf.advance(wp_len);
+            }
         }
         let topic = Some(decode_utf8_string(buf));
         let len = buf.get_u16() as usize;
@@ -177,11 +171,7 @@ pub fn decode_connect(buf: &mut BytesMut) -> std::io::Result<ConnectPacket> {
         (None, None)
     };
 
-    let username = if has_username {
-        Some(decode_utf8_string(buf))
-    } else {
-        None
-    };
+    let username = if has_username { Some(decode_utf8_string(buf)) } else { None };
 
     let password = if has_password {
         let len = buf.get_u16() as usize;
@@ -211,22 +201,11 @@ pub fn decode_publish(buf: &mut BytesMut, header: &FixedHeader) -> std::io::Resu
     let retain = (header.flags & 0x01) != 0;
 
     let topic = decode_utf8_string(buf);
-    let packet_id = if qos != QoS::AtMostOnce {
-        Some(buf.get_u16())
-    } else {
-        None
-    };
+    let packet_id = if qos != QoS::AtMostOnce { Some(buf.get_u16()) } else { None };
 
     let payload = buf.copy_to_bytes(buf.remaining());
 
-    Ok(PublishPacket {
-        topic,
-        payload,
-        qos,
-        retain,
-        dup,
-        packet_id,
-    })
+    Ok(PublishPacket { topic, payload, qos, retain, dup, packet_id })
 }
 
 pub fn decode_subscribe(buf: &mut BytesMut) -> std::io::Result<SubscribePacket> {
@@ -235,15 +214,13 @@ pub fn decode_subscribe(buf: &mut BytesMut) -> std::io::Result<SubscribePacket> 
     let mut subscriptions = Vec::new();
     while buf.remaining() >= 3 {
         let topic_filter = decode_utf8_string(buf);
-        if buf.remaining() == 0 { break; }
+        if buf.remaining() == 0 {
+            break;
+        }
         let sub_options = buf.get_u8();
         let qos = QoS::from_u8(sub_options & 0x03).unwrap_or(QoS::AtMostOnce);
         let retain_handling = (sub_options >> 4) & 0x03;
-        subscriptions.push(SubscriptionFilter {
-            topic_filter,
-            qos,
-            retain_handling,
-        });
+        subscriptions.push(SubscriptionFilter { topic_filter, qos, retain_handling });
     }
 
     Ok(SubscribePacket { packet_id, subscriptions })
@@ -285,9 +262,13 @@ pub fn encode_publish(
 ) -> Vec<u8> {
     let mut buf = Vec::with_capacity(256);
     let mut first_byte = (PacketType::Publish as u8) << 4;
-    if dup { first_byte |= 0x08; }
+    if dup {
+        first_byte |= 0x08;
+    }
     first_byte |= (qos as u8) << 1;
-    if retain { first_byte |= 0x01; }
+    if retain {
+        first_byte |= 0x01;
+    }
     buf.push(first_byte);
 
     let topic_bytes = topic.as_bytes();
@@ -424,10 +405,14 @@ fn decode_variable_length(buf: &mut BytesMut) -> usize {
     let mut value = 0usize;
     let mut multiplier = 1usize;
     loop {
-        if buf.remaining() == 0 { break; }
+        if buf.remaining() == 0 {
+            break;
+        }
         let byte = buf.get_u8() as usize;
         value += (byte & 0x7F) * multiplier;
-        if (byte & 0x80) == 0 { break; }
+        if (byte & 0x80) == 0 {
+            break;
+        }
         multiplier *= 128;
     }
     value
@@ -441,7 +426,9 @@ fn encode_remaining_length_vec(buf: &mut Vec<u8>, mut length: usize) {
             encoded_byte |= 0x80;
         }
         buf.push(encoded_byte);
-        if length == 0 { break; }
+        if length == 0 {
+            break;
+        }
     }
 }
 
@@ -490,7 +477,7 @@ mod tests {
     fn encode_publish_qos1_with_packet_id() {
         let bytes = encode_publish("a/b", b"x", QoS::AtLeastOnce, false, false, Some(42));
         assert_eq!(bytes[0], 0x32); // PUBLISH + QoS 1
-        // Topic (2+3=5) + packet_id (2) + payload (1) = 8
+                                    // Topic (2+3=5) + packet_id (2) + payload (1) = 8
         assert_eq!(bytes[1], 8);
         // Packet ID at offset 2+2+3 = 7
         let pid = u16::from_be_bytes([bytes[7], bytes[8]]);

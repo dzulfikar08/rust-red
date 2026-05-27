@@ -2,7 +2,6 @@
 //!
 //! Verifies that the XML node parses XML strings to objects and
 /// converts objects back to XML strings, matching Node-RED behavior.
-
 use serde_json::json;
 
 use super::harness::TestHarness;
@@ -20,9 +19,7 @@ async fn xml_parse_to_object() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "<root><item>val</item></root>"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "<root><item>val</item></root>"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -49,26 +46,14 @@ async fn xml_stringify() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": {"root": {"item": ["val"]}}}),
-            1,
-        )
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {"root": {"item": ["val"]}}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
     let xml_str = payload.as_str().expect("Payload should be a string");
 
-    assert!(
-        xml_str.contains("<root>"),
-        "XML output should contain '<root>', got: {xml_str}"
-    );
-    assert!(
-        xml_str.contains("<item>val</item>"),
-        "XML output should contain '<item>val</item>', got: {xml_str}"
-    );
+    assert!(xml_str.contains("<root>"), "XML output should contain '<root>', got: {xml_str}");
+    assert!(xml_str.contains("<item>val</item>"), "XML output should contain '<item>val</item>', got: {xml_str}");
 }
 
 /// XML: parse XML with attributes.
@@ -85,13 +70,8 @@ async fn xml_with_attributes() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": "<root><item attr=\"hello\">val</item></root>"}),
-            1,
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect("1", json!({"payload": "<root><item attr=\"hello\">val</item></root>"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -101,9 +81,6 @@ async fn xml_with_attributes() {
     let item_obj = item[0].as_object().expect("Item should be an object");
 
     // With merge_attrs=true (default), attributes are flattened into the element
-    assert!(
-        item_obj.get("attr").is_some(),
-        "Item should contain attribute 'attr'"
-    );
+    assert!(item_obj.get("attr").is_some(), "Item should contain attribute 'attr'");
     assert_eq!(item_obj.get("attr").unwrap().as_str().unwrap(), "hello");
 }

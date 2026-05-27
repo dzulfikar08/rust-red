@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_str};
 
 /// link out -> link in on the same tab (same flow).
 /// Inject sends to link out, which forwards to link in, which wires to test-once.

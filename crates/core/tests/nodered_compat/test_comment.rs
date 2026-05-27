@@ -6,7 +6,7 @@
 use serde_json::json;
 
 use super::flow_builder::FlowBuilder;
-use super::harness::{assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_str};
 
 /// Comment node loads in a flow without errors.
 /// It does not participate in message passing, so it has no wires.

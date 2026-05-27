@@ -43,27 +43,16 @@ impl InfluxDbOutNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let out_config = InfluxDbOutConfig::deserialize(&config.rest)?;
-        Ok(Box::new(InfluxDbOutNode {
-            base: base_node,
-            config: out_config,
-        }))
+        Ok(Box::new(InfluxDbOutNode { base: base_node, config: out_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         let eid_opt = ElementId::from_str(&self.config.config_node).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine
-                    .find_global_node_by_name(&self.config.config_node)
-                    .ok()
-                    .flatten()
-            })
+            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
             .ok_or_else(|| anyhow::anyhow!("Config node '{}' not found", self.config.config_node))?;
 
         Ok(global)
@@ -96,10 +85,7 @@ impl InfluxDbOutNode {
                     }
                     _ => {
                         context_map = context_map.insert(key, value).map_err(|e| {
-                            crate::RustRedError::invalid_operation(&format!(
-                                "Query template context error: {}",
-                                e
-                            ))
+                            crate::RustRedError::invalid_operation(&format!("Query template context error: {}", e))
                         })?;
                     }
                 }
@@ -107,21 +93,12 @@ impl InfluxDbOutNode {
         }
 
         let data = context_map.build();
-        let template = mustache::compile_str(&self.config.query).map_err(|e| {
-            crate::RustRedError::invalid_operation(&format!(
-                "Query template compilation error: {}",
-                e
-            ))
-        })?;
+        let template = mustache::compile_str(&self.config.query)
+            .map_err(|e| crate::RustRedError::invalid_operation(&format!("Query template compilation error: {}", e)))?;
 
         template
             .render_data_to_string(&data)
-            .map_err(|e| {
-                crate::RustRedError::invalid_operation(&format!(
-                    "Query template rendering error: {}",
-                    e
-                ))
-            })
+            .map_err(|e| crate::RustRedError::invalid_operation(&format!("Query template rendering error: {}", e)))
     }
 
     /// Parse the InfluxDB JSON query response into a Variant array.
@@ -219,7 +196,8 @@ impl FlowNodeBehavior for InfluxDbOutNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -242,11 +220,7 @@ impl FlowNodeBehavior for InfluxDbOutNode {
                         match result {
                             Ok(q) => q,
                             Err(e) => {
-                                log::warn!(
-                                    "[influxdb-out:{}] Failed to render query template: {}",
-                                    node.name(),
-                                    e
-                                );
+                                log::warn!("[influxdb-out:{}] Failed to render query template: {}", node.name(), e);
                                 {
                                     let mut guard = msg.write().await;
                                     guard.set(
@@ -261,19 +235,11 @@ impl FlowNodeBehavior for InfluxDbOutNode {
                         }
                     };
 
-                    log::debug!(
-                        "[influxdb-out:{}] Executing query: {}",
-                        node.name(),
-                        rendered_query
-                    );
+                    log::debug!("[influxdb-out:{}] Executing query: {}", node.name(), rendered_query);
 
                     // Execute the query with timeout
                     let timeout = Duration::from_millis(node.config.timeout_ms);
-                    let result = tokio::time::timeout(
-                        timeout,
-                        cfg_inner.query_flux(&rendered_query),
-                    )
-                    .await;
+                    let result = tokio::time::timeout(timeout, cfg_inner.query_flux(&rendered_query)).await;
 
                     match result {
                         Ok(Ok(response_body)) => {
@@ -281,20 +247,13 @@ impl FlowNodeBehavior for InfluxDbOutNode {
                             {
                                 let mut guard = msg.write().await;
                                 guard.set("payload".to_string(), parsed);
-                                guard.set(
-                                    "query".to_string(),
-                                    Variant::String(rendered_query),
-                                );
+                                guard.set("query".to_string(), Variant::String(rendered_query));
                             }
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                         }
                         Ok(Err(e)) => {
-                            log::warn!(
-                                "[influxdb-out:{}] Query error: {}",
-                                node.name(),
-                                e
-                            );
+                            log::warn!("[influxdb-out:{}] Query error: {}", node.name(), e);
                             {
                                 let mut guard = msg.write().await;
                                 guard.set("error".to_string(), Variant::String(e.to_string()));
@@ -310,10 +269,7 @@ impl FlowNodeBehavior for InfluxDbOutNode {
                             );
                             {
                                 let mut guard = msg.write().await;
-                                guard.set(
-                                    "error".to_string(),
-                                    Variant::String("Query timed out".into()),
-                                );
+                                guard.set("error".to_string(), Variant::String("Query timed out".into()));
                             }
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;

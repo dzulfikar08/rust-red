@@ -30,10 +30,8 @@ async fn start_embedded_broker_with_auth(user: &str, pass: &str) -> std::net::So
     let mut config = rust_red_mqtt_broker::config::BrokerConfig::default();
     config.bind = "127.0.0.1:0".to_string();
     config.enabled = true;
-    config.auth = rust_red_mqtt_broker::config::AuthConfig {
-        username: Some(user.to_string()),
-        password: Some(pass.to_string()),
-    };
+    config.auth =
+        rust_red_mqtt_broker::config::AuthConfig { username: Some(user.to_string()), password: Some(pass.to_string()) };
     let broker = Arc::new(rust_red_mqtt_broker::broker::MqttBroker::new(config));
     let addr = broker.clone().start_background().await.expect("embedded broker start");
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -149,14 +147,7 @@ async fn mqtt_out_to_mqtt_in_roundtrip() {
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Inject message into mqtt-out
-    let results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": "hello"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let results = harness.inject_and_collect_timeout("2", json!({"payload": "hello"}), 1, Duration::from_secs(5)).await;
 
     // We may not get the message in time due to async connection setup,
     // but the flow should build and run without errors.
@@ -220,14 +211,8 @@ async fn mqtt_multiple_subscribers_fanout() {
     let harness = TestHarness::from_flow_json(flow);
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": "fanout"}),
-            2,
-            Duration::from_secs(5),
-        )
-        .await;
+    let _results =
+        harness.inject_and_collect_timeout("2", json!({"payload": "fanout"}), 2, Duration::from_secs(5)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -323,14 +308,7 @@ async fn mqtt_wildcard_hash_subscription() {
     let harness = TestHarness::from_flow_json(flow);
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": "23.5"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let _results = harness.inject_and_collect_timeout("2", json!({"payload": "23.5"}), 1, Duration::from_secs(5)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -374,14 +352,8 @@ async fn mqtt_wildcard_plus_subscription() {
     let harness = TestHarness::from_flow_json(flow);
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": "online"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let _results =
+        harness.inject_and_collect_timeout("2", json!({"payload": "online"}), 1, Duration::from_secs(5)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -425,14 +397,8 @@ async fn mqtt_qos1_publish() {
     let harness = TestHarness::from_flow_json(flow);
     tokio::time::sleep(Duration::from_millis(500)).await;
 
-    let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": "qos1 msg"}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let _results =
+        harness.inject_and_collect_timeout("2", json!({"payload": "qos1 msg"}), 1, Duration::from_secs(5)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -529,12 +495,7 @@ async fn mqtt_buffer_payload_passthrough() {
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": [0xDE, 0xAD, 0xBE, 0xEF]}),
-            1,
-            Duration::from_secs(5),
-        )
+        .inject_and_collect_timeout("2", json!({"payload": [0xDE, 0xAD, 0xBE, 0xEF]}), 1, Duration::from_secs(5))
         .await;
 }
 
@@ -556,7 +517,9 @@ async fn mqtt_retained_message_delivery() {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() { panic!("Timeout waiting for CONNACK"); }
+        if remaining.is_zero() {
+            panic!("Timeout waiting for CONNACK");
+        }
         match tokio::time::timeout(remaining, pub_el.poll()).await {
             Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(_)))) => break,
             Ok(Ok(_)) => continue,
@@ -565,13 +528,17 @@ async fn mqtt_retained_message_delivery() {
         }
     }
 
-    pub_client.publish("test/retained", rumqttc::QoS::AtMostOnce, true, b"retained payload")
-        .await.unwrap();
+    pub_client.publish("test/retained", rumqttc::QoS::AtMostOnce, true, b"retained payload").await.unwrap();
 
     // Drain the event loop
     let _ = tokio::time::timeout(Duration::from_secs(1), async {
-        loop { match pub_el.poll().await { Ok(_) | Err(_) => break } }
-    }).await;
+        loop {
+            match pub_el.poll().await {
+                Ok(_) | Err(_) => break,
+            }
+        }
+    })
+    .await;
 
     // Now build a flow with mqtt-in subscribing to the retained topic
     let flow = json!([
@@ -600,7 +567,7 @@ async fn mqtt_retained_message_delivery() {
     // Use inject_and_collect_timeout which doesn't panic on timeout
     let results = harness
         .inject_and_collect_timeout(
-            "1",  // no real injection needed, but the engine needs to run
+            "1", // no real injection needed, but the engine needs to run
             json!({"_trigger": true}),
             1,
             Duration::from_secs(15),
@@ -631,7 +598,9 @@ async fn mqtt_broker_auth_rejection() {
     let mut got_refused = false;
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() { break; }
+        if remaining.is_zero() {
+            break;
+        }
         match tokio::time::timeout(remaining, eventloop.poll()).await {
             Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(ack)))) => {
                 if ack.code != rumqttc::ConnectReturnCode::Success {
@@ -640,7 +609,10 @@ async fn mqtt_broker_auth_rejection() {
                 }
             }
             Ok(Ok(_)) => continue,
-            Ok(Err(_)) => { got_refused = true; break; }
+            Ok(Err(_)) => {
+                got_refused = true;
+                break;
+            }
             Err(_) => break,
         }
     }
@@ -677,14 +649,8 @@ async fn mqtt_out_no_payload_no_publish() {
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Inject message without payload — should not panic or error
-    let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"topic": "no/payload"}),
-            0,
-            Duration::from_secs(2),
-        )
-        .await;
+    let _results =
+        harness.inject_and_collect_timeout("2", json!({"topic": "no/payload"}), 0, Duration::from_secs(2)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -717,22 +683,10 @@ async fn mqtt_out_connect_disconnect_actions() {
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     // Send disconnect action
-    let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"action": "disconnect"}),
-            0,
-            Duration::from_secs(2),
-        )
-        .await;
+    let _results =
+        harness.inject_and_collect_timeout("2", json!({"action": "disconnect"}), 0, Duration::from_secs(2)).await;
 
     // Send connect action
-    let _results = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"action": "connect"}),
-            0,
-            Duration::from_secs(3),
-        )
-        .await;
+    let _results =
+        harness.inject_and_collect_timeout("2", json!({"action": "connect"}), 0, Duration::from_secs(3)).await;
 }

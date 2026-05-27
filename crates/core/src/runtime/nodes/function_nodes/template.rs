@@ -3,8 +3,8 @@
 // Based on Node-RED 80-template.js
 
 use async_trait::async_trait;
-use rust_red_macro::*;
 use mustache::{Data, MapBuilder};
+use rust_red_macro::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio_util::sync::CancellationToken;

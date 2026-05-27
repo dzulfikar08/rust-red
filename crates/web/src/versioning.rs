@@ -81,10 +81,7 @@ pub struct FlowVersionStore {
 
 impl FlowVersionStore {
     pub fn new(flows_file_path: &Path, config: &VersioningConfig) -> Self {
-        let base_dir = flows_file_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join("versions");
+        let base_dir = flows_file_path.parent().unwrap_or_else(|| Path::new(".")).join("versions");
         Self { base_dir, config: config.clone() }
     }
 
@@ -146,8 +143,7 @@ impl FlowVersionStore {
     pub async fn get_version(
         &self,
         version_id: &str,
-    ) -> Result<Option<(VersionMeta, Vec<serde_json::Value>)>, Box<dyn std::error::Error + Send + Sync>>
-    {
+    ) -> Result<Option<(VersionMeta, Vec<serde_json::Value>)>, Box<dyn std::error::Error + Send + Sync>> {
         let index = self.read_index().await?;
         let meta = match index.iter().find(|m| m.id == version_id) {
             Some(m) => m.clone(),
@@ -173,14 +169,12 @@ impl FlowVersionStore {
         from_id: &str,
         to_id: &str,
     ) -> Result<FlowDiff, Box<dyn std::error::Error + Send + Sync>> {
-        let from = self
-            .get_version(from_id)
-            .await?
-            .ok_or_else(|| -> Box<dyn std::error::Error + Send + Sync> { format!("Version {from_id} not found").into() })?;
-        let to = self
-            .get_version(to_id)
-            .await?
-            .ok_or_else(|| -> Box<dyn std::error::Error + Send + Sync> { format!("Version {to_id} not found").into() })?;
+        let from = self.get_version(from_id).await?.ok_or_else(|| -> Box<dyn std::error::Error + Send + Sync> {
+            format!("Version {from_id} not found").into()
+        })?;
+        let to = self.get_version(to_id).await?.ok_or_else(|| -> Box<dyn std::error::Error + Send + Sync> {
+            format!("Version {to_id} not found").into()
+        })?;
 
         let mut diff = compute_diff(&from.1, &to.1);
         diff.from_version = from_id.to_string();
@@ -205,9 +199,7 @@ impl FlowVersionStore {
         self.config.enabled
     }
 
-    async fn read_index(
-        &self,
-    ) -> Result<Vec<VersionMeta>, Box<dyn std::error::Error + Send + Sync>> {
+    async fn read_index(&self) -> Result<Vec<VersionMeta>, Box<dyn std::error::Error + Send + Sync>> {
         let index_path = self.base_dir.join("versions.json");
         if !index_path.exists() {
             return Ok(vec![]);
@@ -217,10 +209,7 @@ impl FlowVersionStore {
         Ok(index)
     }
 
-    async fn write_index(
-        &self,
-        index: &[VersionMeta],
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn write_index(&self, index: &[VersionMeta]) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let index_path = self.base_dir.join("versions.json");
         let json = serde_json::to_string_pretty(index)?;
         tokio::fs::write(&index_path, json).await?;
@@ -263,9 +252,7 @@ fn sort_value(v: serde_json::Value) -> serde_json::Value {
             }
             serde_json::Value::Object(object)
         }
-        serde_json::Value::Array(arr) => {
-            serde_json::Value::Array(arr.into_iter().map(sort_value).collect())
-        }
+        serde_json::Value::Array(arr) => serde_json::Value::Array(arr.into_iter().map(sort_value).collect()),
         other => other,
     }
 }
@@ -276,10 +263,7 @@ fn compute_checksum(canonical_json: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-pub fn compute_diff(
-    from: &[serde_json::Value],
-    to: &[serde_json::Value],
-) -> FlowDiff {
+pub fn compute_diff(from: &[serde_json::Value], to: &[serde_json::Value]) -> FlowDiff {
     let from_map = build_node_map(from);
     let to_map = build_node_map(to);
 
@@ -303,30 +287,14 @@ pub fn compute_diff(
         }
     }
 
-    FlowDiff {
-        from_version: String::new(),
-        to_version: String::new(),
-        added,
-        removed,
-        modified,
-    }
+    FlowDiff { from_version: String::new(), to_version: String::new(), added, removed, modified }
 }
 
-fn build_node_map(
-    flows: &[serde_json::Value],
-) -> std::collections::HashMap<String, &serde_json::Value> {
-    flows
-        .iter()
-        .filter_map(|v| {
-            v.get("id").and_then(|id| id.as_str()).map(|id| (id.to_string(), v))
-        })
-        .collect()
+fn build_node_map(flows: &[serde_json::Value]) -> std::collections::HashMap<String, &serde_json::Value> {
+    flows.iter().filter_map(|v| v.get("id").and_then(|id| id.as_str()).map(|id| (id.to_string(), v))).collect()
 }
 
-fn diff_node_fields(
-    old: &serde_json::Value,
-    new: &serde_json::Value,
-) -> BTreeMap<String, FieldChange> {
+fn diff_node_fields(old: &serde_json::Value, new: &serde_json::Value) -> BTreeMap<String, FieldChange> {
     let mut changes = BTreeMap::new();
     let old_obj = match old.as_object() {
         Some(o) => o,

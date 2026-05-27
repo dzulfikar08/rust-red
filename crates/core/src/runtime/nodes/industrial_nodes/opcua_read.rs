@@ -51,24 +51,16 @@ impl OpcUaReadNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let read_config = OpcUaReadConfig::deserialize(&config.rest)?;
-        Ok(Box::new(OpcUaReadNode {
-            base: base_node,
-            config: read_config,
-        }))
+        Ok(Box::new(OpcUaReadNode { base: base_node, config: read_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         let eid_opt = ElementId::from_str(&self.config.config_node).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine.find_global_node_by_name(&self.config.config_node).ok().flatten()
-            })
+            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
             .ok_or_else(|| anyhow::anyhow!("Config node not found"))?;
 
         Ok(global)
@@ -76,22 +68,20 @@ impl OpcUaReadNode {
 
     /// Perform a browse operation on the configured node, returning child references.
     async fn perform_browse(&self, cfg_inner: &OpcUaConfigNode, msg: &MsgHandle) -> crate::Result<()> {
-        log::info!(
-            "[opcua-read:{}] Browse node_id={} from {}",
-            self.name(),
-            self.config.node_id,
-            cfg_inner.endpoint()
-        );
+        log::info!("[opcua-read:{}] Browse node_id={} from {}", self.name(), self.config.node_id, cfg_inner.endpoint());
 
         // TODO: When opcua client is fully wired, use session.browse() here.
         // The stub returns an empty array so the flow continues gracefully.
         let mut guard = msg.write().await;
         guard.set("payload".to_string(), Variant::from(Vec::<Variant>::new()));
-        guard.set("opcua".to_string(), Variant::from(serde_json::json!({
-            "action": "browse",
-            "nodeId": self.config.node_id,
-            "endpoint": cfg_inner.endpoint(),
-        })));
+        guard.set(
+            "opcua".to_string(),
+            Variant::from(serde_json::json!({
+                "action": "browse",
+                "nodeId": self.config.node_id,
+                "endpoint": cfg_inner.endpoint(),
+            })),
+        );
         Ok(())
     }
 
@@ -108,12 +98,15 @@ impl OpcUaReadNode {
         // TODO: When opcua client is fully wired, use session.read() here.
         let mut guard = msg.write().await;
         guard.set("payload".to_string(), Variant::Null);
-        guard.set("opcua".to_string(), Variant::from(serde_json::json!({
-            "action": "read",
-            "nodeId": self.config.node_id,
-            "attribute": self.config.attribute,
-            "endpoint": cfg_inner.endpoint(),
-        })));
+        guard.set(
+            "opcua".to_string(),
+            Variant::from(serde_json::json!({
+                "action": "read",
+                "nodeId": self.config.node_id,
+                "attribute": self.config.attribute,
+                "endpoint": cfg_inner.endpoint(),
+            })),
+        );
         Ok(())
     }
 }
@@ -136,7 +129,8 @@ impl FlowNodeBehavior for OpcUaReadNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }

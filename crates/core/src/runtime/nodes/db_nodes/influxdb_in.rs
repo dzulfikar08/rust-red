@@ -43,27 +43,16 @@ impl InfluxDbInNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let in_config = InfluxDbInConfig::deserialize(&config.rest)?;
-        Ok(Box::new(InfluxDbInNode {
-            base: base_node,
-            config: in_config,
-        }))
+        Ok(Box::new(InfluxDbInNode { base: base_node, config: in_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         let eid_opt = ElementId::from_str(&self.config.config_node).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine
-                    .find_global_node_by_name(&self.config.config_node)
-                    .ok()
-                    .flatten()
-            })
+            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
             .ok_or_else(|| anyhow::anyhow!("Config node '{}' not found", self.config.config_node))?;
 
         Ok(global)
@@ -106,11 +95,7 @@ impl InfluxDbInNode {
         line.push(' ');
 
         // Fields
-        let field_cols = self
-            .config
-            .field_columns
-            .as_ref()
-            .filter(|c| !c.is_empty());
+        let field_cols = self.config.field_columns.as_ref().filter(|c| !c.is_empty());
 
         if let Some(field_col_list) = field_cols {
             let mut first = true;
@@ -273,7 +258,8 @@ impl FlowNodeBehavior for InfluxDbInNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -296,11 +282,7 @@ impl FlowNodeBehavior for InfluxDbInNode {
                         match result {
                             Ok(lp) => lp,
                             Err(e) => {
-                                log::warn!(
-                                    "[influxdb-in:{}] Failed to build line protocol: {}",
-                                    node.name(),
-                                    e
-                                );
+                                log::warn!("[influxdb-in:{}] Failed to build line protocol: {}", node.name(), e);
                                 {
                                     let mut guard = msg.write().await;
                                     guard.set(
@@ -315,11 +297,7 @@ impl FlowNodeBehavior for InfluxDbInNode {
                         }
                     };
 
-                    log::debug!(
-                        "[influxdb-in:{}] Writing line protocol: {}",
-                        node.name(),
-                        line_protocol
-                    );
+                    log::debug!("[influxdb-in:{}] Writing line protocol: {}", node.name(), line_protocol);
 
                     match cfg_inner.write_line_protocol(&line_protocol, "ms").await {
                         Ok(()) => {
@@ -331,21 +309,14 @@ impl FlowNodeBehavior for InfluxDbInNode {
                                     "measurement".to_string(),
                                     Variant::String(node.config.measurement.clone()),
                                 );
-                                result_map.set_property(
-                                    "lineProtocol".to_string(),
-                                    Variant::String(line_protocol),
-                                );
+                                result_map.set_property("lineProtocol".to_string(), Variant::String(line_protocol));
                                 guard.set("payload".to_string(), Variant::Object(result_map));
                             }
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                         }
                         Err(e) => {
-                            log::warn!(
-                                "[influxdb-in:{}] Write error: {}",
-                                node.name(),
-                                e
-                            );
+                            log::warn!("[influxdb-in:{}] Write error: {}", node.name(), e);
                             {
                                 let mut guard = msg.write().await;
                                 guard.set("error".to_string(), Variant::String(e.to_string()));

@@ -23,9 +23,7 @@ async fn sort_array_numbers_ascending() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": [5, 3, 1, 4, 2]}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": [5, 3, 1, 4, 2]}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let arr = msgs[0].get("payload").unwrap().as_array().unwrap();
@@ -47,9 +45,7 @@ async fn sort_array_numbers_descending() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": [5, 3, 1, 4, 2]}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": [5, 3, 1, 4, 2]}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let arr = msgs[0].get("payload").unwrap().as_array().unwrap();
@@ -71,9 +67,7 @@ async fn sort_array_strings_ascending() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": ["cherry", "apple", "banana"]}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": ["cherry", "apple", "banana"]}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let arr = msgs[0].get("payload").unwrap().as_array().unwrap();
@@ -109,10 +103,7 @@ async fn sort_array_by_key() {
 
     assert_eq!(msgs.len(), 1);
     let arr = msgs[0].get("payload").unwrap().as_array().unwrap();
-    let names: Vec<&str> = arr
-        .iter()
-        .map(|v| v.as_object().unwrap().get("name").unwrap().as_str().unwrap())
-        .collect();
+    let names: Vec<&str> = arr.iter().map(|v| v.as_object().unwrap().get("name").unwrap().as_str().unwrap()).collect();
     assert_eq!(names, vec!["Alice", "Bob", "Charlie"]);
 }
 
@@ -192,9 +183,7 @@ async fn sort_reset_clears_pending() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"reset": true}), 1, Duration::from_millis(500))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"reset": true}), 1, Duration::from_millis(500)).await;
 
     assert!(msgs.is_empty(), "Reset should produce no output");
 }

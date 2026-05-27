@@ -4,8 +4,8 @@ pub mod subscription;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::RwLock;
@@ -82,10 +82,12 @@ impl MqttBroker {
     /// Start the broker, listening for TCP connections.
     /// This method runs indefinitely until the process is terminated.
     pub async fn start(self: Arc<Self>) -> BrokerResult<()> {
-        let addr: SocketAddr = self.config.bind.parse()
-            .map_err(|e: std::net::AddrParseError| BrokerError::ProtocolError(format!("Invalid bind address: {e}")))?;
-        let listener = TcpListener::bind(addr).await
-            .map_err(|e| BrokerError::ProtocolError(format!("Failed to bind: {e}")))?;
+        let addr: SocketAddr =
+            self.config.bind.parse().map_err(|e: std::net::AddrParseError| {
+                BrokerError::ProtocolError(format!("Invalid bind address: {e}"))
+            })?;
+        let listener =
+            TcpListener::bind(addr).await.map_err(|e| BrokerError::ProtocolError(format!("Failed to bind: {e}")))?;
         log::info!("[mqtt-broker] Listening on {}", addr);
 
         loop {
@@ -114,12 +116,13 @@ impl MqttBroker {
     /// Start the broker in a background task and return the bound address.
     /// Useful for testing with port 0 (OS-assigned port).
     pub async fn start_background(self: Arc<Self>) -> BrokerResult<SocketAddr> {
-        let addr: SocketAddr = self.config.bind.parse()
-            .map_err(|e: std::net::AddrParseError| BrokerError::ProtocolError(format!("Invalid bind address: {e}")))?;
-        let listener = TcpListener::bind(addr).await
-            .map_err(|e| BrokerError::ProtocolError(format!("Failed to bind: {e}")))?;
-        let local_addr = listener.local_addr()
-            .map_err(BrokerError::Io)?;
+        let addr: SocketAddr =
+            self.config.bind.parse().map_err(|e: std::net::AddrParseError| {
+                BrokerError::ProtocolError(format!("Invalid bind address: {e}"))
+            })?;
+        let listener =
+            TcpListener::bind(addr).await.map_err(|e| BrokerError::ProtocolError(format!("Failed to bind: {e}")))?;
+        let local_addr = listener.local_addr().map_err(BrokerError::Io)?;
         log::info!("[mqtt-broker] Listening on {}", local_addr);
 
         tokio::spawn(async move {
@@ -151,13 +154,17 @@ impl MqttBroker {
 
     /// Start the broker, accepting connections until `cancel` is fired.
     /// Returns the bound address on success.
-    pub async fn start_with_cancel(self: Arc<Self>, cancel: tokio_util::sync::CancellationToken) -> BrokerResult<SocketAddr> {
-        let addr: SocketAddr = self.config.bind.parse()
-            .map_err(|e: std::net::AddrParseError| BrokerError::ProtocolError(format!("Invalid bind address: {e}")))?;
-        let listener = TcpListener::bind(addr).await
-            .map_err(|e| BrokerError::ProtocolError(format!("Failed to bind: {e}")))?;
-        let local_addr = listener.local_addr()
-            .map_err(BrokerError::Io)?;
+    pub async fn start_with_cancel(
+        self: Arc<Self>,
+        cancel: tokio_util::sync::CancellationToken,
+    ) -> BrokerResult<SocketAddr> {
+        let addr: SocketAddr =
+            self.config.bind.parse().map_err(|e: std::net::AddrParseError| {
+                BrokerError::ProtocolError(format!("Invalid bind address: {e}"))
+            })?;
+        let listener =
+            TcpListener::bind(addr).await.map_err(|e| BrokerError::ProtocolError(format!("Failed to bind: {e}")))?;
+        let local_addr = listener.local_addr().map_err(BrokerError::Io)?;
         log::info!("[mqtt-broker] Listening on {}", local_addr);
 
         loop {
@@ -210,8 +217,8 @@ impl MqttBroker {
             return Err(BrokerError::ProtocolError("First packet must be CONNECT".into()));
         }
 
-        let connect = codec::decode_connect(&mut buf)
-            .map_err(|e| BrokerError::ProtocolError(format!("Bad CONNECT: {e}")))?;
+        let connect =
+            codec::decode_connect(&mut buf).map_err(|e| BrokerError::ProtocolError(format!("Bad CONNECT: {e}")))?;
 
         // Authenticate
         if let Err(e) = self.authenticate(&connect).await {
@@ -222,11 +229,7 @@ impl MqttBroker {
         let client_id = connect.client_id.clone();
 
         // Create session with outbound channel
-        let session = session::Session::new(
-            client_id.clone(),
-            connect.keep_alive,
-            outbound_tx,
-        );
+        let session = session::Session::new(client_id.clone(), connect.keep_alive, outbound_tx);
         let session = Arc::new(session);
 
         {
@@ -239,9 +242,10 @@ impl MqttBroker {
         log::info!("[mqtt-broker] Client '{}' connected", client_id);
 
         // Save will info for cleanup on abnormal disconnect
-        let will_info = connect.will_topic.as_ref().map(|topic| {
-            (topic.clone(), connect.will_payload.clone(), connect.will_qos, connect.will_retain)
-        });
+        let will_info = connect
+            .will_topic
+            .as_ref()
+            .map(|topic| (topic.clone(), connect.will_payload.clone(), connect.will_qos, connect.will_retain));
 
         // Spawn writer task: reads raw packets from channel and writes to TCP
         let writer_handle = tokio::spawn(async move {
@@ -344,9 +348,8 @@ impl MqttBroker {
             let expected_user = self.config.auth.username.as_deref().unwrap();
             let expected_pass = self.config.auth.password.as_deref().unwrap_or("");
             let provided_user = connect.username.as_deref().unwrap_or("");
-            let provided_pass = connect.password.as_deref()
-                .map(|p| String::from_utf8_lossy(p).to_string())
-                .unwrap_or_default();
+            let provided_pass =
+                connect.password.as_deref().map(|p| String::from_utf8_lossy(p).to_string()).unwrap_or_default();
             if provided_user != expected_user || provided_pass != expected_pass {
                 return Err(BrokerError::AuthenticationFailed(connect.client_id.clone()));
             }
@@ -403,11 +406,7 @@ impl MqttBroker {
 
                 for (retained_topic, retained_msg) in retained {
                     let effective_qos = sub_filter.qos.min(retained_msg.qos);
-                    let packet_id = if effective_qos != QoS::AtMostOnce {
-                        Some(next_packet_id())
-                    } else {
-                        None
-                    };
+                    let packet_id = if effective_qos != QoS::AtMostOnce { Some(next_packet_id()) } else { None };
 
                     let _ = session.send_raw(codec::encode_publish(
                         &retained_topic,
@@ -465,20 +464,9 @@ impl MqttBroker {
             if let Some(session) = sessions.get(&sub.client_id) {
                 // Downgrade QoS to the subscription's maximum
                 let effective_qos = qos.min(sub.qos);
-                let packet_id = if effective_qos != QoS::AtMostOnce {
-                    Some(next_packet_id())
-                } else {
-                    None
-                };
+                let packet_id = if effective_qos != QoS::AtMostOnce { Some(next_packet_id()) } else { None };
 
-                let raw_packet = codec::encode_publish(
-                    topic,
-                    payload,
-                    effective_qos,
-                    false,
-                    retain,
-                    packet_id,
-                );
+                let raw_packet = codec::encode_publish(topic, payload, effective_qos, false, retain, packet_id);
 
                 if session.send_raw(raw_packet) {
                     self.metrics.messages_sent.fetch_add(1, Ordering::Relaxed);
@@ -491,11 +479,14 @@ impl MqttBroker {
 
     pub async fn get_sessions_info(&self) -> Vec<SessionInfo> {
         let sessions = self.sessions.read().await;
-        sessions.values().map(|s| SessionInfo {
-            client_id: s.client_id().to_string(),
-            keep_alive: s.keep_alive(),
-            connected_at: s.connected_at(),
-        }).collect()
+        sessions
+            .values()
+            .map(|s| SessionInfo {
+                client_id: s.client_id().to_string(),
+                keep_alive: s.keep_alive(),
+                connected_at: s.connected_at(),
+            })
+            .collect()
     }
 
     pub async fn get_subscriptions_info(&self) -> Vec<SubscriptionInfo> {

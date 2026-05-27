@@ -237,14 +237,7 @@ async fn bacnet_read_analog_input() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "10",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("10", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -286,14 +279,7 @@ async fn bacnet_read_binary_input() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "11",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("11", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -334,14 +320,7 @@ async fn bacnet_read_object_name() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let _msgs = harness
-        .inject_and_collect_timeout(
-            "12",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let _msgs = harness.inject_and_collect_timeout("12", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,14 +357,7 @@ async fn bacnet_write_analog_output() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "20",
-            json!({"payload": 72.5}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("20", json!({"payload": 72.5}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -427,14 +399,7 @@ async fn bacnet_write_binary_output() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "21",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("21", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -476,14 +441,8 @@ async fn bacnet_write_read_roundtrip() {
     ]);
 
     let write_harness = TestHarness::from_flow_json(write_flow);
-    let _write_msgs = write_harness
-        .inject_and_collect_timeout(
-            "30",
-            json!({"payload": 55.5}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let _write_msgs =
+        write_harness.inject_and_collect_timeout("30", json!({"payload": 55.5}), 1, Duration::from_secs(10)).await;
 
     // Step 2: Read back
     let read_flow = json!([
@@ -510,14 +469,8 @@ async fn bacnet_write_read_roundtrip() {
     ]);
 
     let read_harness = TestHarness::from_flow_json(read_flow);
-    let _read_msgs = read_harness
-        .inject_and_collect_timeout(
-            "31",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let _read_msgs =
+        read_harness.inject_and_collect_timeout("31", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -562,14 +515,7 @@ async fn bacnet_read_cov_subscription() {
 
     // The COV subscription should be established on startup.
     // Inject a trigger message to perform an initial read.
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "40",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("40", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));

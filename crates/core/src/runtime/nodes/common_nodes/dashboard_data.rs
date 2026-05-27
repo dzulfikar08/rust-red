@@ -111,10 +111,7 @@ impl FlowNodeBehavior for DashboardDataNode {
                     };
                     engine.dashboard_channel().send(message);
                 } else {
-                    log::warn!(
-                        "[ui_dashboard_data:{}] No engine available, dropping dashboard message",
-                        node.name()
-                    );
+                    log::warn!("[ui_dashboard_data:{}] No engine available, dropping dashboard message", node.name());
                 }
 
                 // Pass the message through to the next node (if any output wire)

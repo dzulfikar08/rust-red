@@ -7,8 +7,8 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::flow_builder::{switch_rule, FlowBuilder};
-use super::harness::{assert_msg_has, TestHarness};
+use super::flow_builder::{FlowBuilder, switch_rule};
+use super::harness::{TestHarness, assert_msg_has};
 
 /// Switch: equality (==) rule with string.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -26,9 +26,7 @@ async fn switch_eq_string() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "Hello"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "Hello"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["payload"], "Hello".into());
@@ -38,21 +36,12 @@ async fn switch_eq_string() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_neq_string() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::neq("Hello", "str")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::neq("Hello", "str")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "Goodbye"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "Goodbye"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["payload"], "Goodbye".into());
@@ -74,9 +63,7 @@ async fn switch_lt_number() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 5}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 5}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["payload"], 5.into());
@@ -86,21 +73,12 @@ async fn switch_lt_number() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_gt_number() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::gt("10", "num")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::gt("10", "num")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 15}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 15}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["payload"], 15.into());
@@ -110,21 +88,12 @@ async fn switch_gt_number() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_gte_number() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::gte("10", "num")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::gte("10", "num")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 10}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 10}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -133,21 +102,12 @@ async fn switch_gte_number() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_lte_number() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::lte("10", "num")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::lte("10", "num")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 10}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 10}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -156,21 +116,12 @@ async fn switch_lte_number() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_between() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::btwn("3", "num", "5", "num")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::btwn("3", "num", "5", "num")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 4}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 4}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["payload"], 4.into());
@@ -180,21 +131,12 @@ async fn switch_between() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_between_lower_bound() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::btwn("3", "num", "5", "num")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::btwn("3", "num", "5", "num")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 3}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 3}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -203,21 +145,12 @@ async fn switch_between_lower_bound() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_contains() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::cont("ello")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::cont("ello")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "Hello World"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "Hello World"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["payload"], "Hello World".into());
@@ -227,21 +160,12 @@ async fn switch_contains() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_null() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_null()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_null()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": null}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": null}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -250,21 +174,12 @@ async fn switch_is_null() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_not_null() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_not_null()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_not_null()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "exists"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "exists"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -273,21 +188,12 @@ async fn switch_is_not_null() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_true() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_true()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_true()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": true}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": true}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -296,21 +202,12 @@ async fn switch_is_true() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_false() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_false()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_false()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": false}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": false}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -319,21 +216,12 @@ async fn switch_is_false() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_empty() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_empty()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_empty()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": ""}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": ""}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -342,21 +230,12 @@ async fn switch_is_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_not_empty() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_not_empty()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_not_empty()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "data"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "data"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -377,9 +256,7 @@ async fn switch_else_rule() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "other"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "other"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0]["payload"], "other".into());
@@ -389,21 +266,12 @@ async fn switch_else_rule() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_istype_string() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::istype("string")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::istype("string")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "a string"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "a string"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -412,21 +280,12 @@ async fn switch_istype_string() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_istype_number() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::istype("number")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::istype("number")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 42}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 42}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -435,21 +294,12 @@ async fn switch_istype_number() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_regex() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::regex("[abc]+")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::regex("[abc]+")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "abc"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "abc"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -461,10 +311,7 @@ async fn switch_multiple_rules_checkall() {
         .switch(
             "1",
             "payload",
-            vec![
-                switch_rule::gt("5", "num"),
-                switch_rule::lt("20", "num"),
-            ],
+            vec![switch_rule::gt("5", "num"), switch_rule::lt("20", "num")],
             true,
             2,
             json!([["99"], ["99"]]),
@@ -473,9 +320,7 @@ async fn switch_multiple_rules_checkall() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 10}), 2)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 10}), 2).await;
 
     assert_eq!(msgs.len(), 2);
 }
@@ -484,21 +329,13 @@ async fn switch_multiple_rules_checkall() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_no_match() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::eq("exact", "str")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::eq("exact", "str")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let result = harness
-        .inject_and_collect_timeout("1", json!({"payload": "other"}), 1, Duration::from_millis(200))
-        .await;
+    let result =
+        harness.inject_and_collect_timeout("1", json!({"payload": "other"}), 1, Duration::from_millis(200)).await;
 
     assert!(result.is_empty(), "Expected no messages when no rule matches");
 }
@@ -511,21 +348,12 @@ async fn switch_no_match() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_hask_object_has_key() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![json!({"t": "hask", "v": "mykey", "vt": "str"})],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![json!({"t": "hask", "v": "mykey", "vt": "str"})], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": {"mykey": "value"}}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {"mykey": "value"}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -534,25 +362,13 @@ async fn switch_hask_object_has_key() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_hask_object_missing_key() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![json!({"t": "hask", "v": "missing", "vt": "str"})],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![json!({"t": "hask", "v": "missing", "vt": "str"})], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
     let result = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": {"other": "value"}}),
-            1,
-            Duration::from_millis(200),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": {"other": "value"}}), 1, Duration::from_millis(200))
         .await;
 
     assert!(result.is_empty(), "hask should not match when key is missing");
@@ -562,21 +378,12 @@ async fn switch_hask_object_missing_key() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_between_upper_bound() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::btwn("3", "num", "5", "num")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::btwn("3", "num", "5", "num")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 5}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 5}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -585,21 +392,12 @@ async fn switch_between_upper_bound() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_between_reversed_bounds() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::btwn("5", "num", "3", "num")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::btwn("5", "num", "3", "num")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 4}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 4}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -620,9 +418,7 @@ async fn switch_regex_case_insensitive() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "HELLO WORLD"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "HELLO WORLD"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -631,21 +427,12 @@ async fn switch_regex_case_insensitive() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_istype_boolean() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::istype("boolean")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::istype("boolean")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": true}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": true}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -654,21 +441,12 @@ async fn switch_istype_boolean() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_istype_array() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::istype("array")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::istype("array")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": [1, 2, 3]}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": [1, 2, 3]}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -677,21 +455,12 @@ async fn switch_istype_array() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_istype_object() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::istype("object")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::istype("object")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": {"key": "val"}}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {"key": "val"}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -700,21 +469,12 @@ async fn switch_istype_object() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_istype_null() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::istype("null")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::istype("null")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": null}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": null}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -735,9 +495,7 @@ async fn switch_checkall_false_stops_at_first() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 10}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 10}), 1).await;
 
     assert_eq!(msgs.len(), 1, "checkall=false should stop at first matching rule");
 }
@@ -746,21 +504,12 @@ async fn switch_checkall_false_stops_at_first() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_eq_msg_property() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![json!({"t": "eq", "v": "topic", "vt": "msg"})],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![json!({"t": "eq", "v": "topic", "vt": "msg"})], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "hello", "topic": "hello"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "hello", "topic": "hello"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -769,21 +518,12 @@ async fn switch_eq_msg_property() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_empty_array() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_empty()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_empty()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": []}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": []}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -792,21 +532,12 @@ async fn switch_is_empty_array() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_empty_object() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_empty()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_empty()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": {}}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -815,21 +546,12 @@ async fn switch_is_empty_object() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_is_not_empty_array() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::is_not_empty()],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::is_not_empty()], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": [1]}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": [1]}), 1).await;
 
     assert_eq!(msgs.len(), 1);
 }
@@ -838,21 +560,13 @@ async fn switch_is_not_empty_array() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_contains_not_matching() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![switch_rule::cont("xyz")],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![switch_rule::cont("xyz")], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let result = harness
-        .inject_and_collect_timeout("1", json!({"payload": "Hello World"}), 1, Duration::from_millis(200))
-        .await;
+    let result =
+        harness.inject_and_collect_timeout("1", json!({"payload": "Hello World"}), 1, Duration::from_millis(200)).await;
 
     assert!(result.is_empty(), "contains should not match when substring is absent");
 }
@@ -861,14 +575,7 @@ async fn switch_contains_not_matching() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn switch_prev_value_eq() {
     let flow = FlowBuilder::new()
-        .switch(
-            "1",
-            "payload",
-            vec![json!({"t": "eq", "v": "", "vt": "prev"})],
-            true,
-            1,
-            json!([["99"]]),
-        )
+        .switch("1", "payload", vec![json!({"t": "eq", "v": "", "vt": "prev"})], true, 1, json!([["99"]]))
         .test_sink("99")
         .to_json();
 
@@ -876,10 +583,7 @@ async fn switch_prev_value_eq() {
     let msgs = harness
         .run_with_inject(
             1,
-            vec![
-                ("1".to_string(), json!({"payload": "hello"})),
-                ("1".to_string(), json!({"payload": "hello"})),
-            ],
+            vec![("1".to_string(), json!({"payload": "hello"})), ("1".to_string(), json!({"payload": "hello"}))],
         )
         .await;
 

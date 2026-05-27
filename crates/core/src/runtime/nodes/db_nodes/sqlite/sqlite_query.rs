@@ -54,30 +54,17 @@ impl SqliteQueryNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let query_config = SqliteQueryConfig::deserialize(&config.rest)?;
-        Ok(Box::new(SqliteQueryNode {
-            base: base_node,
-            config: query_config,
-        }))
+        Ok(Box::new(SqliteQueryNode { base: base_node, config: query_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         let eid_opt = ElementId::from_str(&self.config.config_node).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine
-                    .find_global_node_by_name(&self.config.config_node)
-                    .ok()
-                    .flatten()
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!("Config node '{}' not found", self.config.config_node)
-            })?;
+            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
+            .ok_or_else(|| anyhow::anyhow!("Config node '{}' not found", self.config.config_node))?;
 
         Ok(global)
     }
@@ -125,9 +112,7 @@ impl SqliteQueryNode {
         let result = tokio::time::timeout(
             timeout,
             tokio::task::spawn_blocking(move || {
-                let conn_guard = conn
-                    .lock()
-                    .map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
+                let conn_guard = conn.lock().map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
 
                 let trimmed = sql.trim();
                 let is_select = trimmed.to_uppercase().starts_with("SELECT")
@@ -136,12 +121,10 @@ impl SqliteQueryNode {
                     || trimmed.to_uppercase().starts_with("WITH");
 
                 if is_select {
-                    let mut stmt = conn_guard
-                        .prepare(&sql)
-                        .map_err(|e| anyhow::anyhow!("SQLite prepare error: {e}"))?;
+                    let mut stmt =
+                        conn_guard.prepare(&sql).map_err(|e| anyhow::anyhow!("SQLite prepare error: {e}"))?;
 
-                    let column_names: Vec<String> =
-                        stmt.column_names().iter().map(|s| s.to_string()).collect();
+                    let column_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
                     let column_count = column_names.len();
 
                     // Only pass params if the SQL contains placeholders
@@ -166,14 +149,10 @@ impl SqliteQueryNode {
 
                     let mut result_rows = Vec::new();
                     for row_result in rows {
-                        let map = row_result
-                            .map_err(|e| anyhow::anyhow!("SQLite row error: {e}"))?;
+                        let map = row_result.map_err(|e| anyhow::anyhow!("SQLite row error: {e}"))?;
                         result_rows.push(Variant::Object(map));
                     }
-                    Ok::<SqliteQueryResult, anyhow::Error>(SqliteQueryResult {
-                        rows: result_rows,
-                        changes: 0,
-                    })
+                    Ok::<SqliteQueryResult, anyhow::Error>(SqliteQueryResult { rows: result_rows, changes: 0 })
                 } else {
                     // DML/DDL: use execute() instead of query_map()
                     // Only pass params if the SQL contains placeholders
@@ -184,14 +163,9 @@ impl SqliteQueryNode {
                             .execute(&sql, param_refs.as_slice())
                             .map_err(|e| anyhow::anyhow!("SQLite execute error: {e}"))?
                     } else {
-                        conn_guard
-                            .execute(&sql, [])
-                            .map_err(|e| anyhow::anyhow!("SQLite execute error: {e}"))?
+                        conn_guard.execute(&sql, []).map_err(|e| anyhow::anyhow!("SQLite execute error: {e}"))?
                     };
-                    Ok::<SqliteQueryResult, anyhow::Error>(SqliteQueryResult {
-                        rows: Vec::new(),
-                        changes,
-                    })
+                    Ok::<SqliteQueryResult, anyhow::Error>(SqliteQueryResult { rows: Vec::new(), changes })
                 }
             }),
         )
@@ -224,7 +198,8 @@ impl FlowNodeBehavior for SqliteQueryNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -237,10 +212,7 @@ impl FlowNodeBehavior for SqliteQueryNode {
             with_uow(this.as_ref(), cancel.child_token(), |node, msg| {
                 let cfg = cfg.clone();
                 async move {
-                    let cfg_inner = cfg
-                        .as_any()
-                        .downcast_ref::<SqliteConfigNode>()
-                        .unwrap();
+                    let cfg_inner = cfg.as_any().downcast_ref::<SqliteConfigNode>().unwrap();
 
                     // Extract params from message
                     let params = Self::extract_params(&*msg.read().await);
@@ -266,11 +238,7 @@ impl FlowNodeBehavior for SqliteQueryNode {
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                         }
                         Err(e) => {
-                            log::warn!(
-                                "[sqlite-query:{}] Query error: {}",
-                                node.name(),
-                                e
-                            );
+                            log::warn!("[sqlite-query:{}] Query error: {}", node.name(), e);
                             {
                                 let mut guard = msg.write().await;
                                 guard.set("error".to_string(), Variant::String(e));

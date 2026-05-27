@@ -33,10 +33,7 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     pub fn new(max_rpm: u32) -> Self {
-        Self {
-            buckets: Arc::new(Mutex::new(HashMap::new())),
-            max_rpm,
-        }
+        Self { buckets: Arc::new(Mutex::new(HashMap::new())), max_rpm }
     }
 
     /// Check if a request from the given client key is allowed.
@@ -51,10 +48,8 @@ impl RateLimiter {
             buckets.retain(|_, bucket| now.duration_since(bucket.window_start).as_secs() < 120);
         }
 
-        let bucket = buckets.entry(client_key.to_string()).or_insert_with(|| ClientBucket {
-            window_start: now,
-            count: 0,
-        });
+        let bucket =
+            buckets.entry(client_key.to_string()).or_insert_with(|| ClientBucket { window_start: now, count: 0 });
 
         // Reset window if older than 60 seconds
         if now.duration_since(bucket.window_start).as_secs() >= 60 {
@@ -105,9 +100,7 @@ pub struct RateLimitLayer {
 
 impl RateLimitLayer {
     pub fn new(max_rpm: u32) -> Self {
-        Self {
-            limiter: RateLimiter::new(max_rpm),
-        }
+        Self { limiter: RateLimiter::new(max_rpm) }
     }
 
     pub fn limiter(&self) -> RateLimiter {
@@ -119,10 +112,7 @@ impl<S> tower::Layer<S> for RateLimitLayer {
     type Service = RateLimitMiddleware<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        RateLimitMiddleware {
-            inner,
-            limiter: self.limiter.clone(),
-        }
+        RateLimitMiddleware { inner, limiter: self.limiter.clone() }
     }
 }
 
@@ -142,10 +132,7 @@ where
     type Error = S::Error;
     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(
-        &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 

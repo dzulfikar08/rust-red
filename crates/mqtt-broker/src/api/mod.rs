@@ -1,9 +1,9 @@
 pub mod models;
 
-use std::sync::Arc;
-use std::sync::atomic::Ordering;
-use axum::{Json, extract::State, routing::get, Router};
 use crate::broker::{BrokerMetrics, MqttBroker};
+use axum::{extract::State, routing::get, Json, Router};
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct ApiState {

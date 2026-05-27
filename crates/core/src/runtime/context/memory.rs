@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use propex::PropexSegment;
 use tokio::sync::RwLock;
 
-use super::{RustRedError, ElementId, Variant};
+use super::{ElementId, RustRedError, Variant};
 use crate::Result;
 use crate::runtime::context::*;
 

@@ -1,7 +1,7 @@
 use crate::flows::ensure_flows_file_exists;
 use config::Config;
-use rust_red_core::RustRedError;
 use once_cell::sync::OnceCell;
+use rust_red_core::RustRedError;
 use std::path::Path;
 
 #[allow(dead_code)]

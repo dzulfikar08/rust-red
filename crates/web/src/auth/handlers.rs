@@ -22,8 +22,8 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 
-use super::middleware::{AuthenticatedUser, AuthState};
 use super::jwt::{create_access_token, create_refresh_token, validate_refresh_token};
+use super::middleware::{AuthState, AuthenticatedUser};
 use super::roles::{Permission, Role};
 
 // ---------------------------------------------------------------------------
@@ -214,12 +214,7 @@ pub async fn logout() -> impl IntoResponse {
 
 /// `GET /auth/me`
 pub async fn me(user: AuthenticatedUser) -> impl IntoResponse {
-    Json(UserProfile {
-        id: user.user_id,
-        username: user.username,
-        role: user.role.to_string(),
-        active: true,
-    })
+    Json(UserProfile { id: user.user_id, username: user.username, role: user.role.to_string(), active: true })
 }
 
 /// `GET /auth/users` — admin only
@@ -234,12 +229,7 @@ pub async fn list_users(
     let users = auth_state.user_store.list_users().await;
     let profiles: Vec<UserProfile> = users
         .into_iter()
-        .map(|u| UserProfile {
-            id: u.id,
-            username: u.username,
-            role: u.role.to_string(),
-            active: u.active,
-        })
+        .map(|u| UserProfile { id: u.id, username: u.username, role: u.role.to_string(), active: u.active })
         .collect();
 
     Json(profiles).into_response()
@@ -255,11 +245,7 @@ pub async fn create_user(
         return resp;
     }
 
-    match auth_state
-        .user_store
-        .create_user(&body.username, &body.password, body.role)
-        .await
-    {
+    match auth_state.user_store.create_user(&body.username, &body.password, body.role).await {
         Ok(id) => (
             StatusCode::CREATED,
             Json(serde_json::json!({
@@ -326,11 +312,7 @@ pub async fn update_user_role(
         return resp;
     }
 
-    match auth_state
-        .user_store
-        .set_role(&target_id, body.role)
-        .await
-    {
+    match auth_state.user_store.set_role(&target_id, body.role).await {
         Ok(()) => Json(serde_json::json!({"message": "Role updated"})).into_response(),
         Err(e) => (
             StatusCode::NOT_FOUND,
@@ -358,11 +340,7 @@ pub async fn update_user_password(
         return StatusCode::FORBIDDEN.into_response();
     }
 
-    match auth_state
-        .user_store
-        .set_password(&target_id, &body.password)
-        .await
-    {
+    match auth_state.user_store.set_password(&target_id, &body.password).await {
         Ok(()) => Json(serde_json::json!({"message": "Password updated"})).into_response(),
         Err(e) => (
             StatusCode::NOT_FOUND,
@@ -381,19 +359,10 @@ pub async fn create_api_key(
     Extension(auth_state): Extension<Arc<AuthState>>,
     Json(body): Json<CreateApiKeyRequest>,
 ) -> impl IntoResponse {
-    match auth_state
-        .user_store
-        .create_api_key(&user.user_id, &body.label)
-        .await
-    {
+    match auth_state.user_store.create_api_key(&user.user_id, &body.label).await {
         Ok(raw_key) => {
             let prefix = raw_key[..12].to_string();
-            Json(ApiKeyResponse {
-                key: raw_key,
-                prefix,
-                label: body.label,
-            })
-            .into_response()
+            Json(ApiKeyResponse { key: raw_key, prefix, label: body.label }).into_response()
         }
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -412,14 +381,8 @@ pub async fn list_api_keys(
     Extension(auth_state): Extension<Arc<AuthState>>,
 ) -> impl IntoResponse {
     let keys = auth_state.user_store.list_api_keys(&user.user_id).await;
-    let infos: Vec<ApiKeyInfo> = keys
-        .into_iter()
-        .map(|k| ApiKeyInfo {
-            prefix: k.prefix,
-            label: k.label,
-            active: k.active,
-        })
-        .collect();
+    let infos: Vec<ApiKeyInfo> =
+        keys.into_iter().map(|k| ApiKeyInfo { prefix: k.prefix, label: k.label, active: k.active }).collect();
     Json(infos).into_response()
 }
 

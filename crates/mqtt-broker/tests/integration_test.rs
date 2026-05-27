@@ -23,10 +23,7 @@ async fn start_test_broker() -> (Arc<MqttBroker>, std::net::SocketAddr) {
 }
 
 /// Helper: create a rumqttc client connected to the given address.
-async fn create_client(
-    addr: std::net::SocketAddr,
-    client_id: &str,
-) -> (AsyncClient, rumqttc::EventLoop) {
+async fn create_client(addr: std::net::SocketAddr, client_id: &str) -> (AsyncClient, rumqttc::EventLoop) {
     let mut opts = MqttOptions::new(client_id, addr.ip().to_string(), addr.port());
     opts.set_keep_alive(Duration::from_secs(5));
     opts.set_clean_session(true);
@@ -71,9 +68,7 @@ async fn broker_starts_and_client_connects() {
 
     let (_client, mut eventloop) = create_client(addr, "test-connect").await;
 
-    let connack = wait_for_event(&mut eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    let connack = wait_for_event(&mut eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     assert!(connack.is_some(), "Expected CONNACK from broker");
 }
@@ -90,32 +85,28 @@ async fn subscribe_and_receive_message() {
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-sub").await;
 
     // Wait for CONNACK
-    let connack = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    let connack =
+        wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     assert!(connack.is_some());
 
     // Subscribe to topic
     sub_client.subscribe("test/hello", QoS::AtMostOnce).await.unwrap();
 
     // Wait for SUBACK
-    let suback = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    let suback =
+        wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
     assert!(suback.is_some());
 
     // Create publisher
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub").await;
 
     // Wait for publisher CONNACK
-    let pub_connack = wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    let pub_connack =
+        wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     assert!(pub_connack.is_some());
 
     // Publish a message
-    pub_client.publish("test/hello", QoS::AtMostOnce, false, "hello world".as_bytes())
-        .await.unwrap();
+    pub_client.publish("test/hello", QoS::AtMostOnce, false, "hello world".as_bytes()).await.unwrap();
 
     // Drive the publisher's event loop so the message is actually sent
     let _ = tokio::time::timeout(Duration::from_secs(2), async {
@@ -126,12 +117,12 @@ async fn subscribe_and_receive_message() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
     // Wait for the subscriber to receive the PUBLISH
-    let publish = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let publish =
+        wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
 
     assert!(publish.is_some(), "Subscriber should receive a PUBLISH message");
 
@@ -151,24 +142,17 @@ async fn qos1_publish_and_subscribe() {
 
     // Create subscriber
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-sub-qos1").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     // Subscribe with QoS 1
     sub_client.subscribe("test/qos1", QoS::AtLeastOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // Create publisher and publish with QoS 1
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-qos1").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
-    pub_client.publish("test/qos1", QoS::AtLeastOnce, false, "qos1 message".as_bytes())
-        .await.unwrap();
+    pub_client.publish("test/qos1", QoS::AtLeastOnce, false, "qos1 message".as_bytes()).await.unwrap();
 
     // Drive publisher event loop
     let _ = tokio::time::timeout(Duration::from_secs(2), async {
@@ -180,12 +164,12 @@ async fn qos1_publish_and_subscribe() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
     // Subscriber receives the message
-    let publish = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let publish =
+        wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
 
     assert!(publish.is_some());
     if let Some(Incoming::Publish(p)) = publish {
@@ -204,31 +188,20 @@ async fn multiple_subscribers() {
 
     // Create two subscribers
     let (sub1_client, mut sub1_eventloop) = create_client(addr, "test-sub1-multi").await;
-    wait_for_event(&mut sub1_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub1_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub1_client.subscribe("test/multi", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub1_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub1_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     let (sub2_client, mut sub2_eventloop) = create_client(addr, "test-sub2-multi").await;
-    wait_for_event(&mut sub2_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub2_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub2_client.subscribe("test/multi", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub2_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub2_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // Publisher
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-multi").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
-    pub_client.publish("test/multi", QoS::AtMostOnce, false, "broadcast".as_bytes())
-        .await.unwrap();
+    pub_client.publish("test/multi", QoS::AtMostOnce, false, "broadcast".as_bytes()).await.unwrap();
 
     // Drive publisher
     let _ = tokio::time::timeout(Duration::from_secs(2), async {
@@ -239,15 +212,14 @@ async fn multiple_subscribers() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
     // Both subscribers should receive the message
-    let msg1 = wait_for_event(&mut sub1_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
-    let msg2 = wait_for_event(&mut sub2_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg1 =
+        wait_for_event(&mut sub1_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
+    let msg2 =
+        wait_for_event(&mut sub2_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
 
     assert!(msg1.is_some(), "Subscriber 1 should receive the message");
     assert!(msg2.is_some(), "Subscriber 2 should receive the message");
@@ -263,23 +235,16 @@ async fn wildcard_topic_matching() {
 
     // Subscribe to "sensors/#" (multi-level wildcard)
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-wildcard").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub_client.subscribe("sensors/#", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // Publisher
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-wild").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     // Publish to "sensors/temperature/living" - should match "sensors/#"
-    pub_client.publish("sensors/temperature/living", QoS::AtMostOnce, false, "22.5".as_bytes())
-        .await.unwrap();
+    pub_client.publish("sensors/temperature/living", QoS::AtMostOnce, false, "22.5".as_bytes()).await.unwrap();
 
     // Drive publisher
     let _ = tokio::time::timeout(Duration::from_secs(2), async {
@@ -290,11 +255,10 @@ async fn wildcard_topic_matching() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
-    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
 
     assert!(msg.is_some(), "Subscriber should receive message matching wildcard");
     if let Some(Incoming::Publish(p)) = msg {
@@ -313,12 +277,9 @@ async fn retained_message_delivery() {
 
     // Publisher sends a retained message
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-retain").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
-    pub_client.publish("test/retained", QoS::AtMostOnce, true, "retained payload".as_bytes())
-        .await.unwrap();
+    pub_client.publish("test/retained", QoS::AtMostOnce, true, "retained payload".as_bytes()).await.unwrap();
 
     // Drive publisher
     let _ = tokio::time::timeout(Duration::from_secs(2), async {
@@ -329,23 +290,18 @@ async fn retained_message_delivery() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
     // New subscriber connects AFTER the retained message was published
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-sub-retain").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     sub_client.subscribe("test/retained", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // The subscriber should immediately receive the retained message
-    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
 
     assert!(msg.is_some(), "Subscriber should receive retained message");
     if let Some(Incoming::Publish(p)) = msg {
@@ -364,29 +320,20 @@ async fn unsubscribe_stops_delivery() {
     let (_broker, addr) = start_test_broker().await;
 
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-unsub").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     sub_client.subscribe("test/unsub", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // Unsubscribe
     sub_client.unsubscribe("test/unsub").await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::UnsubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::UnsubAck(_))).await;
 
     // Publisher sends a message
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-unsub").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
-    pub_client.publish("test/unsub", QoS::AtMostOnce, false, "after unsub".as_bytes())
-        .await.unwrap();
+    pub_client.publish("test/unsub", QoS::AtMostOnce, false, "after unsub".as_bytes()).await.unwrap();
 
     let _ = tokio::time::timeout(Duration::from_secs(2), async {
         loop {
@@ -396,12 +343,12 @@ async fn unsubscribe_stops_delivery() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
     // Wait a bit and check that subscriber does NOT receive the message
-    let msg = wait_for_event(&mut sub_eventloop, Duration::from_millis(500), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg =
+        wait_for_event(&mut sub_eventloop, Duration::from_millis(500), |ev| matches!(ev, Incoming::Publish(_))).await;
 
     assert!(msg.is_none(), "Subscriber should NOT receive messages after unsubscribe");
 }
@@ -415,25 +362,18 @@ async fn multiple_topics_selective_matching() {
     let (_broker, addr) = start_test_broker().await;
 
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-selective").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     // Subscribe only to "test/topicA"
     sub_client.subscribe("test/topicA", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // Publisher
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-sel").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     // Publish to topicB (subscriber should NOT receive)
-    pub_client.publish("test/topicB", QoS::AtMostOnce, false, "wrong topic".as_bytes())
-        .await.unwrap();
+    pub_client.publish("test/topicB", QoS::AtMostOnce, false, "wrong topic".as_bytes()).await.unwrap();
 
     // Drive publisher
     let _ = tokio::time::timeout(Duration::from_secs(1), async {
@@ -444,17 +384,16 @@ async fn multiple_topics_selective_matching() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
     // Check subscriber does NOT receive topicB
-    let no_msg = wait_for_event(&mut sub_eventloop, Duration::from_millis(500), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let no_msg =
+        wait_for_event(&mut sub_eventloop, Duration::from_millis(500), |ev| matches!(ev, Incoming::Publish(_))).await;
     assert!(no_msg.is_none(), "Should not receive message from unsubscribed topic");
 
     // Publish to topicA (subscriber SHOULD receive)
-    pub_client.publish("test/topicA", QoS::AtMostOnce, false, "correct topic".as_bytes())
-        .await.unwrap();
+    pub_client.publish("test/topicA", QoS::AtMostOnce, false, "correct topic".as_bytes()).await.unwrap();
 
     let _ = tokio::time::timeout(Duration::from_secs(1), async {
         loop {
@@ -464,11 +403,10 @@ async fn multiple_topics_selective_matching() {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 
-    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
     assert!(msg.is_some(), "Should receive message from subscribed topic");
 }
 
@@ -481,29 +419,20 @@ async fn single_level_wildcard_matching() {
     let (_broker, addr) = start_test_broker().await;
 
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-plus-wild").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     sub_client.subscribe("device/+/status", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-plus").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     // Should match: device/sensor1/status
-    pub_client.publish("device/sensor1/status", QoS::AtMostOnce, false, "online".as_bytes())
-        .await.unwrap();
+    pub_client.publish("device/sensor1/status", QoS::AtMostOnce, false, "online".as_bytes()).await.unwrap();
 
     drive_publisher(&mut pub_eventloop).await;
 
-    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
     assert!(msg.is_some(), "Should match single-level wildcard");
     if let Some(Incoming::Publish(p)) = msg {
         assert_eq!(p.topic, "device/sensor1/status");
@@ -521,33 +450,23 @@ async fn retained_message_replaced() {
 
     // Publish retained v1
     let (pub1, mut pub1_ev) = create_client(addr, "pub-retain-v1").await;
-    wait_for_event(&mut pub1_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub1_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     pub1.publish("test/replace", QoS::AtMostOnce, true, "v1".as_bytes()).await.unwrap();
     drive_publisher(&mut pub1_ev).await;
 
     // Publish retained v2 (replaces v1)
     let (pub2, mut pub2_ev) = create_client(addr, "pub-retain-v2").await;
-    wait_for_event(&mut pub2_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub2_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     pub2.publish("test/replace", QoS::AtMostOnce, true, "v2".as_bytes()).await.unwrap();
     drive_publisher(&mut pub2_ev).await;
 
     // New subscriber should get v2
     let (sub, mut sub_ev) = create_client(addr, "sub-retain-replace").await;
-    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub.subscribe("test/replace", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
-    let msg = wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
     assert!(msg.is_some());
     if let Some(Incoming::Publish(p)) = msg {
         assert_eq!(&p.payload[..], b"v2");
@@ -564,33 +483,23 @@ async fn retained_message_cleared_by_empty_payload() {
 
     // Set retained
     let (pub1, mut pub1_ev) = create_client(addr, "pub-retain-set").await;
-    wait_for_event(&mut pub1_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub1_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     pub1.publish("test/clear", QoS::AtMostOnce, true, "data".as_bytes()).await.unwrap();
     drive_publisher(&mut pub1_ev).await;
 
     // Clear retained with empty payload
     let (pub2, mut pub2_ev) = create_client(addr, "pub-retain-clear").await;
-    wait_for_event(&mut pub2_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub2_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     pub2.publish("test/clear", QoS::AtMostOnce, true, "".as_bytes()).await.unwrap();
     drive_publisher(&mut pub2_ev).await;
 
     // New subscriber should NOT get retained message
     let (sub, mut sub_ev) = create_client(addr, "sub-retain-clear").await;
-    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub.subscribe("test/clear", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
-    let msg = wait_for_event(&mut sub_ev, Duration::from_millis(500), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_ev, Duration::from_millis(500), |ev| matches!(ev, Incoming::Publish(_))).await;
     assert!(msg.is_none(), "Retained message should be cleared");
 }
 
@@ -603,10 +512,8 @@ async fn authentication_rejects_wrong_credentials() {
     let mut config = BrokerConfig::default();
     config.bind = "127.0.0.1:0".to_string();
     config.enabled = true;
-    config.auth = rust_red_mqtt_broker::config::AuthConfig {
-        username: Some("admin".into()),
-        password: Some("secret".into()),
-    };
+    config.auth =
+        rust_red_mqtt_broker::config::AuthConfig { username: Some("admin".into()), password: Some("secret".into()) };
     let broker = Arc::new(MqttBroker::new(config));
     let addr = broker.clone().start_background().await.expect("broker start");
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -629,7 +536,8 @@ async fn authentication_rejects_wrong_credentials() {
                 Err(_) => return true, // connection error = rejected
             }
         }
-    }).await;
+    })
+    .await;
 
     assert!(result.is_ok_and(|rejected| rejected), "Broker should reject wrong credentials");
 }
@@ -653,13 +561,9 @@ async fn large_payload_delivery() {
     sub_opts.set_clean_session(true);
     sub_opts.set_max_packet_size(200_000, 200_000);
     let (sub_client, mut sub_eventloop) = AsyncClient::new(sub_opts, 10);
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub_client.subscribe("test/large", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // 100KB payload
     let large_payload: Vec<u8> = (0..100_000).map(|i| (i % 256) as u8).collect();
@@ -669,17 +573,12 @@ async fn large_payload_delivery() {
     pub_opts.set_clean_session(true);
     pub_opts.set_max_packet_size(200_000, 200_000);
     let (pub_client, mut pub_eventloop) = AsyncClient::new(pub_opts, 10);
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
-    pub_client.publish("test/large", QoS::AtMostOnce, false, large_payload.clone())
-        .await.unwrap();
+    pub_client.publish("test/large", QoS::AtMostOnce, false, large_payload.clone()).await.unwrap();
     drive_publisher(&mut pub_eventloop).await;
 
-    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
 
     assert!(msg.is_some(), "Should receive large payload");
     if let Some(Incoming::Publish(p)) = msg {
@@ -698,13 +597,9 @@ async fn concurrent_publishers() {
 
     // Single subscriber
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-sub-conc").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub_client.subscribe("conc/#", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     // Spawn 5 publishers concurrently
     let mut handles = Vec::new();
@@ -712,15 +607,11 @@ async fn concurrent_publishers() {
         let addr_clone = addr;
         handles.push(tokio::spawn(async move {
             let (client, mut ev) = create_client(addr_clone, &format!("pub-conc-{i}")).await;
-            wait_for_event(&mut ev, Duration::from_secs(5), |ev| {
-                matches!(ev, Incoming::ConnAck(_))
-            }).await;
-            client.publish(
-                &format!("conc/from/{i}"),
-                QoS::AtMostOnce,
-                false,
-                format!("msg-{i}").as_bytes(),
-            ).await.unwrap();
+            wait_for_event(&mut ev, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
+            client
+                .publish(&format!("conc/from/{i}"), QoS::AtMostOnce, false, format!("msg-{i}").as_bytes())
+                .await
+                .unwrap();
             drive_publisher(&mut ev).await;
         }));
     }
@@ -734,7 +625,9 @@ async fn concurrent_publishers() {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     while received < 5 {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() { break; }
+        if remaining.is_zero() {
+            break;
+        }
         match tokio::time::timeout(remaining, sub_eventloop.poll()).await {
             Ok(Ok(Event::Incoming(Incoming::Publish(_)))) => received += 1,
             Ok(Ok(Event::Outgoing(_))) => continue,
@@ -753,26 +646,17 @@ async fn root_wildcard_matches_all() {
     let (_broker, addr) = start_test_broker().await;
 
     let (sub_client, mut sub_eventloop) = create_client(addr, "test-root-hash").await;
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
     sub_client.subscribe("#", QoS::AtMostOnce).await.unwrap();
-    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::SubAck(_))
-    }).await;
+    wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::SubAck(_))).await;
 
     let (pub_client, mut pub_eventloop) = create_client(addr, "test-pub-root").await;
-    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut pub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
-    pub_client.publish("any/deep/topic/here", QoS::AtMostOnce, false, "matched".as_bytes())
-        .await.unwrap();
+    pub_client.publish("any/deep/topic/here", QoS::AtMostOnce, false, "matched".as_bytes()).await.unwrap();
     drive_publisher(&mut pub_eventloop).await;
 
-    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::Publish(_))
-    }).await;
+    let msg = wait_for_event(&mut sub_eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::Publish(_))).await;
     assert!(msg.is_some(), "Root # should match any topic");
     if let Some(Incoming::Publish(p)) = msg {
         assert_eq!(p.topic, "any/deep/topic/here");
@@ -793,9 +677,7 @@ async fn ping_response() {
     let (_client, mut eventloop) = AsyncClient::new(opts, 10);
 
     // Wait for CONNACK
-    wait_for_event(&mut eventloop, Duration::from_secs(5), |ev| {
-        matches!(ev, Incoming::ConnAck(_))
-    }).await;
+    wait_for_event(&mut eventloop, Duration::from_secs(5), |ev| matches!(ev, Incoming::ConnAck(_))).await;
 
     // With 1s keep-alive, rumqttc will send PingReq within ~1.5s
     let alive = tokio::time::timeout(Duration::from_secs(5), async {
@@ -807,7 +689,8 @@ async fn ping_response() {
                 Err(_) => return false,
             }
         }
-    }).await;
+    })
+    .await;
 
     assert!(alive.is_ok_and(|ok| ok), "Should receive PingResp from broker");
 }
@@ -825,5 +708,6 @@ async fn drive_publisher(eventloop: &mut rumqttc::EventLoop) {
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 }

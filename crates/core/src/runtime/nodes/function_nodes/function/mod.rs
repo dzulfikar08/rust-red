@@ -18,9 +18,9 @@ use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
 mod context_class;
-mod rust_red_class;
 mod env_class;
 mod node_class;
+mod rust_red_class;
 
 const OUTPUT_MSGS_CAP: usize = 4;
 
@@ -225,9 +225,8 @@ impl FunctionNode {
         let args = (js_msg,);
         let promised = user_func.call::<_, rquickjs::Promise>(args)?;
         let timeout_dur = std::time::Duration::from_secs(self.timeout_secs);
-        let js_res_value: js::Result<js::Value> = tokio::time::timeout(timeout_dur, promised.into_future())
-            .await
-            .unwrap_or_else(|_| {
+        let js_res_value: js::Result<js::Value> =
+            tokio::time::timeout(timeout_dur, promised.into_future()).await.unwrap_or_else(|_| {
                 log::warn!("[function:{}] Execution timed out after {}s", self.name(), self.timeout_secs);
                 Err(js::Error::Exception)
             });

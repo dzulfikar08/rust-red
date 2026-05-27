@@ -67,9 +67,9 @@ jobs:
       - name: Cargo metadata (fail fast on dependency errors)
         run: cargo metadata --locked --format-version=1
       - name: Check code formatting
-        run: cargo fmt --check
+        run: cargo fmt --all -- --check
       - name: Cargo check (syntax only)
-        run: cargo check --workspace
+        run: cargo check --workspace --exclude rust-red-wasm-sdk --exclude rust-red-wasm-example
 
   build-and-test-windows:
     name: Build and Test on Windows

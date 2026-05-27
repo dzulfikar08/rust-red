@@ -45,11 +45,7 @@ pub struct FlowContextBuilder {
 
 impl FlowContextBuilder {
     pub fn new() -> Self {
-        Self {
-            flow_json: None,
-            debug_output: Vec::new(),
-            errors: Vec::new(),
-        }
+        Self { flow_json: None, debug_output: Vec::new(), errors: Vec::new() }
     }
 
     /// Set the raw flow JSON (typically the array of node objects).
@@ -102,21 +98,14 @@ impl FlowContextBuilder {
             for node in &nodes {
                 node_count += 1;
 
-                let node_type = node
-                    .get("type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unknown");
+                let node_type = node.get("type").and_then(|v| v.as_str()).unwrap_or("unknown");
 
                 if node_type == "tab" {
                     flow_count += 1;
                     continue;
                 }
 
-                let name = node
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
+                let name = node.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
                 let entry = type_map.entry(node_type.to_string()).or_insert((0, Vec::new()));
                 entry.0 += 1;
@@ -128,11 +117,7 @@ impl FlowContextBuilder {
 
         let node_types: Vec<NodeTypeSummary> = type_map
             .into_iter()
-            .map(|(node_type, (count, sample_names))| NodeTypeSummary {
-                node_type,
-                count,
-                sample_names,
-            })
+            .map(|(node_type, (count, sample_names))| NodeTypeSummary { node_type, count, sample_names })
             .collect();
 
         (node_types, node_count, flow_count)
@@ -255,11 +240,7 @@ mod tests {
         assert_eq!(ctx.node_count, 4); // 3 nodes + 1 tab
         assert_eq!(ctx.node_types.len(), 2); // inject + debug
 
-        let inject_type = ctx
-            .node_types
-            .iter()
-            .find(|nt| nt.node_type == "inject")
-            .unwrap();
+        let inject_type = ctx.node_types.iter().find(|nt| nt.node_type == "inject").unwrap();
         assert_eq!(inject_type.count, 2);
     }
 

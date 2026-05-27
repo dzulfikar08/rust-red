@@ -112,7 +112,9 @@ async fn embedded_broker_accepts_connection() {
     let mut got_connack = false;
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() { break; }
+        if remaining.is_zero() {
+            break;
+        }
         match tokio::time::timeout(remaining, eventloop.poll()).await {
             Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(ack)))) => {
                 assert_eq!(ack.code, rumqttc::ConnectReturnCode::Success);
@@ -159,8 +161,7 @@ async fn embedded_broker_pubsub_qos0() {
     wait_for_connack(&mut pub_eventloop).await;
 
     // Publish
-    pub_client.publish("test/embedded/qos0", rumqttc::QoS::AtMostOnce, false, b"hello embedded")
-        .await.unwrap();
+    pub_client.publish("test/embedded/qos0", rumqttc::QoS::AtMostOnce, false, b"hello embedded").await.unwrap();
 
     // Drive publisher event loop
     drain_eventloop(&mut pub_eventloop, Duration::from_secs(2)).await;
@@ -199,8 +200,7 @@ async fn embedded_broker_wildcard_subscription() {
     wait_for_connack(&mut pub_eventloop).await;
 
     // Publish to a deep topic that matches "sensors/#"
-    pub_client.publish("sensors/temp/living/room1", rumqttc::QoS::AtMostOnce, false, b"23.5")
-        .await.unwrap();
+    pub_client.publish("sensors/temp/living/room1", rumqttc::QoS::AtMostOnce, false, b"23.5").await.unwrap();
     drain_eventloop(&mut pub_eventloop, Duration::from_secs(2)).await;
 
     let msg = wait_for_publish(&mut sub_eventloop, Duration::from_secs(5)).await;
@@ -225,8 +225,7 @@ async fn embedded_broker_retained_message() {
     let (pub_client, mut pub_eventloop) = rumqttc::AsyncClient::new(pub_opts, 10);
     wait_for_connack(&mut pub_eventloop).await;
 
-    pub_client.publish("test/retained", rumqttc::QoS::AtMostOnce, true, b"retained msg")
-        .await.unwrap();
+    pub_client.publish("test/retained", rumqttc::QoS::AtMostOnce, true, b"retained msg").await.unwrap();
     drain_eventloop(&mut pub_eventloop, Duration::from_secs(2)).await;
 
     // Late subscriber connects and subscribes
@@ -277,8 +276,7 @@ async fn embedded_broker_fanout() {
     pub_opts.set_clean_session(true);
     let (pub_client, mut pub_el) = rumqttc::AsyncClient::new(pub_opts, 10);
     wait_for_connack(&mut pub_el).await;
-    pub_client.publish("fanout/topic", rumqttc::QoS::AtMostOnce, false, b"fanout msg")
-        .await.unwrap();
+    pub_client.publish("fanout/topic", rumqttc::QoS::AtMostOnce, false, b"fanout msg").await.unwrap();
     drain_eventloop(&mut pub_el, Duration::from_secs(2)).await;
 
     // Both should receive
@@ -296,7 +294,9 @@ async fn wait_for_connack(eventloop: &mut rumqttc::EventLoop) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() { panic!("Timeout waiting for CONNACK"); }
+        if remaining.is_zero() {
+            panic!("Timeout waiting for CONNACK");
+        }
         match tokio::time::timeout(remaining, eventloop.poll()).await {
             Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(_)))) => return,
             Ok(Ok(_)) => continue,
@@ -310,7 +310,9 @@ async fn wait_for_suback(eventloop: &mut rumqttc::EventLoop) {
     let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() { panic!("Timeout waiting for SUBACK"); }
+        if remaining.is_zero() {
+            panic!("Timeout waiting for SUBACK");
+        }
         match tokio::time::timeout(remaining, eventloop.poll()).await {
             Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::SubAck(_)))) => return,
             Ok(Ok(_)) => continue,
@@ -324,7 +326,9 @@ async fn wait_for_publish(eventloop: &mut rumqttc::EventLoop, timeout: Duration)
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
         let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
-        if remaining.is_zero() { return None; }
+        if remaining.is_zero() {
+            return None;
+        }
         match tokio::time::timeout(remaining, eventloop.poll()).await {
             Ok(Ok(rumqttc::Event::Incoming(rumqttc::Packet::Publish(p)))) => return Some(p),
             Ok(Ok(_)) => continue,
@@ -343,5 +347,6 @@ async fn drain_eventloop(eventloop: &mut rumqttc::EventLoop, timeout: Duration) 
                 Err(_) => break,
             }
         }
-    }).await;
+    })
+    .await;
 }

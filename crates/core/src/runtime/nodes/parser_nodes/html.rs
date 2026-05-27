@@ -151,9 +151,7 @@ impl HtmlNode {
             None => {
                 // No payload - pass through
                 drop(msg_guard);
-                return self
-                    .fan_out_one(Envelope { port: 0, msg }, CancellationToken::new())
-                    .await;
+                return self.fan_out_one(Envelope { port: 0, msg }, CancellationToken::new()).await;
             }
         };
 
@@ -211,8 +209,7 @@ impl HtmlNode {
                 response_msg.set("payload".to_string(), Variant::Array(variants));
 
                 let response_handle = MsgHandle::new(response_msg);
-                self.fan_out_one(Envelope { port: 0, msg: response_handle }, CancellationToken::new())
-                    .await?;
+                self.fan_out_one(Envelope { port: 0, msg: response_handle }, CancellationToken::new()).await?;
             }
             HtmlOutputMode::Multi => {
                 // Send separate messages for each matched element
@@ -220,8 +217,7 @@ impl HtmlNode {
                     // No matches - send empty array
                     response_msg.set("payload".to_string(), Variant::Array(vec![]));
                     let response_handle = MsgHandle::new(response_msg);
-                    self.fan_out_one(Envelope { port: 0, msg: response_handle }, CancellationToken::new())
-                        .await?;
+                    self.fan_out_one(Envelope { port: 0, msg: response_handle }, CancellationToken::new()).await?;
                 } else {
                     let count = results.len();
                     for (i, result) in results.into_iter().enumerate() {
@@ -236,11 +232,8 @@ impl HtmlNode {
                         individual_msg.set("parts".to_string(), Variant::Object(parts));
 
                         let individual_handle = MsgHandle::new(individual_msg);
-                        self.fan_out_one(
-                            Envelope { port: 0, msg: individual_handle },
-                            CancellationToken::new(),
-                        )
-                        .await?;
+                        self.fan_out_one(Envelope { port: 0, msg: individual_handle }, CancellationToken::new())
+                            .await?;
                     }
                 }
             }
@@ -254,10 +247,8 @@ impl HtmlNode {
 impl HtmlNode {
     async fn process_html(&self, _msg: MsgHandle) -> crate::Result<()> {
         log::error!("HTML node is not available. Please enable the 'nodes_html' feature.");
-        Err(crate::RustRedError::InvalidOperation(
-            "HTML node requires 'nodes_html' feature to be enabled".to_string(),
-        )
-        .into())
+        Err(crate::RustRedError::InvalidOperation("HTML node requires 'nodes_html' feature to be enabled".to_string())
+            .into())
     }
 }
 
@@ -271,10 +262,7 @@ impl FlowNodeBehavior for HtmlNode {
         while !stop_token.is_cancelled() {
             let node = self.clone();
 
-            with_uow(node.as_ref(), stop_token.clone(), |node, msg| async move {
-                node.process_html(msg).await
-            })
-            .await;
+            with_uow(node.as_ref(), stop_token.clone(), |node, msg| async move { node.process_html(msg).await }).await;
         }
 
         log::debug!("HtmlNode terminated.");

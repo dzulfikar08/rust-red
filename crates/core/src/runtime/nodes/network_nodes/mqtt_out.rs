@@ -139,17 +139,12 @@ impl MqttOutNode {
 
     /// Resolve the broker config reference to a (host, port) pair.
     async fn resolve_broker_addr(&self) -> crate::Result<(String, u16)> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         let eid_opt = ElementId::from_str(&self.config.broker).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine.find_global_node_by_name(&self.config.broker).ok().flatten()
-            })
+            .or_else(|| engine.find_global_node_by_name(&self.config.broker).ok().flatten())
             .ok_or_else(|| anyhow::anyhow!("Broker config '{}' not found", self.config.broker))?;
 
         if let Some(broker) = global.as_any().downcast_ref::<MqttBrokerNode>() {
@@ -165,10 +160,7 @@ impl MqttOutNode {
             return Ok(embedded.configured_addr());
         }
 
-        Err(anyhow::anyhow!(
-            "Broker config '{}' is not a mqtt-broker or mqtt-broker-embedded node",
-            self.config.broker
-        ))
+        Err(anyhow::anyhow!("Broker config '{}' is not a mqtt-broker or mqtt-broker-embedded node", self.config.broker))
     }
 
     async fn ensure_connection(&self) -> crate::Result<()> {

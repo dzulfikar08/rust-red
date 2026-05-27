@@ -95,11 +95,8 @@ fn generate_chain_flow(n_nodes: usize) -> String {
 
     for i in 0..n_nodes {
         let node_id = format!("{:016x}", 0xd100000000000001u64 + i as u64);
-        let next_id = if i < n_nodes - 1 {
-            format!("{:016x}", 0xd100000000000001u64 + i as u64 + 1)
-        } else {
-            debug_id.clone()
-        };
+        let next_id =
+            if i < n_nodes - 1 { format!("{:016x}", 0xd100000000000001u64 + i as u64 + 1) } else { debug_id.clone() };
 
         nodes.push(json!({
             "id": node_id,
@@ -139,9 +136,7 @@ fn generate_fanout_flow(n_paths: usize) -> String {
     let inject_id = format!("{:016x}", 0xb200000000000001u64);
     let hub_id = format!("{:016x}", 0xd200000000000001u64);
 
-    let debug_ids: Vec<String> = (0..n_paths)
-        .map(|i| format!("{:016x}", 0xc200000000000001u64 + i as u64))
-        .collect();
+    let debug_ids: Vec<String> = (0..n_paths).map(|i| format!("{:016x}", 0xc200000000000001u64 + i as u64)).collect();
 
     let mut nodes = vec![
         json!({
@@ -284,10 +279,7 @@ fn benchmark_flow_throughput(flow_json: &str, label: &str, msg_count: usize) -> 
             }
 
             if received < expected_msgs {
-                eprintln!(
-                    "  Iteration {}: received {}/{} messages in {:?}",
-                    iter, received, expected_msgs, elapsed
-                );
+                eprintln!("  Iteration {}: received {}/{} messages in {:?}", iter, received, expected_msgs, elapsed);
             }
 
             durations.push(elapsed);
@@ -323,11 +315,7 @@ fn main() {
     // Chain benchmarks
     for &n_nodes in &[0_usize, 10, 100] {
         let flow_json = generate_chain_flow(n_nodes);
-        let label = if n_nodes == 0 {
-            "passthrough"
-        } else {
-            Box::leak(format!("chain-{}", n_nodes).into_boxed_str())
-        };
+        let label = if n_nodes == 0 { "passthrough" } else { Box::leak(format!("chain-{}", n_nodes).into_boxed_str()) };
         if let Some(stats) = benchmark_flow_throughput(&flow_json, label, msg_count) {
             all_results.push((label, stats));
         }

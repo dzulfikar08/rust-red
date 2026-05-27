@@ -77,11 +77,7 @@ pub struct AuditConfig {
 
 impl Default for AuditConfig {
     fn default() -> Self {
-        Self {
-            enabled: true,
-            path: default_audit_path(),
-            max_file_size_mb: default_max_file_size_mb(),
-        }
+        Self { enabled: true, path: default_audit_path(), max_file_size_mb: default_max_file_size_mb() }
     }
 }
 
@@ -126,10 +122,7 @@ pub struct FileAuditLogger {
 
 impl FileAuditLogger {
     pub fn new(config: AuditConfig) -> Self {
-        Self {
-            config,
-            write_lock: tokio::sync::Mutex::new(()),
-        }
+        Self { config, write_lock: tokio::sync::Mutex::new(()) }
     }
 
     async fn should_rotate(&self) -> bool {
@@ -162,8 +155,8 @@ impl FileAuditLogger {
             self.rotate().await;
         }
 
-        let mut line = serde_json::to_string(event)
-            .unwrap_or_else(|_| "{{\"error\":\"serialization failed\"}}".to_string());
+        let mut line =
+            serde_json::to_string(event).unwrap_or_else(|_| "{{\"error\":\"serialization failed\"}}".to_string());
         line.push('\n');
 
         // Ensure parent directory exists
@@ -174,11 +167,7 @@ impl FileAuditLogger {
         }
 
         // Use OpenOptions for append, creating the file if missing
-        let file = tokio::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.config.path)
-            .await?;
+        let file = tokio::fs::OpenOptions::new().create(true).append(true).open(&self.config.path).await?;
 
         let mut writer = tokio::io::BufWriter::new(file);
         writer.write_all(line.as_bytes()).await?;
@@ -229,11 +218,7 @@ mod tests {
         let file = NamedTempFile::new().unwrap();
         let path = file.path().to_str().unwrap().to_string();
 
-        let config = AuditConfig {
-            enabled: true,
-            path: path.clone(),
-            max_file_size_mb: 100,
-        };
+        let config = AuditConfig { enabled: true, path: path.clone(), max_file_size_mb: 100 };
         let logger = FileAuditLogger::new(config);
 
         let event = AuditEvent::new(AuditEventType::FlowDeploy)
@@ -283,12 +268,7 @@ mod tests {
         let rotated: Vec<_> = std::fs::read_dir(dir.path())
             .unwrap()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.file_name()
-                    .to_str()
-                    .map(|n| n.starts_with("audit.log"))
-                    .unwrap_or(false)
-            })
+            .filter(|e| e.file_name().to_str().map(|n| n.starts_with("audit.log")).unwrap_or(false))
             .collect();
         assert_eq!(rotated.len(), 2); // one rotated, one new
     }

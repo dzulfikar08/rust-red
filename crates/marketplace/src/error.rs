@@ -49,33 +49,16 @@ impl IntoResponse for MarketplaceError {
             MarketplaceError::NotFound(_) | MarketplaceError::VersionNotFound(_, _) => {
                 (StatusCode::NOT_FOUND, "NOT_FOUND")
             }
-            MarketplaceError::VersionConflict(_, _) => {
-                (StatusCode::CONFLICT, "VERSION_CONFLICT")
-            }
-            MarketplaceError::InvalidSemver(_) => {
-                (StatusCode::BAD_REQUEST, "INVALID_SEMVER")
-            }
-            MarketplaceError::VersionNotNewer(_, _) => {
-                (StatusCode::CONFLICT, "VERSION_NOT_NEWER")
-            }
-            MarketplaceError::PluginTooLarge(_, _) => {
-                (StatusCode::PAYLOAD_TOO_LARGE, "PLUGIN_TOO_LARGE")
-            }
-            MarketplaceError::VerificationFailed(_) => {
-                (StatusCode::UNPROCESSABLE_ENTITY, "VERIFICATION_FAILED")
-            }
-            MarketplaceError::BadRequest(_) => {
-                (StatusCode::BAD_REQUEST, "BAD_REQUEST")
-            }
-            MarketplaceError::Internal(_) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR")
-            }
+            MarketplaceError::VersionConflict(_, _) => (StatusCode::CONFLICT, "VERSION_CONFLICT"),
+            MarketplaceError::InvalidSemver(_) => (StatusCode::BAD_REQUEST, "INVALID_SEMVER"),
+            MarketplaceError::VersionNotNewer(_, _) => (StatusCode::CONFLICT, "VERSION_NOT_NEWER"),
+            MarketplaceError::PluginTooLarge(_, _) => (StatusCode::PAYLOAD_TOO_LARGE, "PLUGIN_TOO_LARGE"),
+            MarketplaceError::VerificationFailed(_) => (StatusCode::UNPROCESSABLE_ENTITY, "VERIFICATION_FAILED"),
+            MarketplaceError::BadRequest(_) => (StatusCode::BAD_REQUEST, "BAD_REQUEST"),
+            MarketplaceError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL_ERROR"),
         };
 
-        let body = ErrorBody {
-            error: self.to_string(),
-            code,
-        };
+        let body = ErrorBody { error: self.to_string(), code };
 
         (status, Json(body)).into_response()
     }

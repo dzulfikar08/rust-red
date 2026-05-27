@@ -24,10 +24,18 @@ struct ModbusServerConfig {
     register_count: u16,
 }
 
-fn default_host() -> String { "127.0.0.1".to_string() }
-fn default_port() -> u16 { 5020 }
-fn default_coil_count() -> u16 { 100 }
-fn default_register_count() -> u16 { 100 }
+fn default_host() -> String {
+    "127.0.0.1".to_string()
+}
+fn default_port() -> u16 {
+    5020
+}
+fn default_coil_count() -> u16 {
+    100
+}
+fn default_register_count() -> u16 {
+    100
+}
 
 #[derive(Debug)]
 #[flow_node("modbus-server", red_name = "modbus-server", module = "node-red")]
@@ -44,10 +52,7 @@ impl ModbusServerNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let cfg = ModbusServerConfig::deserialize(&config.rest)?;
-        Ok(Box::new(ModbusServerNode {
-            base: state,
-            config: cfg,
-        }))
+        Ok(Box::new(ModbusServerNode { base: state, config: cfg }))
     }
 
     fn make_event_msg(&self, topic: &str, payload: Variant, session_id: &str, remote_addr: &str) -> MsgHandle {
@@ -152,9 +157,7 @@ impl ModbusServerNode {
             let request_payload = self.build_request_payload(fc, &pdu);
 
             // Process the request and build response
-            let response = self.process_request(
-                fc, &pdu, &coils, &registers,
-            );
+            let response = self.process_request(fc, &pdu, &coils, &registers);
 
             // Emit request event to output
             let fc_name = Self::fc_name(fc);
@@ -166,16 +169,8 @@ impl ModbusServerNode {
                 }
             }
             let event_payload = Variant::Object(payload_map);
-            let event_msg = self.make_event_msg(
-                "modbus/request",
-                event_payload,
-                &session_id,
-                &remote_addr,
-            );
-            if let Err(e) = self.fan_out_one(
-                Envelope { port: 0, msg: event_msg },
-                stop_token.clone(),
-            ).await {
+            let event_msg = self.make_event_msg("modbus/request", event_payload, &session_id, &remote_addr);
+            if let Err(e) = self.fan_out_one(Envelope { port: 0, msg: event_msg }, stop_token.clone()).await {
                 log::debug!("[modbus-server] failed to emit event: {e}");
             }
 
@@ -200,16 +195,9 @@ impl ModbusServerNode {
         }
 
         // Emit disconnect event
-        let disconnect_msg = self.make_event_msg(
-            "modbus/disconnect",
-            Variant::String(remote_addr.clone()),
-            &session_id,
-            &remote_addr,
-        );
-        let _ = self.fan_out_one(
-            Envelope { port: 0, msg: disconnect_msg },
-            stop_token,
-        ).await;
+        let disconnect_msg =
+            self.make_event_msg("modbus/disconnect", Variant::String(remote_addr.clone()), &session_id, &remote_addr);
+        let _ = self.fan_out_one(Envelope { port: 0, msg: disconnect_msg }, stop_token).await;
     }
 
     fn build_request_payload(&self, fc: u8, pdu: &[u8]) -> Option<std::collections::BTreeMap<String, Variant>> {
@@ -272,12 +260,16 @@ impl ModbusServerNode {
         match fc {
             0x01 | 0x02 => {
                 // Read Coils / Read Discrete Inputs
-                if pdu.len() < 5 { return Some(Self::exception(fc, 0x02)); }
+                if pdu.len() < 5 {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let addr = u16::from_be_bytes([pdu[1], pdu[2]]) as usize;
                 let qty = u16::from_be_bytes([pdu[3], pdu[4]]) as usize;
                 let end = addr.saturating_add(qty);
                 let c = coils.lock().unwrap();
-                if end > c.len() { return Some(Self::exception(fc, 0x02)); }
+                if end > c.len() {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let byte_count = (qty + 7) / 8;
                 let mut data = vec![0u8; byte_count];
                 for i in 0..qty {
@@ -291,12 +283,16 @@ impl ModbusServerNode {
             }
             0x03 | 0x04 => {
                 // Read Holding Registers / Read Input Registers
-                if pdu.len() < 5 { return Some(Self::exception(fc, 0x02)); }
+                if pdu.len() < 5 {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let addr = u16::from_be_bytes([pdu[1], pdu[2]]) as usize;
                 let qty = u16::from_be_bytes([pdu[3], pdu[4]]) as usize;
                 let end = addr.saturating_add(qty);
                 let r = registers.lock().unwrap();
-                if end > r.len() { return Some(Self::exception(fc, 0x02)); }
+                if end > r.len() {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let byte_count = (qty * 2) as u8;
                 let mut resp = vec![fc, byte_count];
                 for i in 0..qty {
@@ -306,34 +302,48 @@ impl ModbusServerNode {
             }
             0x05 => {
                 // Write Single Coil
-                if pdu.len() < 5 { return Some(Self::exception(fc, 0x02)); }
+                if pdu.len() < 5 {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let addr = u16::from_be_bytes([pdu[1], pdu[2]]) as usize;
                 let val = u16::from_be_bytes([pdu[3], pdu[4]]);
                 let mut c = coils.lock().unwrap();
-                if addr >= c.len() { return Some(Self::exception(fc, 0x02)); }
+                if addr >= c.len() {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 c[addr] = val == 0xFF00;
                 Some(vec![fc, pdu[1], pdu[2], pdu[3], pdu[4]])
             }
             0x06 => {
                 // Write Single Register
-                if pdu.len() < 5 { return Some(Self::exception(fc, 0x02)); }
+                if pdu.len() < 5 {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let addr = u16::from_be_bytes([pdu[1], pdu[2]]) as usize;
                 let val = u16::from_be_bytes([pdu[3], pdu[4]]);
                 let mut r = registers.lock().unwrap();
-                if addr >= r.len() { return Some(Self::exception(fc, 0x02)); }
+                if addr >= r.len() {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 r[addr] = val;
                 Some(vec![fc, pdu[1], pdu[2], pdu[3], pdu[4]])
             }
             0x0F => {
                 // Write Multiple Coils
-                if pdu.len() < 6 { return Some(Self::exception(fc, 0x02)); }
+                if pdu.len() < 6 {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let addr = u16::from_be_bytes([pdu[1], pdu[2]]) as usize;
                 let qty = u16::from_be_bytes([pdu[3], pdu[4]]) as usize;
                 let byte_count = pdu[5] as usize;
-                if pdu.len() < 6 + byte_count { return Some(Self::exception(fc, 0x03)); }
+                if pdu.len() < 6 + byte_count {
+                    return Some(Self::exception(fc, 0x03));
+                }
                 let end = addr.saturating_add(qty);
                 let mut c = coils.lock().unwrap();
-                if end > c.len() { return Some(Self::exception(fc, 0x02)); }
+                if end > c.len() {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 for i in 0..qty {
                     c[addr + i] = (pdu[6 + i / 8] >> (i % 8)) & 1 == 1;
                 }
@@ -341,14 +351,20 @@ impl ModbusServerNode {
             }
             0x10 => {
                 // Write Multiple Registers
-                if pdu.len() < 6 { return Some(Self::exception(fc, 0x02)); }
+                if pdu.len() < 6 {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 let addr = u16::from_be_bytes([pdu[1], pdu[2]]) as usize;
                 let qty = u16::from_be_bytes([pdu[3], pdu[4]]) as usize;
                 let byte_count = pdu[5] as usize;
-                if pdu.len() < 6 + byte_count { return Some(Self::exception(fc, 0x03)); }
+                if pdu.len() < 6 + byte_count {
+                    return Some(Self::exception(fc, 0x03));
+                }
                 let end = addr.saturating_add(qty);
                 let mut r = registers.lock().unwrap();
-                if end > r.len() { return Some(Self::exception(fc, 0x02)); }
+                if end > r.len() {
+                    return Some(Self::exception(fc, 0x02));
+                }
                 for i in 0..qty {
                     let off = 6 + i * 2;
                     r[addr + i] = u16::from_be_bytes([pdu[off], pdu[off + 1]]);
@@ -386,7 +402,8 @@ impl FlowNodeBehavior for ModbusServerNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -400,7 +417,8 @@ impl FlowNodeBehavior for ModbusServerNode {
                 text: Some(format!("listening :{}", self.config.port)),
             },
             stop_token.clone(),
-        ).await;
+        )
+        .await;
 
         let conn_counter = Arc::new(tokio::sync::Mutex::new(0u64));
 

@@ -85,11 +85,7 @@ pub async fn post_flows(
     // Input size validation
     let max_flow_size = state.red_settings.security.max_flow_size;
     if payload.len() > max_flow_size {
-        log::warn!(
-            "Flow payload too large: {} bytes (max: {} bytes)",
-            payload.len(),
-            max_flow_size
-        );
+        log::warn!("Flow payload too large: {} bytes (max: {} bytes)", payload.len(), max_flow_size);
         return Err(StatusCode::PAYLOAD_TOO_LARGE);
     }
 
@@ -111,10 +107,13 @@ pub async fn post_flows(
     // Validate config_node references before deploying
     if let Err(validation_errors) = validate_flow_config_nodes(&parsed_payload.flows) {
         log::warn!("Deploy rejected: {} invalid config reference(s)", validation_errors.len());
-        state.comms.send_notification("warning", &format!(
-            "Deploy rejected: {} node(s) have invalid config references",
-            validation_errors.len()
-        )).await;
+        state
+            .comms
+            .send_notification(
+                "warning",
+                &format!("Deploy rejected: {} node(s) have invalid config references", validation_errors.len()),
+            )
+            .await;
         // Return validation error as JSON - client must handle HTTP 200 with error payload
         // since Node-RED editor expects JSON response
         return Ok(Json(serde_json::json!({
@@ -470,10 +469,8 @@ pub async fn delete_flow(
 /// Returns Ok(()) if valid, Err(Vec<error details>) if invalid.
 fn validate_flow_config_nodes(flows: &[Value]) -> Result<(), Vec<Value>> {
     // Collect all node IDs present in the flow
-    let all_node_ids: HashSet<String> = flows
-        .iter()
-        .filter_map(|node| node.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()))
-        .collect();
+    let all_node_ids: HashSet<String> =
+        flows.iter().filter_map(|node| node.get("id").and_then(|v| v.as_str()).map(|s| s.to_string())).collect();
 
     let mut errors = Vec::new();
 
@@ -506,11 +503,7 @@ fn validate_flow_config_nodes(flows: &[Value]) -> Result<(), Vec<Value>> {
         }
     }
 
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
 /// `GET /credentials/{type}/{id}`

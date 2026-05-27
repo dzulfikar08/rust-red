@@ -10,7 +10,7 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
-use super::modbus_config::{ModbusConfigNode, ModbusDataType, resolve_modbus_config, downcast_modbus_config};
+use super::modbus_config::{ModbusConfigNode, ModbusDataType, downcast_modbus_config, resolve_modbus_config};
 
 #[derive(Deserialize, Debug, Clone)]
 struct ModbusReadConfig {
@@ -74,10 +74,7 @@ impl ModbusReadNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let read_config = ModbusReadConfig::deserialize(&config.rest)?;
-        Ok(Box::new(ModbusReadNode {
-            base: base_node,
-            config: read_config,
-        }))
+        Ok(Box::new(ModbusReadNode { base: base_node, config: read_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
@@ -92,12 +89,9 @@ impl ModbusReadNode {
             _ => {
                 // Register-based: quantity values * registers-per-value
                 let width = self.config.data_type.register_count();
-                self.config.quantity
-                    .checked_mul(width)
-                    .ok_or_else(|| anyhow::anyhow!(
-                        "quantity ({}) * data_type width ({}) overflows u16",
-                        self.config.quantity, width
-                    ))
+                self.config.quantity.checked_mul(width).ok_or_else(|| {
+                    anyhow::anyhow!("quantity ({}) * data_type width ({}) overflows u16", self.config.quantity, width)
+                })
             }
         }
     }
@@ -151,7 +145,8 @@ impl FlowNodeBehavior for ModbusReadNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -234,28 +229,39 @@ impl FlowNodeBehavior for ModbusReadNode {
                         Ok(payload) => {
                             let mut guard = msg.write().await;
                             guard.set("payload".to_string(), payload);
-                            guard.set("modbus".to_string(), Variant::from(serde_json::json!({
-                                "functionCode": node.config.function_code,
-                                "address": node.config.address,
-                                "quantity": node.config.quantity,
-                            })));
+                            guard.set(
+                                "modbus".to_string(),
+                                Variant::from(serde_json::json!({
+                                    "functionCode": node.config.function_code,
+                                    "address": node.config.address,
+                                    "quantity": node.config.quantity,
+                                })),
+                            );
                             drop(guard);
-                            node.report_status(StatusObject {
-                                fill: Some(StatusFill::Green),
-                                shape: Some(StatusShape::Dot),
-                                text: Some(format!("{} @ {}", node.config.address, node.config.function_code)),
-                            }, cancel.child_token()).await;
+                            node.report_status(
+                                StatusObject {
+                                    fill: Some(StatusFill::Green),
+                                    shape: Some(StatusShape::Dot),
+                                    text: Some(format!("{} @ {}", node.config.address, node.config.function_code)),
+                                },
+                                cancel.child_token(),
+                            )
+                            .await;
                         }
                         Err(e) => {
                             log::warn!("[modbus-read:{}] Read error: {}", node.name(), e);
                             let mut guard = msg.write().await;
                             guard.set("error".to_string(), Variant::String(e.to_string()));
                             drop(guard);
-                            node.report_status(StatusObject {
-                                fill: Some(StatusFill::Red),
-                                shape: Some(StatusShape::Ring),
-                                text: Some(format!("{}", e)),
-                            }, cancel.child_token()).await;
+                            node.report_status(
+                                StatusObject {
+                                    fill: Some(StatusFill::Red),
+                                    shape: Some(StatusShape::Ring),
+                                    text: Some(format!("{}", e)),
+                                },
+                                cancel.child_token(),
+                            )
+                            .await;
                         }
                     }
                     Ok(())

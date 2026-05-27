@@ -5,7 +5,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use rust_red_core::runtime::paths;
-use rust_red_core::runtime::telemetry::{TelemetryConfig, init_telemetry, shutdown_telemetry};
+use rust_red_core::runtime::telemetry::{init_telemetry, shutdown_telemetry, TelemetryConfig};
 use rust_red_web::server::WebServer;
 
 use crate::app::App;

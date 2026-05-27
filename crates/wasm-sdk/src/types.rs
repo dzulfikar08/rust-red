@@ -114,15 +114,12 @@ impl ProcessResult {
 
     /// Create a result that sends a single message to port 0.
     pub fn single(msg: WasmMessage) -> Self {
-        Self {
-            output: Some(vec![vec![Some(msg)]]),
-        }
+        Self { output: Some(vec![vec![Some(msg)]]) }
     }
 
     /// Create a result that sends a single message to a specific port.
     pub fn to_port(port: usize, msg: WasmMessage, total_ports: usize) -> Self {
-        let mut outputs: Vec<Vec<Option<WasmMessage>>> =
-            (0..total_ports).map(|_| Vec::new()).collect();
+        let mut outputs: Vec<Vec<Option<WasmMessage>>> = (0..total_ports).map(|_| Vec::new()).collect();
         outputs[port].push(Some(msg));
         Self { output: Some(outputs) }
     }

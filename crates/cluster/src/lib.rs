@@ -105,11 +105,7 @@ impl ClusterManager {
             });
         }
 
-        log::info!(
-            "cluster: node {} started, bind={}",
-            self.gossip.local_id(),
-            self.config.bind
-        );
+        log::info!("cluster: node {} started, bind={}", self.gossip.local_id(), self.config.bind);
         Ok(())
     }
 

@@ -5,7 +5,7 @@
 
 use serde_json::json;
 
-use super::harness::{assert_msg_num, TestHarness};
+use super::harness::{TestHarness, assert_msg_num};
 
 /// RBE: same value sent twice — second should be blocked.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -23,13 +23,7 @@ async fn rbe_basic_block_repeat() {
     let harness = TestHarness::from_flow_json(flow);
     // Send the same value twice — only the first should pass through
     let msgs = harness
-        .run_with_inject(
-            1,
-            vec![
-                ("1".to_string(), json!({"payload": 42})),
-                ("1".to_string(), json!({"payload": 42})),
-            ],
-        )
+        .run_with_inject(1, vec![("1".to_string(), json!({"payload": 42})), ("1".to_string(), json!({"payload": 42}))])
         .await;
 
     // Only the first message should pass; the second is blocked as a repeat
@@ -53,13 +47,7 @@ async fn rbe_allow_change() {
     let harness = TestHarness::from_flow_json(flow);
     // Send different values — both should pass through
     let msgs = harness
-        .run_with_inject(
-            2,
-            vec![
-                ("1".to_string(), json!({"payload": 10})),
-                ("1".to_string(), json!({"payload": 20})),
-            ],
-        )
+        .run_with_inject(2, vec![("1".to_string(), json!({"payload": 10})), ("1".to_string(), json!({"payload": 20}))])
         .await;
 
     assert_eq!(msgs.len(), 2, "Both different values should pass through");
@@ -94,10 +82,7 @@ async fn rbe_reset() {
         )
         .await;
 
-    assert_eq!(
-        msgs.len(), 2,
-        "After reset, the same value should be allowed through again"
-    );
+    assert_eq!(msgs.len(), 2, "After reset, the same value should be allowed through again");
     assert_msg_num(&msgs[0], "payload", 42);
     assert_msg_num(&msgs[1], "payload", 42);
 }
@@ -119,18 +104,9 @@ async fn rbe_ignore_first() {
     // In rbei mode, the first message is stored but not forwarded.
     // The second message with a different value should pass through.
     let msgs = harness
-        .run_with_inject(
-            1,
-            vec![
-                ("1".to_string(), json!({"payload": 10})),
-                ("1".to_string(), json!({"payload": 20})),
-            ],
-        )
+        .run_with_inject(1, vec![("1".to_string(), json!({"payload": 10})), ("1".to_string(), json!({"payload": 20}))])
         .await;
 
-    assert_eq!(
-        msgs.len(), 1,
-        "rbei should block first message, allow second if different"
-    );
+    assert_eq!(msgs.len(), 1, "rbei should block first message, allow second if different");
     assert_msg_num(&msgs[0], "payload", 20);
 }

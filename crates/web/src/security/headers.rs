@@ -23,28 +23,16 @@ pub async fn add_security_headers(req: Request<Body>, next: Next) -> Response<Bo
     let headers = response.headers_mut();
 
     // Prevent MIME-type sniffing
-    headers.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        HeaderValue::from_static("nosniff"),
-    );
+    headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
 
     // Prevent clickjacking - deny framing entirely
-    headers.insert(
-        header::X_FRAME_OPTIONS,
-        HeaderValue::from_static("DENY"),
-    );
+    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
 
     // Disable legacy XSS protection (browsers handle this better via CSP now)
-    headers.insert(
-        header::HeaderName::from_static("x-xss-protection"),
-        HeaderValue::from_static("0"),
-    );
+    headers.insert(header::HeaderName::from_static("x-xss-protection"), HeaderValue::from_static("0"));
 
     // Control referrer information
-    headers.insert(
-        header::REFERRER_POLICY,
-        HeaderValue::from_static("strict-origin-when-cross-origin"),
-    );
+    headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));
 
     // Content Security Policy - permissive for Node-RED editor compatibility
     // The editor requires inline scripts/styles and eval for the function editor
@@ -58,7 +46,7 @@ pub async fn add_security_headers(req: Request<Body>, next: Next) -> Response<Bo
              font-src 'self'; \
              connect-src 'self' ws: wss:; \
              worker-src 'self' blob:; \
-             frame-ancestors 'none'"
+             frame-ancestors 'none'",
         ),
     );
 
@@ -99,10 +87,7 @@ where
     type Error = S::Error;
     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(
-        &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
@@ -112,22 +97,10 @@ where
             let mut response = fut.await?;
             let headers = response.headers_mut();
 
-            headers.insert(
-                header::X_CONTENT_TYPE_OPTIONS,
-                HeaderValue::from_static("nosniff"),
-            );
-            headers.insert(
-                header::X_FRAME_OPTIONS,
-                HeaderValue::from_static("DENY"),
-            );
-            headers.insert(
-                header::HeaderName::from_static("x-xss-protection"),
-                HeaderValue::from_static("0"),
-            );
-            headers.insert(
-                header::REFERRER_POLICY,
-                HeaderValue::from_static("strict-origin-when-cross-origin"),
-            );
+            headers.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+            headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+            headers.insert(header::HeaderName::from_static("x-xss-protection"), HeaderValue::from_static("0"));
+            headers.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));
             headers.insert(
                 header::CONTENT_SECURITY_POLICY,
                 HeaderValue::from_static(
@@ -138,7 +111,7 @@ where
                      font-src 'self'; \
                      connect-src 'self' ws: wss:; \
                      worker-src 'self' blob:; \
-                     frame-ancestors 'none'"
+                     frame-ancestors 'none'",
                 ),
             );
             headers.insert(

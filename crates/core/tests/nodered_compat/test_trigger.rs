@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_str};
 
 /// Trigger: send op1 immediately, then send op2 after duration (wait-then-send).
 /// Default config: op1="1", op2="0", duration=250ms.
@@ -26,14 +26,7 @@ async fn trigger_send_then_wait() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(2)).await;
 
     // Should get at least the first message (op1="1") immediately
     assert!(!msgs.is_empty(), "Expected at least one message from trigger");
@@ -56,14 +49,7 @@ async fn trigger_wait_then_send() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "Expected op2 message after delay");
     assert_msg_str(&msgs[0], "payload", "0");
@@ -84,14 +70,7 @@ async fn trigger_both_op1_and_op2() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test"}),
-            2,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 2, Duration::from_secs(2)).await;
 
     assert_eq!(msgs.len(), 2, "Expected both op1 and op2 messages");
     assert_msg_str(&msgs[0], "payload", "first");
@@ -119,20 +98,11 @@ async fn trigger_reset() {
     // In Node-RED, msg.reset cancels the pending timer. If reset is present, the node
     // cancels any pending timeout and returns without sending.
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test", "reset": true}),
-            1,
-            Duration::from_millis(500),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "test", "reset": true}), 1, Duration::from_millis(500))
         .await;
 
     // With reset=true, the trigger node should cancel the pending event and not send
-    assert!(
-        msgs.is_empty(),
-        "Reset should cancel pending trigger, got {} messages",
-        msgs.len()
-    );
+    assert!(msgs.is_empty(), "Reset should cancel pending trigger, got {} messages", msgs.len());
 }
 
 /// Trigger: extend flag extends the timer on each message.
@@ -150,14 +120,7 @@ async fn trigger_extend() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test"}),
-            2,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 2, Duration::from_secs(2)).await;
 
     // With extend, first message sends op1, then after duration sends op2
     assert!(!msgs.is_empty(), "Expected messages with extend");

@@ -8,7 +8,7 @@ use std::time::Duration;
 use serde_json::json;
 use tempfile::TempDir;
 
-use super::harness::{assert_msg_has, assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_str};
 
 // ---------------------------------------------------------------------------
 // Helper: build a file write flow (inject -> file -> test-once sink)
@@ -93,14 +93,8 @@ async fn file_write_basic() {
     let flow = build_file_write_flow(&file_path_str, "true", false);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "hello world"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "hello world"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "File node should forward the message");
     assert_msg_str(&msgs[0], "payload", "hello world");
@@ -118,21 +112,12 @@ async fn file_read_basic() {
     let file_path_str = file_path.to_string_lossy().to_string();
 
     // Pre-create the file with known content
-    tokio::fs::write(&file_path, "test content here")
-        .await
-        .expect("write test file");
+    tokio::fs::write(&file_path, "test content here").await.expect("write test file");
 
     let flow = build_file_read_flow(&file_path_str, "utf8");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "trigger"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "trigger"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "File-in node should output a message");
     assert_msg_str(&msgs[0], "payload", "test content here");
@@ -147,21 +132,12 @@ async fn file_append() {
     let file_path_str = file_path.to_string_lossy().to_string();
 
     // Pre-create with initial content
-    tokio::fs::write(&file_path, "first")
-        .await
-        .expect("write initial content");
+    tokio::fs::write(&file_path, "first").await.expect("write initial content");
 
     let flow = build_file_write_flow(&file_path_str, "false", false);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "second"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "second"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "File node should forward appended message");
 
@@ -177,28 +153,16 @@ async fn file_delete() {
     let file_path_str = file_path.to_string_lossy().to_string();
 
     // Pre-create file
-    tokio::fs::write(&file_path, "delete me")
-        .await
-        .expect("write file to delete");
+    tokio::fs::write(&file_path, "delete me").await.expect("write file to delete");
     assert!(file_path.exists(), "File should exist before delete");
 
     let flow = build_file_write_flow(&file_path_str, "delete", false);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "anything"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "anything"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "File delete node should forward message");
-    assert!(
-        !file_path.exists(),
-        "File should be deleted after node processes"
-    );
+    assert!(!file_path.exists(), "File should be deleted after node processes");
 }
 
 /// File create directory: write to a path that requires creating parent dirs.
@@ -211,14 +175,8 @@ async fn file_create_directory() {
     let flow = build_file_write_flow(&file_path_str, "true", true);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "nested content"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "nested content"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "File node should forward message");
     assert!(nested_path.exists(), "File should exist at nested path");
@@ -254,12 +212,7 @@ async fn file_binary_mode() {
     // Use non-ASCII UTF-8 characters as binary-like content
     let binary_content = "binary\u{00e2}\u{009c}\u{0082}data\u{00c3}\u{00bc}";
     let msgs = write_harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": binary_content}),
-            1,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": binary_content}), 1, Duration::from_secs(2))
         .await;
 
     assert!(!msgs.is_empty(), "File node should forward message");
@@ -282,14 +235,8 @@ async fn file_binary_mode() {
         {"id": "98", "z": "200", "type": "test-once"}
     ]);
     let read_harness = TestHarness::from_flow_json(read_flow);
-    let read_msgs = read_harness
-        .inject_and_collect_timeout(
-            "10",
-            json!({"payload": "read"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let read_msgs =
+        read_harness.inject_and_collect_timeout("10", json!({"payload": "read"}), 1, Duration::from_secs(2)).await;
 
     assert!(!read_msgs.is_empty(), "File-in should output binary data");
     let payload = read_msgs[0].get("payload").expect("missing payload");
@@ -311,14 +258,7 @@ async fn file_read_nonexistent() {
     let flow = build_file_read_flow(&file_path_str, "utf8");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "trigger"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "trigger"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "File-in should emit error message for nonexistent file");
     // Node-RED: on error, msg.error is set with the error description
@@ -365,21 +305,12 @@ async fn file_read_buffer_format() {
     let file_path = tmp.path().join("buffer.txt");
     let file_path_str = file_path.to_string_lossy().to_string();
 
-    tokio::fs::write(&file_path, "buffer content")
-        .await
-        .expect("write test file");
+    tokio::fs::write(&file_path, "buffer content").await.expect("write test file");
 
     let flow = build_file_read_flow(&file_path_str, "");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "trigger"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "trigger"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty(), "File-in buffer mode should output a message");
     // Buffer mode returns Variant::Bytes
@@ -415,14 +346,7 @@ async fn file_write_append_newline_single_msg() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "line"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "line"}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty());
 
@@ -469,11 +393,7 @@ async fn file_write_append_newline_multipart() {
     assert!(!msgs1.is_empty());
 
     let contents = tokio::fs::read_to_string(&file_path).await.expect("read file");
-    assert!(
-        contents.ends_with('\n'),
-        "Intermediate part should end with newline, got: {:?}",
-        contents
-    );
+    assert!(contents.ends_with('\n'), "Intermediate part should end with newline, got: {:?}", contents);
 }
 
 /// File-in read with msg.filename: read file path from message property.
@@ -483,9 +403,7 @@ async fn file_read_with_msg_filename() {
     let file_path = tmp.path().join("msg_read.txt");
     let file_path_str = file_path.to_string_lossy().to_string();
 
-    tokio::fs::write(&file_path, "from msg filename")
-        .await
-        .expect("write test file");
+    tokio::fs::write(&file_path, "from msg filename").await.expect("write test file");
 
     let flow = build_file_read_msg_filename_flow();
     let harness = TestHarness::from_flow_json(flow);
@@ -513,14 +431,7 @@ async fn file_write_numeric_payload() {
     let flow = build_file_write_flow(&file_path_str, "true", false);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": 42}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": 42}), 1, Duration::from_secs(2)).await;
 
     assert!(!msgs.is_empty());
 
@@ -539,26 +450,15 @@ async fn file_write_read_roundtrip() {
     let write_flow = build_file_write_flow(&file_path_str, "true", false);
     let write_harness = TestHarness::from_flow_json(write_flow);
     let write_msgs = write_harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "roundtrip data"}),
-            1,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "roundtrip data"}), 1, Duration::from_secs(2))
         .await;
     assert!(!write_msgs.is_empty());
 
     // Step 2: Read it back
     let read_flow = build_file_read_flow(&file_path_str, "utf8");
     let read_harness = TestHarness::from_flow_json(read_flow);
-    let read_msgs = read_harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "read"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let read_msgs =
+        read_harness.inject_and_collect_timeout("1", json!({"payload": "read"}), 1, Duration::from_secs(2)).await;
 
     assert!(!read_msgs.is_empty());
     assert_msg_str(&read_msgs[0], "payload", "roundtrip data");

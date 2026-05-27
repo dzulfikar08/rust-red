@@ -9,7 +9,7 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
-use super::modbus_config::{ModbusConfigNode, ModbusDataType, resolve_modbus_config, downcast_modbus_config};
+use super::modbus_config::{ModbusConfigNode, ModbusDataType, downcast_modbus_config, resolve_modbus_config};
 
 #[derive(Deserialize, Debug, Clone)]
 struct ModbusWriteConfig {
@@ -45,10 +45,7 @@ impl ModbusWriteNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let write_config = ModbusWriteConfig::deserialize(&config.rest)?;
-        Ok(Box::new(ModbusWriteNode {
-            base: base_node,
-            config: write_config,
-        }))
+        Ok(Box::new(ModbusWriteNode { base: base_node, config: write_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
@@ -78,8 +75,7 @@ impl ModbusWriteNode {
                 let coils: Vec<bool> = values
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| v.as_bool()
-                        .ok_or_else(|| anyhow::anyhow!("payload[{}] is not a boolean", i)))
+                    .map(|(i, v)| v.as_bool().ok_or_else(|| anyhow::anyhow!("payload[{}] is not a boolean", i)))
                     .collect::<crate::Result<Vec<_>>>()?;
                 let count = coils.len();
                 conn.write_multiple_coils(address, &coils).await?;
@@ -87,9 +83,8 @@ impl ModbusWriteNode {
             }
             "writeMultipleRegisters" => {
                 // FC16
-                let payload_val = payload.ok_or_else(|| {
-                    anyhow::anyhow!("payload required for writeMultipleRegisters")
-                })?;
+                let payload_val =
+                    payload.ok_or_else(|| anyhow::anyhow!("payload required for writeMultipleRegisters"))?;
                 // Accept either an array of numbers or a single value
                 // (single value gets converted via data_type into multiple registers)
                 let words = if let Some(arr) = payload_val.as_array() {
@@ -109,9 +104,8 @@ impl ModbusWriteNode {
             }
             _ => {
                 // FC6 – writeSingleRegister (default)
-                let payload_val = payload.ok_or_else(|| {
-                    anyhow::anyhow!("payload must be a number for writeSingleRegister")
-                })?;
+                let payload_val =
+                    payload.ok_or_else(|| anyhow::anyhow!("payload must be a number for writeSingleRegister"))?;
                 let words = self.config.data_type.variant_to_words(payload_val)?;
                 // For single-register data types (UInt16/Int16) write FC6
                 // For wider types fall through to FC16 semantics
@@ -146,7 +140,8 @@ impl FlowNodeBehavior for ModbusWriteNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -171,10 +166,13 @@ impl FlowNodeBehavior for ModbusWriteNode {
                         Ok(value) => {
                             let mut guard = msg.write().await;
                             guard.set("payload".to_string(), value);
-                            guard.set("modbus".to_string(), Variant::from(serde_json::json!({
-                                "functionCode": node.config.function_code,
-                                "address": node.config.address,
-                            })));
+                            guard.set(
+                                "modbus".to_string(),
+                                Variant::from(serde_json::json!({
+                                    "functionCode": node.config.function_code,
+                                    "address": node.config.address,
+                                })),
+                            );
                         }
                         Err(e) => {
                             log::warn!("[modbus-write:{}] Write error: {}", node.name(), e);

@@ -12,7 +12,7 @@ use std::time::Duration;
 use serde_json::json;
 
 use super::flow_builder::FlowBuilder;
-use super::harness::{assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_str};
 
 /// Debug node with default payload property loads in a flow without error.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

@@ -48,10 +48,7 @@ fn get_rss_bytes() -> u64 {
 
     // Fallback: use `ps` command (macOS/Linux)
     let pid = std::process::id();
-    let output = Command::new("ps")
-        .args(["-o", "rss=", "-p", &pid.to_string()])
-        .output()
-        .expect("failed to run ps");
+    let output = Command::new("ps").args(["-o", "rss=", "-p", &pid.to_string()]).output().expect("failed to run ps");
 
     let rss_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
     rss_str.parse::<u64>().unwrap_or(0) * 1024 // ps reports in KB
@@ -109,11 +106,8 @@ fn generate_chain_flow(n_nodes: usize) -> String {
 
     for i in 0..n_nodes {
         let node_id = format!("{:016x}", 0xd100000000000001u64 + i as u64);
-        let next_id = if i < n_nodes - 1 {
-            format!("{:016x}", 0xd100000000000001u64 + i as u64 + 1)
-        } else {
-            debug_id.clone()
-        };
+        let next_id =
+            if i < n_nodes - 1 { format!("{:016x}", 0xd100000000000001u64 + i as u64 + 1) } else { debug_id.clone() };
 
         nodes.push(json!({
             "id": node_id,
@@ -174,11 +168,7 @@ fn measure_memory(label: &str, flow_json: Option<&str>) -> MemorySnapshot {
         }
     });
 
-    MemorySnapshot {
-        label: label.to_string(),
-        rss_bytes: result,
-        rss_delta_bytes: result.saturating_sub(rss_before),
-    }
+    MemorySnapshot { label: label.to_string(), rss_bytes: result, rss_delta_bytes: result.saturating_sub(rss_before) }
 }
 
 fn main() {
@@ -206,18 +196,10 @@ fn main() {
     println!("\n========================================");
     println!("  Memory Summary");
     println!("========================================");
-    println!(
-        "{:<20} {:>15} {:>15}",
-        "Configuration", "RSS", "RSS Delta"
-    );
+    println!("{:<20} {:>15} {:>15}", "Configuration", "RSS", "RSS Delta");
     println!("{}", "-".repeat(52));
     for snap in &snapshots {
-        println!(
-            "{:<20} {:>15} {:>15}",
-            snap.label,
-            format_bytes(snap.rss_bytes),
-            format_bytes(snap.rss_delta_bytes),
-        );
+        println!("{:<20} {:>15} {:>15}", snap.label, format_bytes(snap.rss_bytes), format_bytes(snap.rss_delta_bytes),);
     }
 
     // Node-RED comparison instructions

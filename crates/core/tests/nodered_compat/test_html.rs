@@ -17,9 +17,7 @@ async fn html_extract_text() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "<html><body><p>Hello</p></body></html>"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "<html><body><p>Hello</p></body></html>"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -38,9 +36,7 @@ async fn html_extract_html_markup() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "<html><body><p>Hello</p></body></html>"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "<html><body><p>Hello</p></body></html>"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -61,13 +57,8 @@ async fn html_extract_multiple() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": "<ul><li>One</li><li>Two</li><li>Three</li></ul>"}),
-            1,
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect("1", json!({"payload": "<ul><li>One</li><li>Two</li><li>Three</li></ul>"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -88,9 +79,8 @@ async fn html_no_match() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "<html><body><p>No h2 here</p></body></html>"}), 1)
-        .await;
+    let msgs =
+        harness.inject_and_collect("1", json!({"payload": "<html><body><p>No h2 here</p></body></html>"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -108,13 +98,7 @@ async fn html_multi_output() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": "<ul><li>A</li><li>B</li></ul>"}),
-            2,
-        )
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "<ul><li>A</li><li>B</li></ul>"}), 2).await;
 
     assert_eq!(msgs.len(), 2, "Expected 2 separate messages in multi mode");
     assert_eq!(msgs[0].get("payload").unwrap().as_str().unwrap(), "A");

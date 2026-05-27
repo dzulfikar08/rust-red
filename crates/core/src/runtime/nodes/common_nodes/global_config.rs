@@ -37,18 +37,11 @@ impl GlobalConfigNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn GlobalNodeBehavior>> {
         let gc_config = GlobalConfigNodeConfig::deserialize(&config.rest).unwrap_or_default();
-        let env_vars: BTreeMap<String, String> = gc_config
-            .env
-            .iter()
-            .map(|e| (e.name.clone(), e.value.clone()))
-            .collect();
+        let env_vars: BTreeMap<String, String> =
+            gc_config.env.iter().map(|e| (e.name.clone(), e.value.clone())).collect();
 
         if !env_vars.is_empty() {
-            log::info!(
-                "[global-config:{}] Loaded {} environment variables",
-                config.name,
-                env_vars.len()
-            );
+            log::info!("[global-config:{}] Loaded {} environment variables", config.name, env_vars.len());
         }
 
         let context = engine.get_context_manager().new_context(engine.context(), config.id.to_string());

@@ -67,12 +67,7 @@ fn modbus_read_config_defaults() {
 /// Verify the write node config deserializes with all function codes.
 #[test]
 fn modbus_write_config_deserialization() {
-    for fc in &[
-        "writeSingleRegister",
-        "writeMultipleRegisters",
-        "writeSingleCoil",
-        "writeMultipleCoils",
-    ] {
+    for fc in &["writeSingleRegister", "writeMultipleRegisters", "writeSingleCoil", "writeMultipleCoils"] {
         let flow = json!([
             {"id": "100", "type": "tab"},
             {
@@ -185,12 +180,7 @@ fn modbus_read_config_with_polling() {
 /// Verify all four read function codes can be configured.
 #[test]
 fn modbus_read_all_function_codes() {
-    for fc in &[
-        "readCoils",
-        "readDiscreteInputs",
-        "readHoldingRegisters",
-        "readInputRegisters",
-    ] {
+    for fc in &["readCoils", "readDiscreteInputs", "readHoldingRegisters", "readInputRegisters"] {
         let flow = json!([
             {"id": "100", "type": "tab"},
             {
@@ -252,14 +242,7 @@ async fn modbus_read_holding_registers() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": true}), 1, Duration::from_secs(5)).await;
 
     if !msgs.is_empty() {
         // The response should have a payload array with register values
@@ -302,14 +285,7 @@ async fn modbus_read_coils() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("2", json!({"payload": true}), 1, Duration::from_secs(5)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -350,14 +326,7 @@ async fn modbus_read_discrete_inputs() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "3",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("3", json!({"payload": true}), 1, Duration::from_secs(5)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -398,14 +367,7 @@ async fn modbus_read_input_registers() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "4",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("4", json!({"payload": true}), 1, Duration::from_secs(5)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -447,14 +409,7 @@ async fn modbus_read_float_data_type() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "5",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("5", json!({"payload": true}), 1, Duration::from_secs(5)).await;
 
     if !msgs.is_empty() {
         // The float payload should be a number (or array of numbers)
@@ -495,14 +450,7 @@ async fn modbus_write_single_register() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "10",
-            json!({"payload": 12345}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("10", json!({"payload": 12345}), 1, Duration::from_secs(5)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -543,14 +491,7 @@ async fn modbus_write_single_coil() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "11",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("11", json!({"payload": true}), 1, Duration::from_secs(5)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -591,12 +532,7 @@ async fn modbus_write_multiple_coils() {
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness
-        .inject_and_collect_timeout(
-            "12",
-            json!({"payload": [true, false, true, true]}),
-            1,
-            Duration::from_secs(5),
-        )
+        .inject_and_collect_timeout("12", json!({"payload": [true, false, true, true]}), 1, Duration::from_secs(5))
         .await;
 
     if !msgs.is_empty() {
@@ -638,12 +574,7 @@ async fn modbus_write_multiple_registers() {
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness
-        .inject_and_collect_timeout(
-            "13",
-            json!({"payload": [100, 200, 300, 400]}),
-            1,
-            Duration::from_secs(5),
-        )
+        .inject_and_collect_timeout("13", json!({"payload": [100, 200, 300, 400]}), 1, Duration::from_secs(5))
         .await;
 
     if !msgs.is_empty() {
@@ -688,14 +619,8 @@ async fn modbus_write_read_roundtrip() {
     ]);
 
     let write_harness = TestHarness::from_flow_json(write_flow);
-    let _write_msgs = write_harness
-        .inject_and_collect_timeout(
-            "20",
-            json!({"payload": 4242}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let _write_msgs =
+        write_harness.inject_and_collect_timeout("20", json!({"payload": 4242}), 1, Duration::from_secs(5)).await;
 
     // Step 2: Read back
     let read_flow = json!([
@@ -722,14 +647,8 @@ async fn modbus_write_read_roundtrip() {
     ]);
 
     let read_harness = TestHarness::from_flow_json(read_flow);
-    let read_msgs = read_harness
-        .inject_and_collect_timeout(
-            "21",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(5),
-        )
-        .await;
+    let read_msgs =
+        read_harness.inject_and_collect_timeout("21", json!({"payload": true}), 1, Duration::from_secs(5)).await;
 
     if !read_msgs.is_empty() {
         assert!(read_msgs[0].contains("payload"));

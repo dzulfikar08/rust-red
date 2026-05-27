@@ -55,11 +55,7 @@ impl PluginStore {
 
     /// Publish a new plugin version. Creates the plugin record if it does not
     /// yet exist. Returns the plugin ID.
-    pub fn publish(
-        &self,
-        meta: &PluginMetadata,
-        wasm_bytes: Vec<u8>,
-    ) -> Result<String, MarketplaceError> {
+    pub fn publish(&self, meta: &PluginMetadata, wasm_bytes: Vec<u8>) -> Result<String, MarketplaceError> {
         // Size check
         let size = wasm_bytes.len() as u64;
         if size > self.config.max_plugin_size_bytes {
@@ -67,36 +63,27 @@ impl PluginStore {
         }
 
         // Semver validation
-        let incoming_ver = semver::Version::parse(&meta.version)
-            .map_err(|_| MarketplaceError::InvalidSemver(meta.version.clone()))?;
+        let incoming_ver =
+            semver::Version::parse(&meta.version).map_err(|_| MarketplaceError::InvalidSemver(meta.version.clone()))?;
 
         // Check if plugin already exists
         let plugin_id = if let Some(existing_id) = self.name_index.get(&meta.name) {
             let existing_id = existing_id.clone();
             // Verify version does not already exist
-            let plugin = self.plugins.get(&existing_id).ok_or_else(|| {
-                MarketplaceError::Internal("name_index / plugins desync".into())
-            })?;
+            let plugin = self
+                .plugins
+                .get(&existing_id)
+                .ok_or_else(|| MarketplaceError::Internal("name_index / plugins desync".into()))?;
 
             if plugin.versions.contains_key(&meta.version) {
-                return Err(MarketplaceError::VersionConflict(
-                    meta.name.clone(),
-                    meta.version.clone(),
-                ));
+                return Err(MarketplaceError::VersionConflict(meta.name.clone(), meta.version.clone()));
             }
 
             // Enforce that the new version is newer than every existing version
-            let max_existing = plugin
-                .versions
-                .keys()
-                .filter_map(|v| semver::Version::parse(v).ok())
-                .max();
+            let max_existing = plugin.versions.keys().filter_map(|v| semver::Version::parse(v).ok()).max();
             if let Some(existing_max) = max_existing {
                 if incoming_ver <= existing_max {
-                    return Err(MarketplaceError::VersionNotNewer(
-                        meta.version.clone(),
-                        existing_max.to_string(),
-                    ));
+                    return Err(MarketplaceError::VersionNotNewer(meta.version.clone(), existing_max.to_string()));
                 }
             }
 
@@ -139,12 +126,8 @@ impl PluginStore {
 
         // Insert version record
         let now = Utc::now();
-        let version_record = PluginVersion {
-            version: meta.version.clone(),
-            checksum,
-            size_bytes: size,
-            published_at: now,
-        };
+        let version_record =
+            PluginVersion { version: meta.version.clone(), checksum, size_bytes: size, published_at: now };
 
         if let Some(mut plugin) = self.plugins.get_mut(&plugin_id) {
             plugin.versions.insert(meta.version.clone(), version_record);
@@ -156,12 +139,7 @@ impl PluginStore {
             plugin.permissions = meta.permissions.clone();
         }
 
-        log::info!(
-            "Published plugin {} v{} ({} bytes)",
-            meta.name,
-            meta.version,
-            size,
-        );
+        log::info!("Published plugin {} v{} ({} bytes)", meta.name, meta.version, size,);
 
         Ok(plugin_id)
     }
@@ -170,21 +148,12 @@ impl PluginStore {
 
     /// Remove a specific version. If it was the last version, the entire
     /// plugin record is removed.
-    pub fn unpublish_version(
-        &self,
-        plugin_id: &str,
-        version: &str,
-    ) -> Result<(), MarketplaceError> {
-        let plugin = self
-            .plugins
-            .get_mut(plugin_id)
-            .ok_or_else(|| MarketplaceError::NotFound(plugin_id.to_string()))?;
+    pub fn unpublish_version(&self, plugin_id: &str, version: &str) -> Result<(), MarketplaceError> {
+        let plugin =
+            self.plugins.get_mut(plugin_id).ok_or_else(|| MarketplaceError::NotFound(plugin_id.to_string()))?;
 
         if !plugin.versions.contains_key(version) {
-            return Err(MarketplaceError::VersionNotFound(
-                plugin_id.to_string(),
-                version.to_string(),
-            ));
+            return Err(MarketplaceError::VersionNotFound(plugin_id.to_string(), version.to_string()));
         }
 
         // Remove binary
@@ -225,21 +194,14 @@ impl PluginStore {
     pub fn download(&self, plugin_id: &str, version: &str) -> Result<Vec<u8>, MarketplaceError> {
         let bin_key = format!("{}@{}", plugin_id, version);
 
-        let binary = self
-            .binaries
-            .get(&bin_key)
-            .map(|b| b.clone())
-            .ok_or_else(|| {
-                // Distinguish between plugin-not-found and version-not-found
-                if self.plugins.contains_key(plugin_id) {
-                    MarketplaceError::VersionNotFound(
-                        plugin_id.to_string(),
-                        version.to_string(),
-                    )
-                } else {
-                    MarketplaceError::NotFound(plugin_id.to_string())
-                }
-            })?;
+        let binary = self.binaries.get(&bin_key).map(|b| b.clone()).ok_or_else(|| {
+            // Distinguish between plugin-not-found and version-not-found
+            if self.plugins.contains_key(plugin_id) {
+                MarketplaceError::VersionNotFound(plugin_id.to_string(), version.to_string())
+            } else {
+                MarketplaceError::NotFound(plugin_id.to_string())
+            }
+        })?;
 
         // Increment download counter
         if let Some(mut plugin) = self.plugins.get_mut(plugin_id) {
@@ -276,9 +238,7 @@ impl PluginStore {
                 }
                 if let Some(ref search) = query.search {
                     let s = search.to_lowercase();
-                    if !p.name.to_lowercase().contains(&s)
-                        && !p.description.to_lowercase().contains(&s)
-                    {
+                    if !p.name.to_lowercase().contains(&s) && !p.description.to_lowercase().contains(&s) {
                         return false;
                     }
                 }
@@ -309,12 +269,7 @@ impl PluginStore {
         let start = ((page - 1) * page_size) as usize;
         let page_items: Vec<_> = matches.into_iter().skip(start).take(page_size as usize).collect();
 
-        PluginListResponse {
-            plugins: page_items,
-            total,
-            page,
-            page_size,
-        }
+        PluginListResponse { plugins: page_items, total, page, page_size }
     }
 
     // ---- Rating ----
@@ -322,9 +277,7 @@ impl PluginStore {
     /// Add a rating (1-5) for a plugin. Returns the new average.
     pub fn rate(&self, plugin_id: &str, rating: u8) -> Result<f64, MarketplaceError> {
         if !(1..=5).contains(&rating) {
-            return Err(MarketplaceError::BadRequest(
-                "rating must be between 1 and 5".into(),
-            ));
+            return Err(MarketplaceError::BadRequest("rating must be between 1 and 5".into()));
         }
 
         if !self.plugins.contains_key(plugin_id) {
@@ -340,10 +293,7 @@ impl PluginStore {
 
     /// Get rating aggregate for a plugin.
     pub fn get_rating(&self, plugin_id: &str) -> RatingAggregate {
-        self.ratings
-            .get(plugin_id)
-            .map(|r| r.clone())
-            .unwrap_or_default()
+        self.ratings.get(plugin_id).map(|r| r.clone()).unwrap_or_default()
     }
 
     /// Convert a `PluginRecord` to a public `PluginDetail`.

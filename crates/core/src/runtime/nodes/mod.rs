@@ -322,8 +322,8 @@ where
             // across an await point.
             #[cfg(feature = "otel")]
             let mut _otel_span = {
-                use opentelemetry::trace::{Span, SpanKind, Tracer};
                 use opentelemetry::KeyValue;
+                use opentelemetry::trace::{Span, SpanKind, Tracer};
                 let tracer = opentelemetry::global::tracer("rust-red");
                 tracer
                     .span_builder("node_process")
@@ -342,9 +342,7 @@ where
                 #[cfg(feature = "otel")]
                 {
                     use opentelemetry::trace::{Span, Status};
-                    _otel_span.set_status(Status::Error {
-                        description: error_message.clone().into(),
-                    });
+                    _otel_span.set_status(Status::Error { description: error_message.clone().into() });
                 }
 
                 match flow.handle_error(node, &error_message, Some(msg.clone()), None, cancel.clone()).await {

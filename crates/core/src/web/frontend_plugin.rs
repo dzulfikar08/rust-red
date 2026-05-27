@@ -90,13 +90,7 @@ impl FrontendPluginRegistry {
         for entry in inventory::iter::<FrontendPluginEntry> {
             let plugin = (entry.factory)();
             let desc = plugin.descriptor();
-            log::info!(
-                "  - {} v{} ({}) at {}",
-                desc.name,
-                desc.version,
-                desc.id,
-                desc.route_prefix,
-            );
+            log::info!("  - {} v{} ({}) at {}", desc.name, desc.version, desc.id, desc.route_prefix,);
             plugin.on_register();
             reg.plugins.push(plugin);
         }

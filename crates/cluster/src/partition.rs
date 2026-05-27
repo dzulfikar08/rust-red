@@ -31,21 +31,13 @@ pub struct PartitionManager {
 
 impl PartitionManager {
     pub fn new(members: Arc<DashMap<String, ClusterMember>>, local_id: String) -> Self {
-        Self {
-            members,
-            assignments: Arc::new(RwLock::new(HashMap::new())),
-            local_id,
-        }
+        Self { members, assignments: Arc::new(RwLock::new(HashMap::new())), local_id }
     }
 
     /// Compute a stable sort key for leader election. The leader is the
     /// alive member with the lexicographically smallest node_id.
     pub fn leader_id(&self) -> Option<String> {
-        self.members
-            .iter()
-            .filter(|m| m.is_alive())
-            .map(|m| m.node_id.clone())
-            .min()
+        self.members.iter().filter(|m| m.is_alive()).map(|m| m.node_id.clone()).min()
     }
 
     /// Whether this node is the current leader.
@@ -58,12 +50,8 @@ impl PartitionManager {
     /// Uses a simple modulo-based distribution across alive members.
     /// Only the leader should call this.
     pub async fn compute_assignments(&self, flow_ids: &[String]) -> Vec<FlowAssignment> {
-        let alive_nodes: Vec<String> = self
-            .members
-            .iter()
-            .filter(|m| m.is_alive())
-            .map(|m| m.node_id.clone())
-            .collect();
+        let alive_nodes: Vec<String> =
+            self.members.iter().filter(|m| m.is_alive()).map(|m| m.node_id.clone()).collect();
 
         if alive_nodes.is_empty() {
             return Vec::new();
@@ -75,11 +63,7 @@ impl PartitionManager {
             let node_idx = i % n;
             assignments.insert(
                 flow_id.clone(),
-                FlowAssignment {
-                    flow_id: flow_id.clone(),
-                    assigned_to: alive_nodes[node_idx].clone(),
-                    generation: 0,
-                },
+                FlowAssignment { flow_id: flow_id.clone(), assigned_to: alive_nodes[node_idx].clone(), generation: 0 },
             );
         }
 

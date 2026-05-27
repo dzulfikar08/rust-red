@@ -53,11 +53,7 @@ pub struct JwtConfig {
 
 impl Default for JwtConfig {
     fn default() -> Self {
-        Self {
-            secret: "change-me-in-production".to_string(),
-            access_ttl_secs: 900,
-            refresh_ttl_secs: 604_800,
-        }
+        Self { secret: "change-me-in-production".to_string(), access_ttl_secs: 900, refresh_ttl_secs: 604_800 }
     }
 }
 
@@ -68,11 +64,7 @@ impl Default for JwtConfig {
 /// Create a signed access token (JWS compact serialisation).
 ///
 /// Uses the `HS256` algorithm (HMAC-SHA256).
-pub fn create_access_token(
-    user_id: &str,
-    role: Role,
-    config: &JwtConfig,
-) -> Result<String, JwtError> {
+pub fn create_access_token(user_id: &str, role: Role, config: &JwtConfig) -> Result<String, JwtError> {
     let now = Utc::now();
     let claims = AccessTokenClaims {
         sub: user_id.to_string(),
@@ -85,10 +77,7 @@ pub fn create_access_token(
 }
 
 /// Create a signed refresh token.
-pub fn create_refresh_token(
-    user_id: &str,
-    config: &JwtConfig,
-) -> Result<String, JwtError> {
+pub fn create_refresh_token(user_id: &str, config: &JwtConfig) -> Result<String, JwtError> {
     let now = Utc::now();
     let claims = RefreshTokenClaims {
         sub: user_id.to_string(),
@@ -104,10 +93,7 @@ pub fn create_refresh_token(
 // ---------------------------------------------------------------------------
 
 /// Validate an access token and return its claims.
-pub fn validate_access_token(
-    token: &str,
-    config: &JwtConfig,
-) -> Result<AccessTokenClaims, JwtError> {
+pub fn validate_access_token(token: &str, config: &JwtConfig) -> Result<AccessTokenClaims, JwtError> {
     let claims: AccessTokenClaims = decode(token, &config.secret)?;
     if claims.token_type != "access" {
         return Err(JwtError::InvalidTokenType);
@@ -116,10 +102,7 @@ pub fn validate_access_token(
 }
 
 /// Validate a refresh token and return its claims.
-pub fn validate_refresh_token(
-    token: &str,
-    config: &JwtConfig,
-) -> Result<RefreshTokenClaims, JwtError> {
+pub fn validate_refresh_token(token: &str, config: &JwtConfig) -> Result<RefreshTokenClaims, JwtError> {
     let claims: RefreshTokenClaims = decode(token, &config.secret)?;
     if claims.token_type != "refresh" {
         return Err(JwtError::InvalidTokenType);
@@ -232,9 +215,7 @@ fn b64_encode(data: &[u8]) -> String {
 /// URL-safe Base64 decoding (no padding).
 fn b64_decode(input: &str) -> Result<Vec<u8>, JwtError> {
     use base64::Engine;
-    base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(input)
-        .map_err(JwtError::Base64Decode)
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(input).map_err(JwtError::Base64Decode)
 }
 
 // ---------------------------------------------------------------------------
@@ -246,11 +227,7 @@ mod tests {
     use super::*;
 
     fn test_config() -> JwtConfig {
-        JwtConfig {
-            secret: "test-secret-key".to_string(),
-            access_ttl_secs: 900,
-            refresh_ttl_secs: 604_800,
-        }
+        JwtConfig { secret: "test-secret-key".to_string(), access_ttl_secs: 900, refresh_ttl_secs: 604_800 }
     }
 
     #[test]

@@ -55,27 +55,19 @@ impl WasmNodeShim {
         let mut store_guard = self.store.lock().unwrap();
         store_guard.set_epoch_deadline(1_000_000);
         // Send empty config as a minimal WasmMessage
-        let empty_config = WasmMessage {
-            msg_id: String::new(),
-            payload: WasmValue::Null,
-            topic: None,
-            extra: BTreeMap::new(),
-        };
+        let empty_config =
+            WasmMessage { msg_id: String::new(), payload: WasmValue::Null, topic: None, extra: BTreeMap::new() };
         let config_bytes = postcard::to_allocvec(&empty_config).unwrap_or_default();
 
         let len = config_bytes.len() as u32;
-        let ptr = self
-            .alloc_fn
-            .call(&mut *store_guard, len)
-            .unwrap_or(0);
+        let ptr = self.alloc_fn.call(&mut *store_guard, len).unwrap_or(0);
 
         if ptr == 0 {
             log::error!("WasmNodeShim: guest alloc returned null for on_start config");
             return;
         }
 
-        self.memory.data_mut(&mut *store_guard)[ptr as usize..][..len as usize]
-            .copy_from_slice(&config_bytes);
+        self.memory.data_mut(&mut *store_guard)[ptr as usize..][..len as usize].copy_from_slice(&config_bytes);
 
         match self.on_start_fn.call(&mut *store_guard, (ptr, len)) {
             Ok(0) => log::debug!("WasmNodeShim: guest on_start returned success"),
@@ -94,15 +86,13 @@ impl WasmNodeShim {
         }
     }
 
-    async fn process_and_forward(
-        &self,
-        msg: MsgHandle,
-    ) -> anyhow::Result<Vec<Envelope>> {
+    async fn process_and_forward(&self, msg: MsgHandle) -> anyhow::Result<Vec<Envelope>> {
         let mut envelopes = Vec::new();
 
         let wasm_msg = Self::msg_to_wasm(msg).await;
-        let msg_bytes = postcard::to_allocvec(&wasm_msg)
-            .map_err(|e| rust_red_core::RustRedError::InvalidOperation(format!("postcard serialization failed: {e}")))?;
+        let msg_bytes = postcard::to_allocvec(&wasm_msg).map_err(|e| {
+            rust_red_core::RustRedError::InvalidOperation(format!("postcard serialization failed: {e}"))
+        })?;
 
         let mut store_guard = self.store.lock().unwrap();
         store_guard.set_epoch_deadline(1_000_000);
@@ -113,8 +103,7 @@ impl WasmNodeShim {
             .call(&mut *store_guard, len)
             .map_err(|e| rust_red_core::RustRedError::InvalidOperation(format!("guest alloc failed: {e}")))?;
 
-        self.memory.data_mut(&mut *store_guard)[guest_ptr as usize..][..len as usize]
-            .copy_from_slice(&msg_bytes);
+        self.memory.data_mut(&mut *store_guard)[guest_ptr as usize..][..len as usize].copy_from_slice(&msg_bytes);
 
         let result_ptr = self
             .process_fn
@@ -156,10 +145,7 @@ impl WasmNodeShim {
             for (port_idx, port_msgs) in outputs.iter().enumerate() {
                 for wasm_msg in port_msgs.iter().flatten() {
                     let msg_handle = Self::wasm_to_msg(wasm_msg);
-                    envelopes.push(Envelope {
-                        port: port_idx,
-                        msg: msg_handle,
-                    });
+                    envelopes.push(Envelope { port: port_idx, msg: msg_handle });
                 }
             }
         }
@@ -167,10 +153,7 @@ impl WasmNodeShim {
         let pending = store_guard.data_mut().drain_outputs();
         for pending_output in pending {
             let msg_handle = Self::wasm_to_msg(&pending_output.msg);
-            envelopes.push(Envelope {
-                port: pending_output.port as usize,
-                msg: msg_handle,
-            });
+            envelopes.push(Envelope { port: pending_output.port as usize, msg: msg_handle });
         }
 
         Ok(envelopes)
@@ -201,12 +184,7 @@ impl WasmNodeShim {
             }
         }
 
-        WasmMessage {
-            msg_id,
-            payload,
-            topic,
-            extra,
-        }
+        WasmMessage { msg_id, payload, topic, extra }
     }
 
     fn wasm_to_msg(wasm_msg: &WasmMessage) -> MsgHandle {
@@ -241,9 +219,7 @@ impl WasmNodeShim {
             }
             Variant::String(s) => WasmValue::String(s.clone()),
             Variant::Bytes(b) => WasmValue::Bytes(b.clone()),
-            Variant::Array(arr) => {
-                WasmValue::Array(arr.iter().map(Self::variant_to_wasm_value).collect())
-            }
+            Variant::Array(arr) => WasmValue::Array(arr.iter().map(Self::variant_to_wasm_value).collect()),
             Variant::Object(map) => {
                 let mut bt = BTreeMap::new();
                 for (k, v) in map.iter() {
@@ -267,9 +243,7 @@ impl WasmNodeShim {
             }
             WasmValue::String(s) => Variant::String(s.clone()),
             WasmValue::Bytes(b) => Variant::Bytes(b.clone()),
-            WasmValue::Array(arr) => {
-                Variant::Array(arr.iter().map(Self::wasm_value_to_variant).collect())
-            }
+            WasmValue::Array(arr) => Variant::Array(arr.iter().map(Self::wasm_value_to_variant).collect()),
             WasmValue::Object(map) => {
                 let mut bt = BTreeMap::new();
                 for (k, v) in map.iter() {

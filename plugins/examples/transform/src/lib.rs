@@ -38,15 +38,9 @@ fn resolve_placeholder(name: &str, msg: &WasmMessage) -> String {
         _ => {
             // Try "extra." prefix for extra fields
             if let Some(key) = name.strip_prefix("extra.") {
-                msg.extra
-                    .get(key)
-                    .map(|v| wasm_value_to_string(v))
-                    .unwrap_or_else(|| String::new())
+                msg.extra.get(key).map(|v| wasm_value_to_string(v)).unwrap_or_else(|| String::new())
             } else {
-                msg.extra
-                    .get(name)
-                    .map(|v| wasm_value_to_string(v))
-                    .unwrap_or_else(|| String::new())
+                msg.extra.get(name).map(|v| wasm_value_to_string(v)).unwrap_or_else(|| String::new())
             }
         }
     }
@@ -92,7 +86,13 @@ fn render_template(template: &str, msg: &WasmMessage) -> String {
 fn wasm_value_to_string(v: &WasmValue) -> String {
     match v {
         WasmValue::Null => String::from("null"),
-        WasmValue::Bool(b) => if *b { String::from("true") } else { String::from("false") },
+        WasmValue::Bool(b) => {
+            if *b {
+                String::from("true")
+            } else {
+                String::from("false")
+            }
+        }
         WasmValue::I64(n) => format!("{}", n),
         WasmValue::U64(n) => format!("{}", n),
         WasmValue::F64(n) => format!("{}", n),
@@ -103,10 +103,7 @@ fn wasm_value_to_string(v: &WasmValue) -> String {
             format!("[{}]", items.join(", "))
         }
         WasmValue::Object(obj) => {
-            let items: Vec<String> = obj
-                .iter()
-                .map(|(k, v)| format!("{}:{}", k, wasm_value_to_string(v)))
-                .collect();
+            let items: Vec<String> = obj.iter().map(|(k, v)| format!("{}:{}", k, wasm_value_to_string(v))).collect();
             format!("{{{}}}", items.join(", "))
         }
     }
@@ -149,7 +146,9 @@ fn apply_rename(msg: &mut WasmMessage, from: &str, to: &str) {
 /// Set a property on the message (payload, topic, or extra).
 fn set_property(msg: &mut WasmMessage, key: &str, val: WasmValue) {
     match key {
-        "payload" => { msg.payload = val; }
+        "payload" => {
+            msg.payload = val;
+        }
         "topic" => {
             msg.topic = Some(val.as_str().unwrap_or("").to_owned());
         }
@@ -191,9 +190,7 @@ fn apply_add(msg: &mut WasmMessage, key: &str, value_expr: &str) {
 /// Returns true if the message should pass through.
 fn eval_filter(msg: &WasmMessage, condition: &str) -> bool {
     match condition {
-        "nonnull" | "notnull" | "non-null" => {
-            !matches!(msg.payload, WasmValue::Null)
-        }
+        "nonnull" | "notnull" | "non-null" => !matches!(msg.payload, WasmValue::Null),
         "truthy" => match &msg.payload {
             WasmValue::Null => false,
             WasmValue::Bool(b) => *b,
@@ -342,8 +339,12 @@ impl WasmNodeHandler for TransformNode {
             for rule in &rules {
                 match apply_rule(&mut msg, rule) {
                     RuleResult::Pass => {}
-                    RuleResult::Matched => { filter_result = Some(true); }
-                    RuleResult::Unmatched => { filter_result = Some(false); }
+                    RuleResult::Matched => {
+                        filter_result = Some(true);
+                    }
+                    RuleResult::Unmatched => {
+                        filter_result = Some(false);
+                    }
                 }
             }
 
@@ -354,10 +355,7 @@ impl WasmNodeHandler for TransformNode {
             }
         } else {
             // Default behavior: pass through with a "processed" stamp
-            msg.extra.insert(
-                String::from("processed"),
-                WasmValue::Bool(true),
-            );
+            msg.extra.insert(String::from("processed"), WasmValue::Bool(true));
             ProcessResult::to_port(0, msg, 2)
         }
     }

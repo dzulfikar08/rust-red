@@ -3,7 +3,7 @@
 //! Instead of writing raw JSON arrays, use `FlowBuilder` to construct
 //! test flows with a fluent API.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 /// Builder for constructing Node-RED flow JSON arrays.
 pub struct FlowBuilder {
@@ -13,29 +13,19 @@ pub struct FlowBuilder {
 impl FlowBuilder {
     /// Create a new flow builder with a default tab node.
     pub fn new() -> Self {
-        Self {
-            nodes: vec![json!({"id": "100", "type": "tab", "label": "Test Flow"})],
-        }
+        Self { nodes: vec![json!({"id": "100", "type": "tab", "label": "Test Flow"})] }
     }
 
     /// Create a new flow builder with a custom tab ID.
     pub fn with_tab_id(tab_id: &str) -> Self {
-        Self {
-            nodes: vec![json!({"id": tab_id, "type": "tab", "label": "Test Flow"})],
-        }
+        Self { nodes: vec![json!({"id": tab_id, "type": "tab", "label": "Test Flow"})] }
     }
 
     /// Add an inject node that fires once on deploy.
     ///
     /// Sets `once: true`, `onceDelay: 0`.
     /// `wires` is a JSON value like `json!([["99"]])` or `json!([["a"], ["b"]])`.
-    pub fn inject_once(
-        mut self,
-        id: &str,
-        payload: &str,
-        payload_type: &str,
-        wires: Value,
-    ) -> Self {
+    pub fn inject_once(mut self, id: &str, payload: &str, payload_type: &str, wires: Value) -> Self {
         self.nodes.push(json!({
             "id": id,
             "type": "inject",
@@ -58,12 +48,7 @@ impl FlowBuilder {
     }
 
     /// Add an inject node that fires once with multiple properties.
-    pub fn inject_once_with_props(
-        mut self,
-        id: &str,
-        props: Vec<(&str, &str, &str)>,
-        wires: Value,
-    ) -> Self {
+    pub fn inject_once_with_props(mut self, id: &str, props: Vec<(&str, &str, &str)>, wires: Value) -> Self {
         let props_json: Vec<Value> = props
             .iter()
             .map(|(p, v, vt)| {
@@ -150,14 +135,7 @@ impl FlowBuilder {
     }
 
     /// Add a template node.
-    pub fn template(
-        mut self,
-        id: &str,
-        template: &str,
-        field: &str,
-        output: &str,
-        wires: Value,
-    ) -> Self {
+    pub fn template(mut self, id: &str, template: &str, field: &str, output: &str, wires: Value) -> Self {
         self.nodes.push(json!({
             "id": id,
             "type": "template",
@@ -174,13 +152,7 @@ impl FlowBuilder {
     }
 
     /// Add a delay node.
-    pub fn delay(
-        mut self,
-        id: &str,
-        delay: &str,
-        delay_units: &str,
-        wires: Value,
-    ) -> Self {
+    pub fn delay(mut self, id: &str, delay: &str, delay_units: &str, wires: Value) -> Self {
         self.nodes.push(json!({
             "id": id,
             "type": "delay",
@@ -238,14 +210,7 @@ impl FlowBuilder {
     }
 
     /// Add a join node.
-    pub fn join(
-        mut self,
-        id: &str,
-        mode: &str,
-        build: &str,
-        count: Option<usize>,
-        wires: Value,
-    ) -> Self {
+    pub fn join(mut self, id: &str, mode: &str, build: &str, count: Option<usize>, wires: Value) -> Self {
         let mut node = json!({
             "id": id,
             "type": "join",
@@ -375,7 +340,7 @@ impl Default for FlowBuilder {
 
 /// Create a switch rule JSON value for common operations.
 pub mod switch_rule {
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     pub fn eq(value: &str, value_type: &str) -> Value {
         json!({"t": "eq", "v": value, "vt": value_type})
@@ -452,7 +417,7 @@ pub mod switch_rule {
 
 /// Create a change rule JSON value for common operations.
 pub mod change_rule {
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
 
     pub fn set(prop: &str, prop_type: &str, to: &str, to_type: &str) -> Value {
         json!({"t": "set", "p": prop, "pt": prop_type, "to": to, "tot": to_type})
@@ -462,14 +427,7 @@ pub mod change_rule {
         json!({"t": "delete", "p": prop, "pt": prop_type})
     }
 
-    pub fn change(
-        prop: &str,
-        prop_type: &str,
-        from: &str,
-        from_type: &str,
-        to: &str,
-        to_type: &str,
-    ) -> Value {
+    pub fn change(prop: &str, prop_type: &str, from: &str, from_type: &str, to: &str, to_type: &str) -> Value {
         json!({
             "t": "change",
             "p": prop,

@@ -32,12 +32,7 @@ pub fn read_from_guest(
     let len = len as usize;
     let mem_data = memory.data(store);
     if ptr + len > mem_data.len() {
-        anyhow::bail!(
-            "read_from_guest: out-of-bounds access ptr={} len={} mem_size={}",
-            ptr,
-            len,
-            mem_data.len()
-        );
+        anyhow::bail!("read_from_guest: out-of-bounds access ptr={} len={} mem_size={}", ptr, len, mem_data.len());
     }
     Ok(mem_data[ptr..][..len].to_vec())
 }

@@ -89,9 +89,7 @@ impl App {
             if cluster_cfg.enabled {
                 let cancel = CancellationToken::new();
                 let mgr = Arc::new(ClusterManager::new(cluster_cfg, cancel));
-                let bridge = rust_red_cluster::bridge::ClusterPartitionerBridge::new(
-                    mgr.partition_manager.clone(),
-                );
+                let bridge = rust_red_cluster::bridge::ClusterPartitionerBridge::new(mgr.partition_manager.clone());
                 engine.set_cluster_partitioner(Arc::new(bridge));
                 Some(mgr)
             } else {

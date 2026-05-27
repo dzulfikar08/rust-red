@@ -27,11 +27,7 @@ impl ModbusRequestQueue {
     /// Acquire a permit, waiting for `command_delay` if needed.
     /// Returns a guard that releases the permit on drop.
     pub async fn acquire(&self) -> crate::Result<SemaphorePermit<'_>> {
-        let permit = self
-            .semaphore
-            .acquire()
-            .await
-            .map_err(|_| anyhow::anyhow!("Queue closed"))?;
+        let permit = self.semaphore.acquire().await.map_err(|_| anyhow::anyhow!("Queue closed"))?;
 
         // Enforce command_delay: wait until enough time has passed since last request
         if let Some(delay) = self.command_delay {
@@ -56,9 +52,7 @@ impl ModbusRequestQueue {
 
 impl std::fmt::Debug for ModbusRequestQueue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ModbusRequestQueue")
-            .field("command_delay", &self.command_delay)
-            .finish()
+        f.debug_struct("ModbusRequestQueue").field("command_delay", &self.command_delay).finish()
     }
 }
 

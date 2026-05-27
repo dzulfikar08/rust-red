@@ -89,11 +89,7 @@ impl Role {
                 Permission::LibraryAccess,
                 Permission::VersioningAccess,
             ],
-            Role::Viewer => &[
-                Permission::ViewFlows,
-                Permission::ViewDebug,
-                Permission::ViewSettings,
-            ],
+            Role::Viewer => &[Permission::ViewFlows, Permission::ViewDebug, Permission::ViewSettings],
         }
     }
 

@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use propex::PropexSegment;
 use tokio::sync::{Mutex, RwLock};
 
-use super::{RustRedError, ElementId, Variant};
+use super::{ElementId, RustRedError, Variant};
 use crate::Result;
 use crate::runtime::context::*;
 
@@ -36,8 +36,8 @@ impl SharedState {
         if let Some(parent) = path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-        let json_bytes = serde_json::to_string_pretty(data)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let json_bytes =
+            serde_json::to_string_pretty(data).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         let tmp_path = path.with_extension("json.tmp");
         tokio::fs::write(&tmp_path, &json_bytes).await?;
         tokio::fs::rename(&tmp_path, &path).await?;
@@ -114,16 +114,10 @@ impl ContextStore for FileContextStore {
 
     async fn open(&self) -> Result<()> {
         tokio::fs::create_dir_all(&self.state.base_dir).await?;
-        log::info!(
-            "[LOCALFS] Opened file context store '{}' at '{}'",
-            self.name,
-            self.state.base_dir.display()
-        );
+        log::info!("[LOCALFS] Opened file context store '{}' at '{}'", self.name, self.state.base_dir.display());
         let state = Arc::clone(&self.state);
         let handle = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(
-                std::time::Duration::from_secs(state.flush_interval_secs.max(1)),
-            );
+            let mut interval = tokio::time::interval(std::time::Duration::from_secs(state.flush_interval_secs.max(1)));
             interval.tick().await; // skip first immediate tick
             loop {
                 interval.tick().await;
@@ -304,10 +298,7 @@ mod tests {
 
         assert!(store.get_one("nodeX", &propex::parse("foo").unwrap()).await.is_err());
         store.set_one("nodeX", &propex::parse("foo").unwrap(), "test".into()).await.unwrap();
-        assert_eq!(
-            store.get_one("nodeX", &propex::parse("foo").unwrap()).await.unwrap(),
-            "test".into()
-        );
+        assert_eq!(store.get_one("nodeX", &propex::parse("foo").unwrap()).await.unwrap(), "test".into());
 
         store.close().await.unwrap();
     }

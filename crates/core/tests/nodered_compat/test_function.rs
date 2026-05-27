@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_has, assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_str};
 
 /// Helper to build a minimal function node flow.
 fn function_flow(func: &str) -> serde_json::Value {
@@ -44,9 +44,7 @@ fn function_flow_multi_output(func: &str, outputs: usize) -> serde_json::Value {
 async fn function_basic_modify_payload() {
     let flow = function_flow("msg.payload = 'modified'; return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "modified");
 }
@@ -56,9 +54,8 @@ async fn function_basic_modify_payload() {
 async fn function_return_null() {
     let flow = function_flow("return null;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(300))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(300)).await;
     assert_eq!(msgs.len(), 0, "Expected no output when function returns null");
 }
 
@@ -68,12 +65,7 @@ async fn function_access_topic() {
     let flow = function_flow("msg.payload = msg.topic; return msg;");
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "x", "topic": "hello"}),
-            1,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "x", "topic": "hello"}), 1, Duration::from_secs(2))
         .await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "hello");
@@ -84,9 +76,7 @@ async fn function_access_topic() {
 async fn function_set_new_property() {
     let flow = function_flow("msg.newprop = 'added'; return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_has(&msgs[0], "newprop");
     assert_msg_str(&msgs[0], "newprop", "added");
@@ -97,9 +87,7 @@ async fn function_set_new_property() {
 async fn function_throw_error() {
     let flow = function_flow("throw new Error('test error');");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 0, "Expected no output when function throws");
 }
 
@@ -108,14 +96,10 @@ async fn function_throw_error() {
 async fn function_numeric_operations() {
     let flow = function_flow("msg.payload = msg.payload * 2 + 1; return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": 5}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": 5}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
-    let num = payload
-        .as_f64()
-        .unwrap_or_else(|| panic!("Payload is not a number: {:?}", payload));
+    let num = payload.as_f64().unwrap_or_else(|| panic!("Payload is not a number: {:?}", payload));
     assert_eq!(num, 11.0, "Expected 5 * 2 + 1 = 11");
 }
 
@@ -124,9 +108,7 @@ async fn function_numeric_operations() {
 async fn function_conditional_logic_pass() {
     let flow = function_flow("if (msg.payload > 10) { return msg; } return null;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": 15}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": 15}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
 }
 
@@ -134,9 +116,7 @@ async fn function_conditional_logic_pass() {
 async fn function_conditional_logic_filtered() {
     let flow = function_flow("if (msg.payload > 10) { return msg; } return null;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": 5}), 1, Duration::from_millis(300))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": 5}), 1, Duration::from_millis(300)).await;
     assert_eq!(msgs.len(), 0, "Expected no output when payload <= 10");
 }
 
@@ -145,9 +125,7 @@ async fn function_conditional_logic_filtered() {
 async fn function_array_manipulation() {
     let flow = function_flow("msg.payload = msg.payload.map(x => x * 2); return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": [1, 2, 3]}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": [1, 2, 3]}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     // Verify the payload is an array [2, 4, 6]
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -168,22 +146,13 @@ async fn function_json_parse() {
     let flow = function_flow("msg.payload = JSON.parse(msg.payload); return msg;");
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "{\"key\":\"val\"}"}),
-            1,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "{\"key\":\"val\"}"}), 1, Duration::from_secs(2))
         .await;
     assert_eq!(msgs.len(), 1);
     // payload should be an object with key="val"
     let payload = msgs[0].get("payload").expect("Missing payload");
-    let obj = payload
-        .as_object()
-        .unwrap_or_else(|| panic!("Expected object payload, got {:?}", payload));
-    let val = obj
-        .get("key")
-        .expect("Missing 'key' in parsed object");
+    let obj = payload.as_object().unwrap_or_else(|| panic!("Expected object payload, got {:?}", payload));
+    let val = obj.get("key").expect("Missing 'key' in parsed object");
     assert_eq!(val.as_str().unwrap(), "val");
 }
 
@@ -192,9 +161,7 @@ async fn function_json_parse() {
 async fn function_string_methods() {
     let flow = function_flow("msg.payload = msg.payload.toUpperCase(); return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "hello"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "hello"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "HELLO");
 }
@@ -208,14 +175,10 @@ async fn function_string_methods() {
 async fn function_date_now_timestamp() {
     let flow = function_flow("msg.payload = Date.now(); return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
-    let ts = payload
-        .as_f64()
-        .unwrap_or_else(|| panic!("Payload should be a number, got {:?}", payload));
+    let ts = payload.as_f64().unwrap_or_else(|| panic!("Payload should be a number, got {:?}", payload));
     // Timestamp should be a reasonable value (after year 2020 in milliseconds)
     assert!(ts > 1577836800000.0, "Date.now() should return a millisecond timestamp, got {ts}");
 }
@@ -225,14 +188,10 @@ async fn function_date_now_timestamp() {
 async fn function_date_object_creation() {
     let flow = function_flow("msg.payload = new Date().getFullYear(); return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
-    let year = payload
-        .as_f64()
-        .unwrap_or_else(|| panic!("Payload should be a number, got {:?}", payload));
+    let year = payload.as_f64().unwrap_or_else(|| panic!("Payload should be a number, got {:?}", payload));
     // Year should be current year (2020-2030 range for a safe test)
     assert!(year >= 2020.0 && year <= 2035.0, "getFullYear() should return current year, got {year}");
 }
@@ -244,13 +203,9 @@ async fn function_date_object_creation() {
 /// Function: context.get/set at node scope.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_context_get_set() {
-    let flow = function_flow(
-        "context.set('mykey', 'myvalue');\nmsg.payload = context.get('mykey');\nreturn msg;"
-    );
+    let flow = function_flow("context.set('mykey', 'myvalue');\nmsg.payload = context.get('mykey');\nreturn msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "myvalue");
 }
@@ -258,13 +213,9 @@ async fn function_context_get_set() {
 /// Function: flow.get/set at flow scope.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_flow_get_set() {
-    let flow = function_flow(
-        "flow.set('flowkey', 'flowvalue');\nmsg.payload = flow.get('flowkey');\nreturn msg;"
-    );
+    let flow = function_flow("flow.set('flowkey', 'flowvalue');\nmsg.payload = flow.get('flowkey');\nreturn msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "flowvalue");
 }
@@ -272,13 +223,9 @@ async fn function_flow_get_set() {
 /// Function: global.get/set at global scope.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_global_get_set() {
-    let flow = function_flow(
-        "global.set('gkey', 'gvalue');\nmsg.payload = global.get('gkey');\nreturn msg;"
-    );
+    let flow = function_flow("global.set('gkey', 'gvalue');\nmsg.payload = global.get('gkey');\nreturn msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "gvalue");
 }
@@ -287,12 +234,10 @@ async fn function_global_get_set() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_context_get_undefined() {
     let flow = function_flow(
-        "var val = context.get('nonexistent');\nmsg.payload = (typeof val === 'undefined') ? 'yes' : 'no';\nreturn msg;"
+        "var val = context.get('nonexistent');\nmsg.payload = (typeof val === 'undefined') ? 'yes' : 'no';\nreturn msg;",
     );
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "yes");
 }
@@ -300,13 +245,9 @@ async fn function_context_get_undefined() {
 /// Function: context.set with numeric values.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_context_set_numeric() {
-    let flow = function_flow(
-        "context.set('counter', 42);\nmsg.payload = context.get('counter');\nreturn msg;"
-    );
+    let flow = function_flow("context.set('counter', 42);\nmsg.payload = context.get('counter');\nreturn msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
     assert_eq!(payload.as_f64().unwrap(), 42.0);
@@ -316,12 +257,10 @@ async fn function_context_set_numeric() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_context_set_object() {
     let flow = function_flow(
-        "context.set('data', {name: 'test', count: 5});\nvar d = context.get('data');\nmsg.payload = d.name + ':' + d.count;\nreturn msg;"
+        "context.set('data', {name: 'test', count: 5});\nvar d = context.get('data');\nmsg.payload = d.name + ':' + d.count;\nreturn msg;",
     );
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "test:5");
 }
@@ -333,13 +272,9 @@ async fn function_context_set_object() {
 /// Function: node.send() with a single message on port 0.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_node_send_single() {
-    let flow = function_flow(
-        "msg.payload = 'sent'; node.send(msg);"
-    );
+    let flow = function_flow("msg.payload = 'sent'; node.send(msg);");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "sent");
 }
@@ -352,23 +287,16 @@ async fn function_node_send_multi_output() {
         2,
     );
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 2, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 2, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 2);
 }
 
 /// Function: node.send() with null on one output port (port 0 null, port 1 has msg).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn function_node_send_multi_output_with_null() {
-    let flow = function_flow_multi_output(
-        "node.send([null, {payload: 'only-port1'}]);",
-        2,
-    );
+    let flow = function_flow_multi_output("node.send([null, {payload: 'only-port1'}]);", 2);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "only-port1");
 }
@@ -382,9 +310,8 @@ async fn function_node_send_multi_output_with_null() {
 async fn function_malformed_syntax_error() {
     let flow = function_flow("function {;;; invalid syntax {{{");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500)).await;
     // The function node should fail gracefully -- no output
     assert_eq!(msgs.len(), 0, "Expected no output for malformed JS syntax");
 }
@@ -394,9 +321,8 @@ async fn function_malformed_syntax_error() {
 async fn function_undefined_reference() {
     let flow = function_flow("msg.payload = nonexistentVariable;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500)).await;
     assert_eq!(msgs.len(), 0, "Expected no output for undefined reference error");
 }
 
@@ -405,9 +331,8 @@ async fn function_undefined_reference() {
 async fn function_type_error() {
     let flow = function_flow("var x = 42; x();");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500)).await;
     assert_eq!(msgs.len(), 0, "Expected no output for TypeError");
 }
 
@@ -418,9 +343,8 @@ async fn function_type_error() {
 async fn function_empty_body() {
     let flow = function_flow("");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(300))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(300)).await;
     // Empty body means no explicit return -> undefined -> no output
     assert_eq!(msgs.len(), 0, "Empty function body should produce no output");
 }
@@ -430,9 +354,8 @@ async fn function_empty_body() {
 async fn function_null_property_access() {
     let flow = function_flow("var x = null; msg.payload = x.foo;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_millis(500)).await;
     assert_eq!(msgs.len(), 0, "Expected no output for null property access TypeError");
 }
 
@@ -453,9 +376,7 @@ async fn function_node_properties() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
     let s = payload.as_str().unwrap();
@@ -472,9 +393,7 @@ async fn function_node_properties() {
 async fn function_node_log() {
     let flow = function_flow("node.log('hello from log'); return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
 }
 
@@ -483,9 +402,7 @@ async fn function_node_log() {
 async fn function_node_warn() {
     let flow = function_flow("node.warn('warning message'); return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
 }
 
@@ -494,9 +411,7 @@ async fn function_node_warn() {
 async fn function_node_error() {
     let flow = function_flow("node.error('error message'); return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
 }
 
@@ -509,9 +424,7 @@ async fn function_node_error() {
 async fn function_env_get() {
     let flow = function_flow("msg.payload = env.get('TEST_ENV_VAR') || 'not-set'; return msg;");
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "input"}), 1, Duration::from_secs(2)).await;
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "not-set");
 }

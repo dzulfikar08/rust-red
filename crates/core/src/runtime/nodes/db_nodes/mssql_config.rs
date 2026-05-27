@@ -96,22 +96,13 @@ impl Manager for MssqlManager {
         Ok(client)
     }
 
-    async fn recycle(
-        &self,
-        client: &mut Self::Type,
-        _: &managed::Metrics,
-    ) -> RecycleResult<Self::Error> {
+    async fn recycle(&self, client: &mut Self::Type, _: &managed::Metrics) -> RecycleResult<Self::Error> {
         // Simple liveness check: execute a lightweight query.
         // Must consume the result to keep the connection in a clean state.
-        let stream = client
-            .simple_query("SELECT 1")
-            .await
-            .map_err(|e| managed::RecycleError::Backend(anyhow::anyhow!(e)))?;
+        let stream =
+            client.simple_query("SELECT 1").await.map_err(|e| managed::RecycleError::Backend(anyhow::anyhow!(e)))?;
         // into_results() consumes the stream completely
-        stream
-            .into_results()
-            .await
-            .map_err(|e| managed::RecycleError::Backend(anyhow::anyhow!(e)))?;
+        stream.into_results().await.map_err(|e| managed::RecycleError::Backend(anyhow::anyhow!(e)))?;
         Ok(())
     }
 }
@@ -136,29 +127,17 @@ impl MssqlConfigNode {
             name: config.name.clone(),
             type_str: "mssql-config",
             ordering: config.ordering,
-            context: engine.get_context_manager().new_context(
-                engine.context(),
-                config.id.to_string(),
-            ),
+            context: engine.get_context_manager().new_context(engine.context(), config.id.to_string()),
             disabled: config.disabled,
         };
-        Ok(Box::new(MssqlConfigNode {
-            base: state,
-            config: mssql_config,
-            pool: Arc::new(RwLock::new(None)),
-        }))
+        Ok(Box::new(MssqlConfigNode { base: state, config: mssql_config, pool: Arc::new(RwLock::new(None)) }))
     }
 
-    pub async fn get_pool(
-        &self,
-    ) -> crate::Result<deadpool::managed::Object<MssqlManager>> {
+    pub async fn get_pool(&self) -> crate::Result<deadpool::managed::Object<MssqlManager>> {
         {
             let guard = self.pool.read().await;
             if let Some(pool) = guard.as_ref() {
-                let obj = pool
-                    .get()
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Pool get error: {e}"))?;
+                let obj = pool.get().await.map_err(|e| anyhow::anyhow!("Pool get error: {e}"))?;
                 return Ok(obj);
             }
         }
@@ -168,9 +147,7 @@ impl MssqlConfigNode {
                 let manager = MssqlManager::new(&self.config);
                 let pool = Pool::builder(manager)
                     .max_size(self.config.pool_max_size as usize)
-                    .wait_timeout(Some(Duration::from_millis(
-                        self.config.connect_timeout_ms,
-                    )))
+                    .wait_timeout(Some(Duration::from_millis(self.config.connect_timeout_ms)))
                     .build()
                     .map_err(|e| anyhow::anyhow!("Pool build error: {e}"))?;
                 *guard = Some(pool);
@@ -181,9 +158,7 @@ impl MssqlConfigNode {
                 );
             }
             let pool = guard.as_ref().unwrap();
-            pool.get()
-                .await
-                .map_err(|e| anyhow::anyhow!("Pool get error: {e}"))
+            pool.get().await.map_err(|e| anyhow::anyhow!("Pool get error: {e}"))
         }
     }
 

@@ -5,7 +5,7 @@
 
 use serde_json::json;
 
-use super::harness::{assert_msg_f64, TestHarness};
+use super::harness::{TestHarness, assert_msg_f64};
 
 /// Range: scale 5 from [0,10] to [0,100] → 50.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -119,15 +119,10 @@ async fn range_drop_out_of_range() {
 
     let harness = TestHarness::from_flow_json(flow);
     // Use timeout variant since drop produces no output, which would cause default to timeout
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": 15}), 1, std::time::Duration::from_millis(500))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": 15}), 1, std::time::Duration::from_millis(500)).await;
 
-    assert!(
-        msgs.is_empty(),
-        "Out-of-range value should be dropped, got {} messages",
-        msgs.len()
-    );
+    assert!(msgs.is_empty(), "Out-of-range value should be dropped, got {} messages", msgs.len());
 }
 
 /// Range: scale with fractional result and no rounding.

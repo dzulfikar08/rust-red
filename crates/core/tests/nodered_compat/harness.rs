@@ -58,8 +58,7 @@ impl TestHarness {
 
     /// Build a test engine from a JSON string.
     pub fn from_flow_json_str(json_str: &str) -> Self {
-        let json: serde_json::Value =
-            serde_json::from_str(json_str).expect("Invalid JSON string");
+        let json: serde_json::Value = serde_json::from_str(json_str).expect("Invalid JSON string");
         Self::from_flow_json(json)
     }
 
@@ -69,22 +68,12 @@ impl TestHarness {
     ///
     /// Returns the captured messages.
     pub async fn run(&self, expected_count: usize) -> Vec<Msg> {
-        self.engine
-            .run_once(expected_count, DEFAULT_TIMEOUT)
-            .await
-            .expect("Engine run_once failed")
+        self.engine.run_once(expected_count, DEFAULT_TIMEOUT).await.expect("Engine run_once failed")
     }
 
     /// Run the engine with a timeout, expecting `expected_count` messages.
-    pub async fn run_with_timeout(
-        &self,
-        expected_count: usize,
-        timeout: Duration,
-    ) -> Vec<Msg> {
-        self.engine
-            .run_once(expected_count, timeout)
-            .await
-            .expect("Engine run_once failed")
+    pub async fn run_with_timeout(&self, expected_count: usize, timeout: Duration) -> Vec<Msg> {
+        self.engine.run_once(expected_count, timeout).await.expect("Engine run_once failed")
     }
 
     /// Run the engine, injecting messages manually into specific nodes.
@@ -105,12 +94,8 @@ impl TestHarness {
             })
             .collect();
 
-        let inject_json: serde_json::Value = inject_data
-            .iter()
-            .map(|(eid, msg)| {
-                json!([eid.to_string(), msg])
-            })
-            .collect();
+        let inject_json: serde_json::Value =
+            inject_data.iter().map(|(eid, msg)| json!([eid.to_string(), msg])).collect();
 
         let inject_list: Vec<(ElementId, Msg)> =
             Vec::deserialize(inject_json).expect("Failed to deserialize inject list");
@@ -128,8 +113,7 @@ impl TestHarness {
         msg_json: serde_json::Value,
         expected_count: usize,
     ) -> Vec<Msg> {
-        self.run_with_inject(expected_count, vec![(node_id.to_string(), msg_json)])
-            .await
+        self.run_with_inject(expected_count, vec![(node_id.to_string(), msg_json)]).await
     }
 
     fn build_inject_list(&self, node_id: &str, msg_json: serde_json::Value) -> Vec<(ElementId, Msg)> {
@@ -148,10 +132,7 @@ impl TestHarness {
         timeout: Duration,
     ) -> Vec<Msg> {
         let inject_list = self.build_inject_list(node_id, msg_json);
-        self.engine
-            .run_once_with_inject(expected_count, timeout, inject_list)
-            .await
-            .unwrap_or_default()
+        self.engine.run_once_with_inject(expected_count, timeout, inject_list).await.unwrap_or_default()
     }
 }
 
@@ -162,14 +143,8 @@ impl TestHarness {
 /// Assert that a message property equals an expected Variant value.
 #[track_caller]
 pub fn assert_msg_eq(msg: &Msg, key: &str, expected: &Variant) {
-    let actual = msg
-        .get(key)
-        .unwrap_or_else(|| panic!("Message missing property '{key}'"));
-    assert_eq!(
-        actual, expected,
-        "Message property '{key}': expected {:?}, got {:?}",
-        expected, actual
-    );
+    let actual = msg.get(key).unwrap_or_else(|| panic!("Message missing property '{key}'"));
+    assert_eq!(actual, expected, "Message property '{key}': expected {:?}, got {:?}", expected, actual);
 }
 
 /// Assert that a message property equals a string value.
@@ -186,9 +161,7 @@ pub fn assert_msg_str(msg: &Msg, key: &str, expected: &str) {
 /// Assert that a message property equals a numeric value.
 #[track_caller]
 pub fn assert_msg_num(msg: &Msg, key: &str, expected: i64) {
-    let actual = msg
-        .get(key)
-        .unwrap_or_else(|| panic!("Message missing property '{key}'"));
+    let actual = msg.get(key).unwrap_or_else(|| panic!("Message missing property '{key}'"));
     match actual {
         Variant::Number(n) => {
             let actual_num = n.as_i64().unwrap_or_else(|| panic!("Number overflow for '{key}'"));
@@ -201,9 +174,7 @@ pub fn assert_msg_num(msg: &Msg, key: &str, expected: i64) {
 /// Assert that a message property equals a floating-point value (with tolerance).
 #[track_caller]
 pub fn assert_msg_f64(msg: &Msg, key: &str, expected: f64) {
-    let actual = msg
-        .get(key)
-        .unwrap_or_else(|| panic!("Message missing property '{key}'"));
+    let actual = msg.get(key).unwrap_or_else(|| panic!("Message missing property '{key}'"));
     match actual {
         Variant::Number(n) => {
             let actual_num = n.as_f64().unwrap_or_else(|| panic!("Number is not f64 for '{key}'"));
@@ -219,9 +190,7 @@ pub fn assert_msg_f64(msg: &Msg, key: &str, expected: f64) {
 /// Assert that a message property equals a boolean value.
 #[track_caller]
 pub fn assert_msg_bool(msg: &Msg, key: &str, expected: bool) {
-    let actual = msg
-        .get(key)
-        .unwrap_or_else(|| panic!("Message missing property '{key}'"));
+    let actual = msg.get(key).unwrap_or_else(|| panic!("Message missing property '{key}'"));
     match actual {
         Variant::Bool(b) => assert_eq!(*b, expected, "Message property '{key}' mismatch"),
         other => panic!("Property '{key}' is not a boolean: {:?}", other),
@@ -237,8 +206,5 @@ pub fn assert_msg_has(msg: &Msg, key: &str) {
 /// Assert that a message does NOT have the given property.
 #[track_caller]
 pub fn assert_msg_not_has(msg: &Msg, key: &str) {
-    assert!(
-        !msg.contains(key),
-        "Message has unexpected property '{key}'"
-    );
+    assert!(!msg.contains(key), "Message has unexpected property '{key}'");
 }

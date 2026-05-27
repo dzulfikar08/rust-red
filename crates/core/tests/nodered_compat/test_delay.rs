@@ -8,7 +8,7 @@ use std::time::Duration;
 use serde_json::json;
 
 use super::flow_builder::FlowBuilder;
-use super::harness::{assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_str};
 
 /// Delay: fixed delay of milliseconds.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -25,14 +25,7 @@ async fn delay_fixed_milliseconds() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "delayed"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "delayed"}), 1, Duration::from_secs(2)).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "delayed");
@@ -53,14 +46,8 @@ async fn delay_fixed_seconds() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "delayed-1s"}),
-            1,
-            Duration::from_secs(3),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "delayed-1s"}), 1, Duration::from_secs(3)).await;
 
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "delayed-1s");
@@ -83,24 +70,13 @@ async fn delay_respects_timing() {
     let harness = TestHarness::from_flow_json(flow);
 
     let start = std::time::Instant::now();
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "delayed"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "delayed"}), 1, Duration::from_secs(2)).await;
 
     let elapsed = start.elapsed();
 
     assert_eq!(msgs.len(), 1);
     // The message should take at least ~500ms to arrive
-    assert!(
-        elapsed >= Duration::from_millis(400),
-        "Delay should be at least ~500ms, but was {:?}",
-        elapsed
-    );
+    assert!(elapsed >= Duration::from_millis(400), "Delay should be at least ~500ms, but was {:?}", elapsed);
 }
 
 /// Delay: multiple messages each get delayed independently.
@@ -121,10 +97,7 @@ async fn delay_multiple_messages() {
     let msgs = harness
         .run_with_inject(
             2,
-            vec![
-                ("1".to_string(), json!({"payload": "msg1"})),
-                ("1".to_string(), json!({"payload": "msg2"})),
-            ],
+            vec![("1".to_string(), json!({"payload": "msg1"})), ("1".to_string(), json!({"payload": "msg2"}))],
         )
         .await;
 
@@ -147,12 +120,7 @@ async fn delay_variable() {
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "var-delayed", "delay": 100}),
-            1,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "var-delayed", "delay": 100}), 1, Duration::from_secs(2))
         .await;
 
     assert_eq!(msgs.len(), 1);
@@ -175,14 +143,8 @@ async fn delay_rate_limit() {
 
     let harness = TestHarness::from_flow_json(flow);
     // Send 3 messages, rate limit is 2/sec so we need some time for them to pass
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "rate-limited"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "rate-limited"}), 1, Duration::from_secs(2)).await;
 
     // At least the first message should get through
     assert!(!msgs.is_empty());
@@ -208,23 +170,13 @@ async fn delay_random_mode() {
 
     let harness = TestHarness::from_flow_json(flow);
     let start = std::time::Instant::now();
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "random-delayed"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "random-delayed"}), 1, Duration::from_secs(2)).await;
 
     let elapsed = start.elapsed();
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "random-delayed");
-    assert!(
-        elapsed >= Duration::from_millis(50),
-        "Random delay should be at least ~100ms, but was {:?}",
-        elapsed
-    );
+    assert!(elapsed >= Duration::from_millis(50), "Random delay should be at least ~100ms, but was {:?}", elapsed);
 }
 
 /// Delay: reset message cancels pending delayed messages.
@@ -253,11 +205,7 @@ async fn delay_reset_message() {
         .await;
 
     // The reset should prevent the delayed message from being sent
-    assert!(
-        msgs.is_empty(),
-        "Reset should cancel pending message, got {} messages",
-        msgs.len()
-    );
+    assert!(msgs.is_empty(), "Reset should cancel pending message, got {} messages", msgs.len());
 }
 
 /// Delay: negative msg.delay value sends message immediately in variable delay mode.
@@ -277,22 +225,13 @@ async fn delay_negative_msg_delay() {
     let harness = TestHarness::from_flow_json(flow);
     let start = std::time::Instant::now();
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "instant", "delay": -100}),
-            1,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "instant", "delay": -100}), 1, Duration::from_secs(2))
         .await;
 
     let elapsed = start.elapsed();
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "instant");
-    assert!(
-        elapsed < Duration::from_millis(200),
-        "Negative delay should send immediately, but took {:?}",
-        elapsed
-    );
+    assert!(elapsed < Duration::from_millis(200), "Negative delay should send immediately, but took {:?}", elapsed);
 }
 
 /// Delay: variable delay with msg.delay=0 sends immediately.
@@ -312,20 +251,11 @@ async fn delay_variable_zero() {
     let harness = TestHarness::from_flow_json(flow);
     let start = std::time::Instant::now();
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "zero-delay", "delay": 0}),
-            1,
-            Duration::from_secs(2),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "zero-delay", "delay": 0}), 1, Duration::from_secs(2))
         .await;
 
     let elapsed = start.elapsed();
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "zero-delay");
-    assert!(
-        elapsed < Duration::from_millis(200),
-        "Zero delay should be fast, but took {:?}",
-        elapsed
-    );
+    assert!(elapsed < Duration::from_millis(200), "Zero delay should be fast, but took {:?}", elapsed);
 }

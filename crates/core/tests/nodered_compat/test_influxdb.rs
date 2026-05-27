@@ -25,7 +25,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_has, assert_msg_not_has, TestHarness};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_not_has};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -157,14 +157,8 @@ async fn influxdb_in_auth_error() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": {"value": 1.0}}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": {"value": 1.0}}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "should get message with auth error");
     assert_msg_has(&msgs[0], "error");
@@ -178,14 +172,10 @@ async fn influxdb_in_auth_error() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Requires running InfluxDB v2 server"]
 async fn influxdb_out_flux_query() {
-    let flow = build_influxdb_out_flow(
-        "from(bucket: \"test\") |> range(start: -1h) |> limit(n: 10)"
-    );
+    let flow = build_influxdb_out_flow("from(bucket: \"test\") |> range(start: -1h) |> limit(n: 10)");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "query"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "query"}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "influxdb-out should forward query result");
     assert_msg_not_has(&msgs[0], "error");
@@ -195,18 +185,11 @@ async fn influxdb_out_flux_query() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Requires running InfluxDB v2 server"]
 async fn influxdb_out_template_query() {
-    let flow = build_influxdb_out_flow(
-        "from(bucket: \"{{bucket}}\") |> range(start: -1h) |> limit(n: 10)"
-    );
+    let flow = build_influxdb_out_flow("from(bucket: \"{{bucket}}\") |> range(start: -1h) |> limit(n: 10)");
     let harness = TestHarness::from_flow_json(flow);
 
     let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "query", "bucket": "test"}),
-            1,
-            Duration::from_secs(10),
-        )
+        .inject_and_collect_timeout("1", json!({"payload": "query", "bucket": "test"}), 1, Duration::from_secs(10))
         .await;
 
     assert!(!msgs.is_empty(), "influxdb-out should forward templated query result");
@@ -220,9 +203,8 @@ async fn influxdb_out_invalid_query() {
     let flow = build_influxdb_out_flow("INVALID FLUX QUERY SYNTAX");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "bad_query"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "bad_query"}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "should get message with query error");
     assert_msg_has(&msgs[0], "error");

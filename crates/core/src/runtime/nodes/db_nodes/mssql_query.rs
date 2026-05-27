@@ -41,33 +41,17 @@ impl MssqlQueryNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let query_config = MssqlQueryConfig::deserialize(&config.rest)?;
-        Ok(Box::new(MssqlQueryNode {
-            base: base_node,
-            config: query_config,
-        }))
+        Ok(Box::new(MssqlQueryNode { base: base_node, config: query_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         let eid_opt = ElementId::from_str(&self.config.config_node).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine
-                    .find_global_node_by_name(&self.config.config_node)
-                    .ok()
-                    .flatten()
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Config node '{}' not found",
-                    self.config.config_node
-                )
-            })?;
+            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
+            .ok_or_else(|| anyhow::anyhow!("Config node '{}' not found", self.config.config_node))?;
 
         Ok(global)
     }
@@ -180,7 +164,8 @@ impl FlowNodeBehavior for MssqlQueryNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -197,23 +182,20 @@ impl FlowNodeBehavior for MssqlQueryNode {
                     let mut pool_obj = match cfg_inner.get_pool().await {
                         Ok(obj) => obj,
                         Err(e) => {
-                            log::error!(
-                                "[mssql-query:{}] Pool error: {}",
-                                node.name(),
-                                e
-                            );
+                            log::error!("[mssql-query:{}] Pool error: {}", node.name(), e);
                             {
                                 let mut guard = msg.write().await;
-                                guard.set(
-                                    "error".to_string(),
-                                    Variant::String(e.to_string()),
-                                );
+                                guard.set("error".to_string(), Variant::String(e.to_string()));
                             }
-                            node.report_status(StatusObject {
-                                fill: Some(StatusFill::Red),
-                                shape: Some(StatusShape::Ring),
-                                text: Some(format!("{}", e)),
-                            }, cancel.child_token()).await;
+                            node.report_status(
+                                StatusObject {
+                                    fill: Some(StatusFill::Red),
+                                    shape: Some(StatusShape::Ring),
+                                    text: Some(format!("{}", e)),
+                                },
+                                cancel.child_token(),
+                            )
+                            .await;
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                             return Ok(());
@@ -225,59 +207,36 @@ impl FlowNodeBehavior for MssqlQueryNode {
                     drop(msg_read);
 
                     let timeout = Duration::from_millis(node.config.timeout_ms);
-                    let query_result = tokio::time::timeout(
-                        timeout,
-                        query.query(&mut *pool_obj),
-                    )
-                    .await;
+                    let query_result = tokio::time::timeout(timeout, query.query(&mut *pool_obj)).await;
 
                     match query_result {
-                        Ok(Ok(stream)) => {
-                            match stream.into_first_result().await {
-                                Ok(rows) => {
-                                    let count = rows.len();
-                                    {
-                                        let mut guard = msg.write().await;
-                                        let variant_rows = Self::rows_to_variant(rows);
-                                        guard.set("payload".to_string(), variant_rows);
-                                        guard.set(
-                                            "rowCount".to_string(),
-                                            Variant::from(count as i64),
-                                        );
-                                    }
-                                    let envelope = Envelope { port: 0, msg };
-                                    node.fan_out_one(envelope, CancellationToken::new()).await?;
+                        Ok(Ok(stream)) => match stream.into_first_result().await {
+                            Ok(rows) => {
+                                let count = rows.len();
+                                {
+                                    let mut guard = msg.write().await;
+                                    let variant_rows = Self::rows_to_variant(rows);
+                                    guard.set("payload".to_string(), variant_rows);
+                                    guard.set("rowCount".to_string(), Variant::from(count as i64));
                                 }
-                                Err(e) => {
-                                    log::warn!(
-                                        "[mssql-query:{}] Result collection error: {}",
-                                        node.name(),
-                                        e
-                                    );
-                                    {
-                                        let mut guard = msg.write().await;
-                                        guard.set(
-                                            "error".to_string(),
-                                            Variant::String(e.to_string()),
-                                        );
-                                    }
-                                    let envelope = Envelope { port: 0, msg };
-                                    node.fan_out_one(envelope, CancellationToken::new()).await?;
-                                }
+                                let envelope = Envelope { port: 0, msg };
+                                node.fan_out_one(envelope, CancellationToken::new()).await?;
                             }
-                        }
+                            Err(e) => {
+                                log::warn!("[mssql-query:{}] Result collection error: {}", node.name(), e);
+                                {
+                                    let mut guard = msg.write().await;
+                                    guard.set("error".to_string(), Variant::String(e.to_string()));
+                                }
+                                let envelope = Envelope { port: 0, msg };
+                                node.fan_out_one(envelope, CancellationToken::new()).await?;
+                            }
+                        },
                         Ok(Err(e)) => {
-                            log::warn!(
-                                "[mssql-query:{}] Query error: {}",
-                                node.name(),
-                                e
-                            );
+                            log::warn!("[mssql-query:{}] Query error: {}", node.name(), e);
                             {
                                 let mut guard = msg.write().await;
-                                guard.set(
-                                    "error".to_string(),
-                                    Variant::String(e.to_string()),
-                                );
+                                guard.set("error".to_string(), Variant::String(e.to_string()));
                             }
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
@@ -290,10 +249,7 @@ impl FlowNodeBehavior for MssqlQueryNode {
                             );
                             {
                                 let mut guard = msg.write().await;
-                                guard.set(
-                                    "error".to_string(),
-                                    Variant::String("Query timed out".into()),
-                                );
+                                guard.set("error".to_string(), Variant::String("Query timed out".into()));
                             }
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;

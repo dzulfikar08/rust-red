@@ -10,10 +10,8 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::flow_builder::{change_rule, switch_rule, FlowBuilder};
-use super::harness::{
-    assert_msg_has, assert_msg_not_has, assert_msg_num, assert_msg_str, TestHarness,
-};
+use super::flow_builder::{FlowBuilder, change_rule, switch_rule};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_not_has, assert_msg_num, assert_msg_str};
 
 // ---------------------------------------------------------------------------
 // Test 1: Simple inject -> debug flow (most basic Node-RED pattern)
@@ -174,11 +172,7 @@ async fn import_switch_routing() {
         .switch(
             "n2",
             "payload",
-            vec![
-                switch_rule::eq("critical", "str"),
-                switch_rule::eq("warning", "str"),
-                switch_rule::else_rule(),
-            ],
+            vec![switch_rule::eq("critical", "str"), switch_rule::eq("warning", "str"), switch_rule::else_rule()],
             true,
             3,
             json!([["n99a"], ["n99b"], ["n99c"]]),
@@ -189,9 +183,7 @@ async fn import_switch_routing() {
         .to_json();
 
     let harness = TestHarness::from_flow_json(flow_sink);
-    let msgs = harness
-        .inject_and_collect_timeout("n2", json!({"payload": "warning"}), 1, Duration::from_secs(2))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("n2", json!({"payload": "warning"}), 1, Duration::from_secs(2)).await;
 
     assert_eq!(msgs.len(), 1, "Warning output should receive exactly 1 message");
     assert_msg_str(&msgs[0], "payload", "warning");
@@ -221,11 +213,7 @@ async fn import_change_node_manipulation() {
 
     let harness = TestHarness::from_flow_json(flow);
     let msgs = harness
-        .inject_and_collect(
-            "n1",
-            json!({"payload": "raw", "original": "keep-this", "temp": "remove-this"}),
-            1,
-        )
+        .inject_and_collect("n1", json!({"payload": "raw", "original": "keep-this", "temp": "remove-this"}), 1)
         .await;
 
     assert_eq!(msgs.len(), 1);
@@ -320,10 +308,7 @@ async fn import_named_nodes_and_comment() {
     // Verify the JSON payload was parsed correctly
     let payload = msgs[0].get("payload").expect("Missing payload");
     let obj = payload.as_object().expect("Payload should be an object");
-    assert!(
-        obj.contains_key("temperature"),
-        "Payload should contain 'temperature' key"
-    );
+    assert!(obj.contains_key("temperature"), "Payload should contain 'temperature' key");
     assert_msg_str(&msgs[0], "topic", "sensor/temperature");
 }
 
@@ -359,10 +344,7 @@ async fn import_inject_with_full_configuration() {
     // Check the JSON payload
     let payload = msgs[0].get("payload").expect("Missing payload");
     let obj = payload.as_object().expect("Payload should be an object");
-    assert_eq!(
-        obj.get("device").unwrap().as_str().unwrap(),
-        "sensor-01"
-    );
+    assert_eq!(obj.get("device").unwrap().as_str().unwrap(), "sensor-01");
 
     // Check topic and custom props
     assert_msg_str(&msgs[0], "topic", "iot/sensor/data");
@@ -453,14 +435,8 @@ async fn import_template_mustache() {
     assert_eq!(msgs.len(), 1);
     let output = msgs[0].get("payload").expect("Missing payload");
     let output_str = output.as_str().expect("Payload should be a string");
-    assert!(
-        output_str.contains("Alice"),
-        "Template output should contain 'Alice', got: {output_str}"
-    );
-    assert!(
-        output_str.contains("95"),
-        "Template output should contain '95', got: {output_str}"
-    );
+    assert!(output_str.contains("Alice"), "Template output should contain 'Alice', got: {output_str}");
+    assert!(output_str.contains("95"), "Template output should contain '95', got: {output_str}");
 }
 
 // ---------------------------------------------------------------------------
@@ -535,9 +511,7 @@ async fn import_subflow_instantiation() {
     // The subflow import may or may not be fully supported yet.
     // At minimum, it should not panic. If the engine cannot handle subflows,
     // from_flow_json will return an error and the expect will fail.
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        TestHarness::from_flow_json(flow)
-    }));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| TestHarness::from_flow_json(flow)));
 
     // If subflow is not supported, the test should still pass without panicking.
     // If supported, it should build cleanly.
@@ -630,10 +604,7 @@ async fn import_catch_node_error_handling() {
     assert!(!msgs.is_empty(), "Catch node should capture the JSON.parse error");
     let output = msgs[0].get("payload").expect("Missing payload");
     let output_str = output.as_str().expect("Payload should be a string");
-    assert!(
-        output_str.contains("ERROR:"),
-        "Error handler should prefix with 'ERROR:', got: {output_str}"
-    );
+    assert!(output_str.contains("ERROR:"), "Error handler should prefix with 'ERROR:', got: {output_str}");
     assert_msg_has(&msgs[0], "error");
 }
 
@@ -668,10 +639,7 @@ async fn import_status_node() {
     // The flow should import and the status node should be registered.
     // At minimum we should get the message from the function node.
     let msgs = harness.run_with_timeout(1, Duration::from_secs(2)).await;
-    assert!(
-        !msgs.is_empty(),
-        "Should receive at least one message from the function node"
-    );
+    assert!(!msgs.is_empty(), "Should receive at least one message from the function node");
 }
 
 // ---------------------------------------------------------------------------
@@ -777,10 +745,7 @@ async fn import_multi_tab_complex_flow() {
     // 23.5 degrees should go to the "else" (normal) output
     let output = msgs[0].get("payload").expect("Missing payload");
     let output_str = output.as_str().expect("Payload should be a string");
-    assert!(
-        output_str.contains("23.5"),
-        "Output should contain temperature reading, got: {output_str}"
-    );
+    assert!(output_str.contains("23.5"), "Output should contain temperature reading, got: {output_str}");
 }
 
 // ---------------------------------------------------------------------------
@@ -863,16 +828,11 @@ async fn import_complete_node() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("n2", json!({"payload": "test"}), 2)
-        .await;
+    let msgs = harness.inject_and_collect("n2", json!({"payload": "test"}), 2).await;
 
     // We expect at least one message -- either from the function output
     // or from the complete node (or both).
-    assert!(
-        !msgs.is_empty(),
-        "Should receive at least one message from function output or complete node"
-    );
+    assert!(!msgs.is_empty(), "Should receive at least one message from function output or complete node");
 }
 
 // ---------------------------------------------------------------------------

@@ -7,12 +7,12 @@ use std::sync::{Arc, OnceLock};
 use std::time::SystemTime;
 
 use dashmap::DashMap;
+use notify::Watcher;
 use rust_red_core::runtime::flow::Flow;
 use rust_red_core::runtime::model::json::RedFlowNodeConfig;
 use rust_red_core::runtime::nodes::*;
 use rust_red_core::runtime::registry::RegistryBuilder;
 use sha2::{Digest, Sha256};
-use notify::Watcher;
 
 use crate::abi;
 use crate::shim::WasmNodeShim;
@@ -68,11 +68,7 @@ pub struct PluginManagerConfig {
 
 impl Default for PluginManagerConfig {
     fn default() -> Self {
-        Self {
-            plugin_dir: PathBuf::from("./plugins"),
-            max_fuel: 10_000_000,
-            max_memory_pages: 16,
-        }
+        Self { plugin_dir: PathBuf::from("./plugins"), max_fuel: 10_000_000, max_memory_pages: 16 }
     }
 }
 
@@ -88,11 +84,7 @@ impl PluginManager {
         wasm_config.wasm_multi_memory(true);
         let engine = wasmtime::Engine::new(&wasm_config)?;
 
-        Ok(Self {
-            engine,
-            plugins: DashMap::new(),
-            plugin_dir: config.plugin_dir.clone(),
-        })
+        Ok(Self { engine, plugins: DashMap::new(), plugin_dir: config.plugin_dir.clone() })
     }
 
     /// Scan the plugin directory and load all .wasm files.
@@ -149,13 +141,8 @@ impl PluginManager {
         let checksum = hasher.finalize().to_vec();
 
         // 6. Store in global module registry for factory function lookup
-        global_registry().insert(
-            info.node_type.clone(),
-            WasmModuleEntry {
-                engine: self.engine.clone(),
-                module: module.clone(),
-            },
-        );
+        global_registry()
+            .insert(info.node_type.clone(), WasmModuleEntry { engine: self.engine.clone(), module: module.clone() });
 
         // 7. Store in local plugin map
         self.plugins.insert(
@@ -176,12 +163,7 @@ impl PluginManager {
     fn validate_module(&self, module: &wasmtime::Module) -> anyhow::Result<()> {
         let exports: Vec<&str> = module.exports().map(|e| e.name()).collect();
 
-        let required = [
-            "rust_red_node_info",
-            "rust_red_on_start",
-            "rust_red_process_msg",
-            "rust_red_on_stop",
-        ];
+        let required = ["rust_red_node_info", "rust_red_on_start", "rust_red_process_msg", "rust_red_on_stop"];
 
         for req in &required {
             if !exports.iter().any(|e| e == req) {
@@ -205,13 +187,11 @@ impl PluginManager {
         abi::register_core_imports(&mut linker)?;
 
         log::debug!("Instantiating WASM module for info extraction...");
-        let instance = linker.instantiate(&mut store, module)
-            .map_err(|e| anyhow::anyhow!("WASM instantiation failed: {e}"))?;
+        let instance =
+            linker.instantiate(&mut store, module).map_err(|e| anyhow::anyhow!("WASM instantiation failed: {e}"))?;
         log::debug!("WASM instance created successfully");
 
-        let memory = instance
-            .get_memory(&mut store, "memory")
-            .ok_or_else(|| anyhow::anyhow!("no memory export"))?;
+        let memory = instance.get_memory(&mut store, "memory").ok_or_else(|| anyhow::anyhow!("no memory export"))?;
         log::debug!("Initial memory: {} pages ({} bytes)", memory.size(&store), memory.size(&store) * 65536);
 
         let _alloc_fn = instance
@@ -223,8 +203,8 @@ impl PluginManager {
             .map_err(|e| anyhow::anyhow!("no rust_red_node_info export: {e}"))?;
 
         log::debug!("Calling rust_red_node_info...");
-        let result_ptr = info_fn.call(&mut store, ())
-            .map_err(|e| anyhow::anyhow!("rust_red_node_info call failed: {e}"))?;
+        let result_ptr =
+            info_fn.call(&mut store, ()).map_err(|e| anyhow::anyhow!("rust_red_node_info call failed: {e}"))?;
         log::debug!("rust_red_node_info returned ptr={}", result_ptr);
 
         // Get result length if exported
@@ -243,7 +223,12 @@ impl PluginManager {
         let ptr = result_ptr as usize;
         let len = result_len as usize;
         if ptr + len > mem_data.len() {
-            anyhow::bail!("rust_red_node_info result pointer out of bounds (ptr={}, len={}, mem={})", ptr, len, mem_data.len());
+            anyhow::bail!(
+                "rust_red_node_info result pointer out of bounds (ptr={}, len={}, mem={})",
+                ptr,
+                len,
+                mem_data.len()
+            );
         }
         let slice = &mem_data[ptr..][..len];
 
@@ -296,10 +281,7 @@ impl PluginManager {
         let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
             match res {
                 Ok(event) => {
-                    if matches!(
-                        event.kind,
-                        notify::EventKind::Create(_) | notify::EventKind::Modify(_)
-                    ) {
+                    if matches!(event.kind, notify::EventKind::Create(_) | notify::EventKind::Modify(_)) {
                         for path in event.paths {
                             if path.extension() == Some(OsStr::new("wasm")) {
                                 log::info!("WASM plugin changed: {:?}, reloading...", path);
@@ -345,14 +327,9 @@ fn wasm_node_factory(
 ) -> rust_red_core::Result<Box<dyn FlowNodeBehavior>> {
     let node_type = config.type_name.as_str();
 
-    let entry = global_registry()
-        .get(node_type)
-        .ok_or_else(|| {
-            rust_red_core::RustRedError::InvalidOperation(format!(
-                "WASM module not found for node type: {}",
-                node_type
-            ))
-        })?;
+    let entry = global_registry().get(node_type).ok_or_else(|| {
+        rust_red_core::RustRedError::InvalidOperation(format!("WASM module not found for node type: {}", node_type))
+    })?;
 
     let engine = &entry.engine;
     let module = &entry.module;
@@ -388,21 +365,10 @@ fn wasm_node_factory(
         .get_typed_func::<u32, u32>(&mut store, "rust_red_alloc")
         .map_err(|e| rust_red_core::RustRedError::InvalidOperation(format!("no rust_red_alloc: {e}")))?;
 
-    let result_len_fn = instance
-        .get_typed_func::<(), u32>(&mut store, "rust_red_result_len")
-        .ok();
+    let result_len_fn = instance.get_typed_func::<(), u32>(&mut store, "rust_red_result_len").ok();
 
-    let shim = WasmNodeShim::new(
-        base,
-        instance,
-        store,
-        memory,
-        process_fn,
-        on_start_fn,
-        on_stop_fn,
-        alloc_fn,
-        result_len_fn,
-    );
+    let shim =
+        WasmNodeShim::new(base, instance, store, memory, process_fn, on_start_fn, on_stop_fn, alloc_fn, result_len_fn);
 
     log::info!("Created WasmNodeShim for '{}'", node_type);
 

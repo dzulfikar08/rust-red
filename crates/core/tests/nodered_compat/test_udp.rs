@@ -98,10 +98,7 @@ async fn udp_out_sends_datagram() {
 
     match tokio::time::timeout(Duration::from_secs(3), recv_task).await {
         Ok(Ok(received)) => {
-            assert!(
-                received.contains("hello udp"),
-                "UDP receiver should have gotten the payload, got: {received}"
-            );
+            assert!(received.contains("hello udp"), "UDP receiver should have gotten the payload, got: {received}");
         }
         _ => {
             // The UDP out node processes messages through its run() loop.

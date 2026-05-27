@@ -3,12 +3,11 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
-    Router,
     extract::{Multipart, Path, Query, State},
-    http::{HeaderValue, StatusCode, header},
+    http::{header, HeaderValue, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post},
+    Json, Router,
 };
 use tokio::sync::RwLock;
 
@@ -26,14 +25,8 @@ pub fn marketplace_router(state: AppState) -> Router {
         .route("/plugins", get(list_plugins).post(publish_plugin))
         .route("/plugins/{id}", get(get_plugin_detail))
         .route("/plugins/{id}/versions", get(list_versions))
-        .route(
-            "/plugins/{id}/download/{version}",
-            get(download_plugin),
-        )
-        .route(
-            "/plugins/{id}/versions/{version}",
-            delete(unpublish_version),
-        )
+        .route("/plugins/{id}/download/{version}", get(download_plugin))
+        .route("/plugins/{id}/versions/{version}", delete(unpublish_version))
         .route("/plugins/{id}/rate", post(rate_plugin))
         .with_state(state)
 }
@@ -114,7 +107,10 @@ async fn download_plugin(
         StatusCode::OK,
         [
             (header::CONTENT_TYPE, HeaderValue::from_static("application/wasm")),
-            (header::CONTENT_DISPOSITION, HeaderValue::from_str(&disposition).unwrap_or_else(|_| HeaderValue::from_static("attachment"))),
+            (
+                header::CONTENT_DISPOSITION,
+                HeaderValue::from_str(&disposition).unwrap_or_else(|_| HeaderValue::from_static("attachment")),
+            ),
         ],
         binary,
     ))
@@ -217,30 +213,27 @@ fn resolve_record(store: &PluginStore, id: &str) -> Result<PluginRecord, Marketp
 }
 
 /// Extract metadata and wasm bytes from a multipart upload.
-async fn parse_publish_multipart(
-    mut multipart: Multipart,
-) -> Result<(PluginMetadata, Vec<u8>), MarketplaceError> {
+async fn parse_publish_multipart(mut multipart: Multipart) -> Result<(PluginMetadata, Vec<u8>), MarketplaceError> {
     let mut metadata: Option<PluginMetadata> = None;
     let mut wasm_bytes: Option<Vec<u8>> = None;
 
-    while let Some(field) = multipart.next_field().await.map_err(|e| {
-        MarketplaceError::BadRequest(format!("multipart error: {e}"))
-    })? {
+    while let Some(field) =
+        multipart.next_field().await.map_err(|e| MarketplaceError::BadRequest(format!("multipart error: {e}")))?
+    {
         let name = field.name().unwrap_or("").to_string();
         match name.as_str() {
             "metadata" => {
-                let text = field.text().await.map_err(|e| {
-                    MarketplaceError::BadRequest(format!("metadata read error: {e}"))
-                })?;
-                let meta: PluginMetadata = serde_json::from_str(&text).map_err(|e| {
-                    MarketplaceError::BadRequest(format!("invalid metadata JSON: {e}"))
-                })?;
+                let text = field
+                    .text()
+                    .await
+                    .map_err(|e| MarketplaceError::BadRequest(format!("metadata read error: {e}")))?;
+                let meta: PluginMetadata = serde_json::from_str(&text)
+                    .map_err(|e| MarketplaceError::BadRequest(format!("invalid metadata JSON: {e}")))?;
                 metadata = Some(meta);
             }
             "wasm" => {
-                let data = field.bytes().await.map_err(|e| {
-                    MarketplaceError::BadRequest(format!("wasm read error: {e}"))
-                })?;
+                let data =
+                    field.bytes().await.map_err(|e| MarketplaceError::BadRequest(format!("wasm read error: {e}")))?;
                 wasm_bytes = Some(data.to_vec());
             }
             other => {
@@ -249,12 +242,8 @@ async fn parse_publish_multipart(
         }
     }
 
-    let meta = metadata.ok_or_else(|| {
-        MarketplaceError::BadRequest("missing 'metadata' field".into())
-    })?;
-    let wasm = wasm_bytes.ok_or_else(|| {
-        MarketplaceError::BadRequest("missing 'wasm' field".into())
-    })?;
+    let meta = metadata.ok_or_else(|| MarketplaceError::BadRequest("missing 'metadata' field".into()))?;
+    let wasm = wasm_bytes.ok_or_else(|| MarketplaceError::BadRequest("missing 'wasm' field".into()))?;
 
     Ok((meta, wasm))
 }

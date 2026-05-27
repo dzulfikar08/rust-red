@@ -1,5 +1,5 @@
-use serde::Serialize;
 use crate::broker::{SessionInfo, SubscriptionInfo};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct BrokerStatus {
@@ -14,7 +14,11 @@ pub struct BrokerStatus {
 }
 
 #[derive(Debug, Serialize)]
-pub struct ConnectionsResponse { pub connections: Vec<SessionInfo> }
+pub struct ConnectionsResponse {
+    pub connections: Vec<SessionInfo>,
+}
 
 #[derive(Debug, Serialize)]
-pub struct SubscriptionsResponse { pub subscriptions: Vec<SubscriptionInfo> }
+pub struct SubscriptionsResponse {
+    pub subscriptions: Vec<SubscriptionInfo>,
+}

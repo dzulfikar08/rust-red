@@ -86,14 +86,7 @@ pub async fn update_dashboard(
 }
 
 /// DELETE /dashboard/:id - delete a dashboard
-pub async fn delete_dashboard(
-    State(store): State<DashboardStore>,
-    Path(id): Path<String>,
-) -> StatusCode {
+pub async fn delete_dashboard(State(store): State<DashboardStore>, Path(id): Path<String>) -> StatusCode {
     let mut map = store.write().await;
-    if map.remove(&id).is_some() {
-        StatusCode::NO_CONTENT
-    } else {
-        StatusCode::NOT_FOUND
-    }
+    if map.remove(&id).is_some() { StatusCode::NO_CONTENT } else { StatusCode::NOT_FOUND }
 }

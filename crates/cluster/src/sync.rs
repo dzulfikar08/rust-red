@@ -55,10 +55,7 @@ pub struct SyncManager {
 }
 
 impl SyncManager {
-    pub fn new(
-        members: Arc<DashMap<String, ClusterMember>>,
-        local_id: String,
-    ) -> Self {
+    pub fn new(members: Arc<DashMap<String, ClusterMember>>, local_id: String) -> Self {
         Self {
             members,
             context: Arc::new(RwLock::new(HashMap::new())),
@@ -150,12 +147,8 @@ impl SyncManager {
     /// Session affinity: compute which node should handle a given
     /// session key. Uses consistent hashing over alive member ids.
     pub fn session_affinity(&self, session_key: &str) -> Option<String> {
-        let mut candidates: Vec<String> = self
-            .members
-            .iter()
-            .filter(|m| m.is_alive())
-            .map(|m| m.node_id.clone())
-            .collect();
+        let mut candidates: Vec<String> =
+            self.members.iter().filter(|m| m.is_alive()).map(|m| m.node_id.clone()).collect();
 
         if candidates.is_empty() {
             return None;

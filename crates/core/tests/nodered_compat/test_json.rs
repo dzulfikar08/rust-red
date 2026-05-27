@@ -12,19 +12,10 @@ use rust_red_core::runtime::model::Variant;
 /// JSON: parse a JSON string into an object (auto mode).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_parse_string_to_object() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": "{\"name\":\"test\",\"value\":42}"}),
-            1,
-        )
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "{\"name\":\"test\",\"value\":42}"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -36,19 +27,10 @@ async fn json_parse_string_to_object() {
 /// JSON: parse a JSON string (explicit obj mode).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_parse_explicit() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "obj", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "obj", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"payload": "{\"a\":1,\"b\":\"two\"}"}),
-            1,
-        )
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "{\"a\":1,\"b\":\"two\"}"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -60,22 +42,16 @@ async fn json_parse_explicit() {
 /// JSON: stringify an object to a JSON string (auto mode).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_stringify_object() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": {"name": "test", "count": 5}}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {"name": "test", "count": 5}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
     assert!(payload.is_string(), "Payload should be a JSON string");
     let json_str = payload.as_str().unwrap();
-    let parsed: serde_json::Value = serde_json::from_str(json_str)
-        .expect("Result should be valid JSON");
+    let parsed: serde_json::Value = serde_json::from_str(json_str).expect("Result should be valid JSON");
     assert_eq!(parsed["name"], "test");
     assert_eq!(parsed["count"], 5);
 }
@@ -83,15 +59,10 @@ async fn json_stringify_object() {
 /// JSON: stringify an object (explicit str mode).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_stringify_explicit() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "str", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "str", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": {"key": "value"}}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": {"key": "value"}}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -101,15 +72,10 @@ async fn json_stringify_explicit() {
 /// JSON: parse a JSON array.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_parse_array() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "[1,2,3]"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "[1,2,3]"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -124,15 +90,10 @@ async fn json_parse_array() {
 /// JSON: stringify a boolean (auto mode should stringify).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_stringify_boolean() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": true}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": true}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -143,15 +104,10 @@ async fn json_stringify_boolean() {
 /// JSON: stringify a number (auto mode should stringify).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_stringify_number() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": 42}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": 42}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let payload = msgs[0].get("payload").expect("Missing payload");
@@ -163,15 +119,10 @@ async fn json_stringify_number() {
 /// (string that is NOT valid JSON should pass through).
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn json_auto_invalid_string_passthrough() {
-    let flow = FlowBuilder::new()
-        .json_node("1", "", json!([["99"]]))
-        .test_sink("99")
-        .to_json();
+    let flow = FlowBuilder::new().json_node("1", "", json!([["99"]])).test_sink("99").to_json();
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "not-json"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "not-json"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     assert!(msgs[0].get("payload").is_some());
@@ -189,13 +140,7 @@ async fn json_custom_property() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect(
-            "1",
-            json!({"data": "{\"parsed\": true}"}),
-            1,
-        )
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"data": "{\"parsed\": true}"}), 1).await;
 
     assert_eq!(msgs.len(), 1);
     let data = msgs[0].get("data").expect("Missing data property");

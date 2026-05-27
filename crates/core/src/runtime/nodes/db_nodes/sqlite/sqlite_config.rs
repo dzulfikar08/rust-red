@@ -52,9 +52,7 @@ impl SqliteConfigNode {
             name: config.name.clone(),
             type_str: "sqlite-config",
             ordering: config.ordering,
-            context: engine
-                .get_context_manager()
-                .new_context(engine.context(), config.id.to_string()),
+            context: engine.get_context_manager().new_context(engine.context(), config.id.to_string()),
             disabled: config.disabled,
         };
 
@@ -63,9 +61,7 @@ impl SqliteConfigNode {
                 .map_err(|e| anyhow::anyhow!("Failed to open in-memory SQLite: {e}"))?
         } else {
             rusqlite::Connection::open(&sqlite_config.path)
-                .map_err(|e| {
-                    anyhow::anyhow!("Failed to open SQLite at '{}': {e}", sqlite_config.path)
-                })?
+                .map_err(|e| anyhow::anyhow!("Failed to open SQLite at '{}': {e}", sqlite_config.path))?
         };
 
         // Enable WAL mode if configured
@@ -75,52 +71,31 @@ impl SqliteConfigNode {
         }
 
         // Set busy timeout
-        conn.execute_batch(&format!(
-            "PRAGMA busy_timeout={};",
-            sqlite_config.busy_timeout_ms
-        ))
-        .map_err(|e| anyhow::anyhow!("Failed to set busy timeout: {e}"))?;
+        conn.execute_batch(&format!("PRAGMA busy_timeout={};", sqlite_config.busy_timeout_ms))
+            .map_err(|e| anyhow::anyhow!("Failed to set busy timeout: {e}"))?;
 
         log::info!(
             "[sqlite-config:{}] Opened SQLite database: {}",
             state.name,
-            if sqlite_config.path == ":memory:" {
-                ":memory:".to_string()
-            } else {
-                sqlite_config.path.clone()
-            }
+            if sqlite_config.path == ":memory:" { ":memory:".to_string() } else { sqlite_config.path.clone() }
         );
 
-        Ok(Box::new(SqliteConfigNode {
-            base: state,
-            config: sqlite_config,
-            connection: Arc::new(Mutex::new(conn)),
-        }))
+        Ok(Box::new(SqliteConfigNode { base: state, config: sqlite_config, connection: Arc::new(Mutex::new(conn)) }))
     }
 
     /// Execute a non-query statement (INSERT, UPDATE, DELETE, etc.) and return rows affected.
     /// Runs synchronously -- caller should wrap in `spawn_blocking` if needed from async context.
     pub fn execute_sync(&self, sql: &str, params: &[&dyn ToSql]) -> crate::Result<usize> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
-        let affected = conn
-            .execute(sql, params)
-            .map_err(|e| anyhow::anyhow!("SQLite execute error: {e}"))?;
+        let conn = self.connection.lock().map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
+        let affected = conn.execute(sql, params).map_err(|e| anyhow::anyhow!("SQLite execute error: {e}"))?;
         Ok(affected)
     }
 
     /// Execute a SELECT query and return rows as Vec<Variant>.
     /// Runs synchronously -- caller should wrap in `spawn_blocking` if needed from async context.
     pub fn query_sync(&self, sql: &str, params: &[&dyn ToSql]) -> crate::Result<Vec<Variant>> {
-        let conn = self
-            .connection
-            .lock()
-            .map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
-        let mut stmt = conn
-            .prepare(sql)
-            .map_err(|e| anyhow::anyhow!("SQLite prepare error: {e}"))?;
+        let conn = self.connection.lock().map_err(|e| anyhow::anyhow!("Connection lock poisoned: {e}"))?;
+        let mut stmt = conn.prepare(sql).map_err(|e| anyhow::anyhow!("SQLite prepare error: {e}"))?;
         let column_names: Vec<String> = stmt.column_names().iter().map(|s| s.to_string()).collect();
         let column_count = column_names.len();
 

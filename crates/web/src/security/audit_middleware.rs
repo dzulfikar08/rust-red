@@ -34,30 +34,22 @@ fn classify_request(req: &Request<Body>) -> (AuditEventType, serde_json::Value) 
     let path = req.uri().path().to_string();
 
     match path.as_str() {
-        p if p == "/flows" && method == "POST" => (
-            AuditEventType::FlowDeploy,
-            serde_json::json!({"method": method.as_str(), "path": path}),
-        ),
-        p if p.starts_with("/flow/") && method == "DELETE" => (
-            AuditEventType::FlowDelete,
-            serde_json::json!({"method": method.as_str(), "path": path}),
-        ),
-        p if p == "/nodes" && method == "POST" => (
-            AuditEventType::NodeCreate,
-            serde_json::json!({"method": method.as_str(), "path": path}),
-        ),
-        p if p.starts_with("/nodes/") && method == "DELETE" => (
-            AuditEventType::NodeDelete,
-            serde_json::json!({"method": method.as_str(), "path": path}),
-        ),
-        p if p.starts_with("/nodes/") && method == "PUT" => (
-            AuditEventType::PluginLoad,
-            serde_json::json!({"method": method.as_str(), "path": path}),
-        ),
-        _ => (
-            AuditEventType::ConfigChange,
-            serde_json::json!({"method": method.as_str(), "path": path}),
-        ),
+        p if p == "/flows" && method == "POST" => {
+            (AuditEventType::FlowDeploy, serde_json::json!({"method": method.as_str(), "path": path}))
+        }
+        p if p.starts_with("/flow/") && method == "DELETE" => {
+            (AuditEventType::FlowDelete, serde_json::json!({"method": method.as_str(), "path": path}))
+        }
+        p if p == "/nodes" && method == "POST" => {
+            (AuditEventType::NodeCreate, serde_json::json!({"method": method.as_str(), "path": path}))
+        }
+        p if p.starts_with("/nodes/") && method == "DELETE" => {
+            (AuditEventType::NodeDelete, serde_json::json!({"method": method.as_str(), "path": path}))
+        }
+        p if p.starts_with("/nodes/") && method == "PUT" => {
+            (AuditEventType::PluginLoad, serde_json::json!({"method": method.as_str(), "path": path}))
+        }
+        _ => (AuditEventType::ConfigChange, serde_json::json!({"method": method.as_str(), "path": path})),
     }
 }
 
@@ -76,10 +68,7 @@ impl<S> tower::Layer<S> for AuditLogLayer {
     type Service = AuditLogMiddleware<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        AuditLogMiddleware {
-            inner,
-            logger: self.logger.clone(),
-        }
+        AuditLogMiddleware { inner, logger: self.logger.clone() }
     }
 }
 
@@ -97,14 +86,9 @@ where
 {
     type Response = Response<Body>;
     type Error = S::Error;
-    type Future = std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
-    >;
+    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(
-        &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
     }
 
@@ -127,16 +111,12 @@ where
             let success = match &result {
                 Ok(response) => {
                     let status = response.status();
-                    !status.is_server_error()
-                        && status != StatusCode::UNAUTHORIZED
-                        && status != StatusCode::FORBIDDEN
+                    !status.is_server_error() && status != StatusCode::UNAUTHORIZED && status != StatusCode::FORBIDDEN
                 }
                 Err(_) => false,
             };
 
-            let event = rust_red_core::runtime::audit::AuditEvent::new(event_type)
-                .details(details)
-                .success(success);
+            let event = rust_red_core::runtime::audit::AuditEvent::new(event_type).details(details).success(success);
 
             let event = match user {
                 Some(u) => event.user(u),

@@ -75,11 +75,7 @@ impl<'js> NodeClass {
         // Create a child token linked to the function node's stop_token so that
         // node.send() tasks are cancelled when the node stops.
         let func_node = self.node.upgrade().ok_or(rquickjs::Error::UnrelatedRuntime)?;
-        let cancel = func_node
-            .stop_token
-            .get()
-            .map(|t| t.child_token())
-            .unwrap_or_else(CancellationToken::new);
+        let cancel = func_node.stop_token.get().map(|t| t.child_token()).unwrap_or_else(CancellationToken::new);
 
         match msgs.type_of() {
             rquickjs::Type::Array => {

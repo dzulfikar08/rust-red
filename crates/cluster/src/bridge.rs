@@ -14,17 +14,13 @@ impl ClusterPartitionerBridge {
     }
 }
 
-impl rust_red_core::runtime::cluster_aware::ClusterFlowPartitioner
-    for ClusterPartitionerBridge
-{
+impl rust_red_core::runtime::cluster_aware::ClusterFlowPartitioner for ClusterPartitionerBridge {
     fn owns_flow(&self, flow_id: &str) -> bool {
         // PartitionManager::owns_flow is async, so we use tokio::task::block_in_place
         // since this may be called from an async context within the engine.
         // The PartitionManager uses internal async locking but the operation is fast.
         tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.partition_manager.owns_flow(flow_id).await
-            })
+            tokio::runtime::Handle::current().block_on(async { self.partition_manager.owns_flow(flow_id).await })
         })
     }
 

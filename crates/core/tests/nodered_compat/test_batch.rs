@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_has, TestHarness};
+use super::harness::{TestHarness, assert_msg_has};
 
 /// Batch: batch messages by count (group of N messages).
 // Mirrors: Node-RED 19-batch_spec.js "should batch messages by count"
@@ -97,9 +97,7 @@ async fn batch_reset_clears_pending() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"reset": true}), 1, Duration::from_millis(500))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"reset": true}), 1, Duration::from_millis(500)).await;
 
     assert!(msgs.is_empty(), "Reset should produce no output");
 }
@@ -154,10 +152,7 @@ async fn batch_count_one() {
     let msgs = harness
         .run_with_inject(
             2,
-            vec![
-                ("1".to_string(), json!({"payload": "first"})),
-                ("1".to_string(), json!({"payload": "second"})),
-            ],
+            vec![("1".to_string(), json!({"payload": "first"})), ("1".to_string(), json!({"payload": "second"}))],
         )
         .await;
 

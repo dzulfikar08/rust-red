@@ -156,14 +156,7 @@ async fn opcua_read_node_value() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "10",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("10", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -207,14 +200,7 @@ async fn opcua_read_browse_action() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "11",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("11", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -257,14 +243,7 @@ async fn opcua_read_description_attribute() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let _msgs = harness
-        .inject_and_collect_timeout(
-            "12",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let _msgs = harness.inject_and_collect_timeout("12", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -299,14 +278,7 @@ async fn opcua_write_node_value() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "20",
-            json!({"payload": 42.5}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("20", json!({"payload": 42.5}), 1, Duration::from_secs(10)).await;
 
     if !msgs.is_empty() {
         assert!(msgs[0].contains("payload"));
@@ -346,14 +318,8 @@ async fn opcua_write_read_roundtrip() {
     ]);
 
     let write_harness = TestHarness::from_flow_json(write_flow);
-    let _write_msgs = write_harness
-        .inject_and_collect_timeout(
-            "30",
-            json!({"payload": 99.9}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let _write_msgs =
+        write_harness.inject_and_collect_timeout("30", json!({"payload": 99.9}), 1, Duration::from_secs(10)).await;
 
     // Step 2: Read back
     let read_flow = json!([
@@ -377,14 +343,8 @@ async fn opcua_write_read_roundtrip() {
     ]);
 
     let read_harness = TestHarness::from_flow_json(read_flow);
-    let _read_msgs = read_harness
-        .inject_and_collect_timeout(
-            "31",
-            json!({"payload": true}),
-            1,
-            Duration::from_secs(10),
-        )
-        .await;
+    let _read_msgs =
+        read_harness.inject_and_collect_timeout("31", json!({"payload": true}), 1, Duration::from_secs(10)).await;
 }
 
 // ---------------------------------------------------------------------------

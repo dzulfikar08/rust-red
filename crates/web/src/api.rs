@@ -1,10 +1,15 @@
 use axum::{
     Router,
-    routing::{get, post, delete, put},
+    routing::{delete, get, post, put},
 };
 use http::header::{AUTHORIZATION, CONTENT_TYPE};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
+use crate::auth::UserStore;
+use crate::auth::handlers::*;
+use crate::auth::jwt::JwtConfig;
+use crate::auth::middleware::{AuthState, auth_middleware};
+use crate::handlers::dashboard::{self, DashboardStore};
 use crate::handlers::library::*;
 use crate::handlers::web_state::WebState;
 use crate::handlers::*;
@@ -12,11 +17,6 @@ use crate::health::*;
 use crate::security::AuditLogLayer;
 use crate::security::SecurityHeadersLayer;
 use crate::security::rate_limit::RateLimitLayer;
-use crate::auth::middleware::{AuthState, auth_middleware};
-use crate::auth::handlers::*;
-use crate::auth::UserStore;
-use crate::auth::jwt::JwtConfig;
-use crate::handlers::dashboard::{self, DashboardStore};
 use std::sync::Arc;
 
 /// `GET /api/frontend/plugins` - list all registered frontend plugins.
@@ -35,10 +35,7 @@ use crate::handlers::ai as ai_handlers;
 /// Axum middleware that creates an OpenTelemetry span for each HTTP request.
 /// When the `otel` feature is not enabled this compiles to a no-op pass-through.
 #[cfg(feature = "otel")]
-async fn otel_http_trace(
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
+async fn otel_http_trace(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
     use opentelemetry::trace::{Span, SpanKind, Status, Tracer};
 
     let method = req.method().clone();
@@ -68,10 +65,7 @@ async fn otel_http_trace(
 }
 
 #[cfg(not(feature = "otel"))]
-async fn otel_http_trace(
-    req: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
+async fn otel_http_trace(req: axum::extract::Request, next: axum::middleware::Next) -> axum::response::Response {
     next.run(req).await
 }
 
@@ -154,7 +148,10 @@ fn create_debug_routes() -> Router {
 fn create_dashboard_routes(store: DashboardStore) -> Router {
     Router::new()
         .route("/dashboard", get(dashboard::list_dashboards).post(dashboard::create_dashboard))
-        .route("/dashboard/{id}", get(dashboard::get_dashboard).put(dashboard::update_dashboard).delete(dashboard::delete_dashboard))
+        .route(
+            "/dashboard/{id}",
+            get(dashboard::get_dashboard).put(dashboard::update_dashboard).delete(dashboard::delete_dashboard),
+        )
         .with_state(store)
 }
 
@@ -197,20 +194,24 @@ fn build_cors_layer(cors_origins: &[String]) -> Option<CorsLayer> {
         Some(
             CorsLayer::new()
                 .allow_origin(AllowOrigin::any())
-                .allow_methods([http::Method::GET, http::Method::POST, http::Method::PUT, http::Method::DELETE, http::Method::OPTIONS])
+                .allow_methods([
+                    http::Method::GET,
+                    http::Method::POST,
+                    http::Method::PUT,
+                    http::Method::DELETE,
+                    http::Method::OPTIONS,
+                ])
                 .allow_headers([CONTENT_TYPE, AUTHORIZATION]),
         )
     } else {
         // Allow specific origins
         let origins: Vec<http::HeaderValue> = cors_origins
             .iter()
-            .filter_map(|o| {
-                match o.parse() {
-                    Ok(v) => Some(v),
-                    Err(e) => {
-                        log::warn!("CORS: ignoring invalid origin '{o}': {e}");
-                        None
-                    }
+            .filter_map(|o| match o.parse() {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    log::warn!("CORS: ignoring invalid origin '{o}': {e}");
+                    None
                 }
             })
             .collect();
@@ -223,7 +224,13 @@ fn build_cors_layer(cors_origins: &[String]) -> Option<CorsLayer> {
             Some(
                 CorsLayer::new()
                     .allow_origin(AllowOrigin::list(origins))
-                    .allow_methods([http::Method::GET, http::Method::POST, http::Method::PUT, http::Method::DELETE, http::Method::OPTIONS])
+                    .allow_methods([
+                        http::Method::GET,
+                        http::Method::POST,
+                        http::Method::PUT,
+                        http::Method::DELETE,
+                        http::Method::OPTIONS,
+                    ])
                     .allow_headers([CONTENT_TYPE, AUTHORIZATION]),
             )
         }
@@ -255,11 +262,7 @@ pub fn create_all_routes(web_state: &WebState) -> Router {
     let auth_config = &web_state.auth_config;
 
     // Build auth state (shared across all handlers)
-    let user_store = if auth_config.enabled {
-        UserStore::with_default_admin()
-    } else {
-        UserStore::new()
-    };
+    let user_store = if auth_config.enabled { UserStore::with_default_admin() } else { UserStore::new() };
 
     let jwt_config = JwtConfig {
         secret: auth_config.token_secret.clone(),
@@ -267,11 +270,7 @@ pub fn create_all_routes(web_state: &WebState) -> Router {
         refresh_ttl_secs: auth_config.refresh_token_ttl_secs,
     };
 
-    let auth_state = AuthState {
-        user_store,
-        jwt_config,
-        auth_enabled: auth_config.enabled,
-    };
+    let auth_state = AuthState { user_store, jwt_config, auth_enabled: auth_config.enabled };
 
     if auth_config.enabled {
         log::info!("Authentication enabled (RBAC active)");
@@ -300,9 +299,7 @@ pub fn create_all_routes(web_state: &WebState) -> Router {
     {
         let cm = web_state.cluster_manager.read().unwrap().clone();
         if let Some(cluster_mgr) = cm {
-            let cluster_state = rust_red_cluster::api::ClusterApiState {
-                manager: cluster_mgr,
-            };
+            let cluster_state = rust_red_cluster::api::ClusterApiState { manager: cluster_mgr };
             router = router.nest("/cluster", rust_red_cluster::api::cluster_router(cluster_state));
         }
     }

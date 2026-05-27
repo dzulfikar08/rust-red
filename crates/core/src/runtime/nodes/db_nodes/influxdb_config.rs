@@ -45,8 +45,7 @@ impl InfluxDbConfigNode {
         let client = reqwest::Client::builder()
             .default_headers({
                 let mut headers = reqwest::header::HeaderMap::new();
-                if let Ok(auth_val) =
-                    reqwest::header::HeaderValue::from_str(&format!("Token {}", influx_config.token))
+                if let Ok(auth_val) = reqwest::header::HeaderValue::from_str(&format!("Token {}", influx_config.token))
                 {
                     headers.insert(reqwest::header::AUTHORIZATION, auth_val);
                 }
@@ -60,16 +59,10 @@ impl InfluxDbConfigNode {
             name: config.name.clone(),
             type_str: "influxdb-config",
             ordering: config.ordering,
-            context: engine
-                .get_context_manager()
-                .new_context(engine.context(), config.id.to_string()),
+            context: engine.get_context_manager().new_context(engine.context(), config.id.to_string()),
             disabled: config.disabled,
         };
-        Ok(Box::new(InfluxDbConfigNode {
-            base: state,
-            config: influx_config,
-            client,
-        }))
+        Ok(Box::new(InfluxDbConfigNode { base: state, config: influx_config, client }))
     }
 
     #[allow(dead_code)]
@@ -90,11 +83,7 @@ impl InfluxDbConfigNode {
     /// Write line protocol data to InfluxDB v2.
     ///
     /// `precision` should be one of "ns", "us", "ms", "s". Defaults to "ns" if empty.
-    pub async fn write_line_protocol(
-        &self,
-        line_protocol: &str,
-        precision: &str,
-    ) -> crate::Result<()> {
+    pub async fn write_line_protocol(&self, line_protocol: &str, precision: &str) -> crate::Result<()> {
         let prec = if precision.is_empty() { "ns" } else { precision };
         let url = format!(
             "{}/api/v2/write?org={}&bucket={}&precision={}",
@@ -114,25 +103,12 @@ impl InfluxDbConfigNode {
 
         let status = resp.status();
         if status.is_success() {
-            log::debug!(
-                "[influxdb-config:{}] Write succeeded (status={})",
-                self.name(),
-                status
-            );
+            log::debug!("[influxdb-config:{}] Write succeeded (status={})", self.name(), status);
             Ok(())
         } else {
             let body = resp.text().await.unwrap_or_else(|_| "<no body>".to_string());
-            log::warn!(
-                "[influxdb-config:{}] Write failed (status={}): {}",
-                self.name(),
-                status,
-                body
-            );
-            Err(anyhow::anyhow!(
-                "InfluxDB write failed (status={}): {}",
-                status,
-                body
-            ))
+            log::warn!("[influxdb-config:{}] Write failed (status={}): {}", self.name(), status, body);
+            Err(anyhow::anyhow!("InfluxDB write failed (status={}): {}", status, body))
         }
     }
 
@@ -160,24 +136,11 @@ impl InfluxDbConfigNode {
         let body = resp.text().await.unwrap_or_else(|_| "<no body>".to_string());
 
         if status.is_success() {
-            log::debug!(
-                "[influxdb-config:{}] Query succeeded (status={})",
-                self.name(),
-                status
-            );
+            log::debug!("[influxdb-config:{}] Query succeeded (status={})", self.name(), status);
             Ok(body)
         } else {
-            log::warn!(
-                "[influxdb-config:{}] Query failed (status={}): {}",
-                self.name(),
-                status,
-                body
-            );
-            Err(anyhow::anyhow!(
-                "InfluxDB query failed (status={}): {}",
-                status,
-                body
-            ))
+            log::warn!("[influxdb-config:{}] Query failed (status={}): {}", self.name(), status, body);
+            Err(anyhow::anyhow!("InfluxDB query failed (status={}): {}", status, body))
         }
     }
 }

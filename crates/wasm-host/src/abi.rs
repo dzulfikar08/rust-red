@@ -26,12 +26,7 @@ pub fn register_core_imports(linker: &mut Linker<WasmNodeState>) -> anyhow::Resu
 ///
 /// Log a message from the guest at the given level:
 /// 0 = error, 1 = warn, 2 = info, 3 = debug, 4 = trace.
-fn host_log(
-    mut caller: wasmtime::Caller<'_, WasmNodeState>,
-    level: u32,
-    msg_ptr: u32,
-    msg_len: u32,
-) {
+fn host_log(mut caller: wasmtime::Caller<'_, WasmNodeState>, level: u32, msg_ptr: u32, msg_len: u32) {
     let memory = match get_memory(&mut caller) {
         Some(m) => m,
         None => {
@@ -61,12 +56,7 @@ fn host_log(
 /// `host_send_msg(port: u32, msg_ptr: u32, msg_len: u32)`
 ///
 /// Queue a message for output on the given port.
-fn host_send_msg(
-    mut caller: wasmtime::Caller<'_, WasmNodeState>,
-    port: u32,
-    msg_ptr: u32,
-    msg_len: u32,
-) {
+fn host_send_msg(mut caller: wasmtime::Caller<'_, WasmNodeState>, port: u32, msg_ptr: u32, msg_len: u32) {
     let memory = match get_memory(&mut caller) {
         Some(m) => m,
         None => {
@@ -127,21 +117,14 @@ fn host_set_status(
         _ => None,
     };
 
-    caller.data_mut().status = Some(StatusObject {
-        fill: status_fill,
-        shape: status_shape,
-        text,
-    });
+    caller.data_mut().status = Some(StatusObject { fill: status_fill, shape: status_shape, text });
 }
 
 /// `host_alloc(size: u32) -> u32`
 ///
 /// Allocate `size` bytes in guest linear memory.
 /// This is a fallback allocator — the guest should export its own `rust_red_alloc`.
-fn host_alloc_fn(
-    mut caller: wasmtime::Caller<'_, WasmNodeState>,
-    size: u32,
-) -> u32 {
+fn host_alloc_fn(mut caller: wasmtime::Caller<'_, WasmNodeState>, size: u32) -> u32 {
     const WASM_PAGE_SIZE: usize = 65536;
 
     let memory = match get_memory(&mut caller) {
@@ -167,11 +150,7 @@ fn host_alloc_fn(
 }
 
 /// `host_report_error(msg_ptr: u32, msg_len: u32)`
-fn host_report_error(
-    mut caller: wasmtime::Caller<'_, WasmNodeState>,
-    msg_ptr: u32,
-    msg_len: u32,
-) {
+fn host_report_error(mut caller: wasmtime::Caller<'_, WasmNodeState>, msg_ptr: u32, msg_len: u32) {
     let memory = match get_memory(&mut caller) {
         Some(m) => m,
         None => return,

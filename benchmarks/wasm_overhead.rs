@@ -52,14 +52,8 @@ impl Default for BenchWasmValue {
 fn create_sample_message(payload_size: usize) -> BenchWasmMessage {
     let payload_str = "x".repeat(payload_size);
     let mut extra = std::collections::BTreeMap::new();
-    extra.insert(
-        "counter".to_string(),
-        BenchWasmValue::U64(42),
-    );
-    extra.insert(
-        "metadata".to_string(),
-        BenchWasmValue::String("benchmark-test".to_string()),
-    );
+    extra.insert("counter".to_string(), BenchWasmValue::U64(42));
+    extra.insert("metadata".to_string(), BenchWasmValue::String("benchmark-test".to_string()));
 
     BenchWasmMessage {
         msg_id: "0123456789abcdef".to_string(),
@@ -108,10 +102,7 @@ fn bench_serialization(label: &str, msg: &BenchWasmMessage, iterations: usize) -
         deser_stats.p50.as_nanos(),
         deser_stats.p99.as_nanos(),
     );
-    println!(
-        "  Round-trip:  mean={:.2}ns",
-        (ser_stats.mean + deser_stats.mean).as_nanos(),
-    );
+    println!("  Round-trip:  mean={:.2}ns", (ser_stats.mean + deser_stats.mean).as_nanos(),);
 
     SerializationResult {
         label: label.to_string(),
@@ -140,7 +131,8 @@ struct SerializationResult {
 fn bench_wasm_plugin_load() -> Option<Duration> {
     // This requires the wasm_plugins feature and a compiled echo plugin
     // Return None if not available
-    let echo_wasm_path = std::path::Path::new("plugins/examples/echo/target/wasm32-unknown-unknown/release/rust_red_plugin_echo.wasm");
+    let echo_wasm_path =
+        std::path::Path::new("plugins/examples/echo/target/wasm32-unknown-unknown/release/rust_red_plugin_echo.wasm");
     if !echo_wasm_path.exists() {
         println!("\nWASM echo plugin not found at {:?}", echo_wasm_path);
         println!("Build it with: cd plugins/examples/echo && cargo build --target wasm32-unknown-unknown --release");

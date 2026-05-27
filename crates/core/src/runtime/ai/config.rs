@@ -38,11 +38,7 @@ pub struct AiConfig {
 
 impl Default for AiConfig {
     fn default() -> Self {
-        Self {
-            enabled: false,
-            default_provider: default_provider(),
-            providers: AiProvidersConfig::default(),
-        }
+        Self { enabled: false, default_provider: default_provider(), providers: AiProvidersConfig::default() }
     }
 }
 
@@ -199,10 +195,7 @@ pub struct LocalWasmConfig {
 
 impl Default for LocalWasmConfig {
     fn default() -> Self {
-        Self {
-            enabled: false,
-            model_path: String::new(),
-        }
+        Self { enabled: false, model_path: String::new() }
     }
 }
 

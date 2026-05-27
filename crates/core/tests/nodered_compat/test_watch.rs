@@ -11,7 +11,7 @@ use std::time::Duration;
 use serde_json::json;
 use tempfile::TempDir;
 
-use super::harness::{assert_msg_has, TestHarness};
+use super::harness::{TestHarness, assert_msg_has};
 
 // ---------------------------------------------------------------------------
 // Helper: build a watch flow
@@ -71,9 +71,7 @@ async fn watch_file_change() {
 
     // Pre-create a file before setting up the watch
     let existing_file = tmp.path().join("existing.txt");
-    tokio::fs::write(&existing_file, "original")
-        .await
-        .expect("create initial file");
+    tokio::fs::write(&existing_file, "original").await.expect("create initial file");
 
     let flow = build_watch_flow(&watch_dir);
     let harness = TestHarness::from_flow_json(flow);
@@ -132,11 +130,7 @@ async fn watch_file_delete() {
     // was received and the file path is correct.
     let payload = delete_msg.get("payload").expect("missing payload");
     if let Some(path_str) = payload.as_str() {
-        assert!(
-            path_str.contains("to_delete.txt"),
-            "Payload should reference the deleted file, got: {}",
-            path_str
-        );
+        assert!(path_str.contains("to_delete.txt"), "Payload should reference the deleted file, got: {}", path_str);
     }
 }
 
@@ -167,11 +161,7 @@ async fn watch_message_contains_path() {
     // Payload should be the full file path
     let payload = msgs[0].get("payload").expect("missing payload");
     if let Some(path_str) = payload.as_str() {
-        assert!(
-            path_str.contains("path_test.txt"),
-            "Payload should contain the filename, got: {}",
-            path_str
-        );
+        assert!(path_str.contains("path_test.txt"), "Payload should contain the filename, got: {}", path_str);
     }
 
     // Additional properties should be set

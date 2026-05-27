@@ -1,16 +1,15 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
+    Json, Router,
     extract::State,
     routing::{get, post},
-    Router,
 };
 use serde::{Deserialize, Serialize};
 
+use crate::ClusterManager;
 use crate::partition::FlowAssignment;
 use crate::sync::{DeployAck, DeployRequest};
-use crate::ClusterManager;
 
 // ---------------------------------------------------------------------------
 // API response types
@@ -73,9 +72,7 @@ pub struct ClusterApiState {
 // Handlers
 // ---------------------------------------------------------------------------
 
-pub async fn get_cluster_status(
-    State(state): State<ClusterApiState>,
-) -> Json<ClusterStatusResponse> {
+pub async fn get_cluster_status(State(state): State<ClusterApiState>) -> Json<ClusterStatusResponse> {
     let members = state.manager.members();
     let now = chrono::Utc::now();
     let alive_count = members.iter().filter(|m| m.is_alive()).count();
@@ -107,9 +104,7 @@ pub async fn get_cluster_status(
     })
 }
 
-pub async fn get_cluster_nodes(
-    State(state): State<ClusterApiState>,
-) -> Json<ClusterNodesResponse> {
+pub async fn get_cluster_nodes(State(state): State<ClusterApiState>) -> Json<ClusterNodesResponse> {
     let members = state.manager.members();
     let now = chrono::Utc::now();
 
@@ -178,9 +173,7 @@ pub async fn post_cluster_deploy(
     })
 }
 
-pub async fn get_cluster_flows(
-    State(state): State<ClusterApiState>,
-) -> Json<FlowDistributionResponse> {
+pub async fn get_cluster_flows(State(state): State<ClusterApiState>) -> Json<FlowDistributionResponse> {
     let assignments = state.manager.partition_manager.get_assignments().await;
     Json(FlowDistributionResponse { assignments })
 }

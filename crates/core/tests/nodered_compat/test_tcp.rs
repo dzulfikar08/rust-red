@@ -55,24 +55,14 @@ async fn tcp_in_server_mode_receives_data() {
     // we inject a message directly into node "1" to verify the flow
     // wiring compiles and the node processes input correctly.
 
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "hello tcp"}),
-            1,
-            Duration::from_secs(2),
-        )
-        .await;
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "hello tcp"}), 1, Duration::from_secs(2)).await;
 
     // The TCP in node in server mode processes inbound socket data via its
     // own run() loop, not via injected messages.  When we inject a message
     // directly the node may or may not forward it.  The primary assertion
     // here is that the flow compiles and the engine starts without error.
-    assert!(
-        msgs.len() <= 1,
-        "Expected at most 1 message (node may not forward injected msgs), got {}",
-        msgs.len()
-    );
+    assert!(msgs.len() <= 1, "Expected at most 1 message (node may not forward injected msgs), got {}", msgs.len());
 }
 
 // ---------------------------------------------------------------------------

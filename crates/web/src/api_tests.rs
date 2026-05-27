@@ -2,12 +2,10 @@
 
 #[cfg(test)]
 mod tests {
+    use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
-    use axum::Router;
-    use rust_red_core::web::frontend_plugin::{
-        FrontendPlugin, FrontendPluginRegistry, PluginDescriptor,
-    };
+    use rust_red_core::web::frontend_plugin::{FrontendPlugin, FrontendPluginRegistry, PluginDescriptor};
     use std::path::PathBuf;
     use tower::ServiceExt;
 
@@ -160,16 +158,11 @@ mod tests {
         // Build a minimal router with the health check handler
         let app = Router::new().route("/health", axum::routing::get(health_check));
 
-        let response = app
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let response = app.oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap()).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), 1024)
-            .await
-            .unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 1024).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["status"], "healthy");
         assert_eq!(json["service"], "rust-red-web");
@@ -181,16 +174,11 @@ mod tests {
 
         let app = Router::new().route("/info", axum::routing::get(api_info));
 
-        let response = app
-            .oneshot(Request::builder().uri("/info").body(Body::empty()).unwrap())
-            .await
-            .unwrap();
+        let response = app.oneshot(Request::builder().uri("/info").body(Body::empty()).unwrap()).await.unwrap();
 
         assert_eq!(response.status(), StatusCode::OK);
 
-        let body = axum::body::to_bytes(response.into_body(), 1024)
-            .await
-            .unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 1024).await.unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["name"], "Rust-Red Web API");
     }

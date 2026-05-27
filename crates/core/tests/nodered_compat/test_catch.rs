@@ -6,7 +6,7 @@
 use serde_json::json;
 
 use super::flow_builder::FlowBuilder;
-use super::harness::{assert_msg_has, TestHarness};
+use super::harness::{TestHarness, assert_msg_has};
 
 /// Catch node captures errors from function nodes.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -26,9 +26,7 @@ async fn catch_captures_error() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 1).await;
 
     assert!(!msgs.is_empty(), "Catch node should have captured the error");
     let error_msg = &msgs[0];
@@ -53,9 +51,7 @@ async fn catch_scoped_capture() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 1).await;
 
     assert!(!msgs.is_empty(), "Catch node should have captured the scoped error");
     assert_msg_has(&msgs[0], "error");
@@ -78,9 +74,7 @@ async fn catch_error_contains_source_info() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 1).await;
 
     assert!(!msgs.is_empty());
     let error_msg = &msgs[0];
@@ -108,14 +102,9 @@ async fn complete_node_fires_on_completion() {
 
     let harness = TestHarness::from_flow_json(flow);
     // We expect 2 messages: one from the function output, one from the complete node
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "input"}), 2)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "input"}), 2).await;
 
-    assert!(
-        msgs.len() >= 1,
-        "Should receive at least one message from complete or function"
-    );
+    assert!(msgs.len() >= 1, "Should receive at least one message from complete or function");
 }
 
 /// Catch node: uncaught errors are captured by uncaught=true catch node.
@@ -135,9 +124,7 @@ async fn catch_uncaught_error() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 1).await;
 
     assert!(!msgs.is_empty(), "Uncaught catch node should capture the error");
 }
@@ -168,9 +155,7 @@ async fn catch_scope_filters_by_node_id() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 1).await;
 
     assert!(!msgs.is_empty(), "Catch node should capture error from scoped node");
     assert_msg_has(&msgs[0], "error");
@@ -196,9 +181,7 @@ async fn catch_multiple_catch_nodes() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 2)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 2).await;
 
     assert!(msgs.len() >= 2, "Both catch nodes should receive the error, got {}", msgs.len());
     for msg in &msgs {
@@ -223,9 +206,7 @@ async fn catch_error_message_detailed_content() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 1).await;
 
     assert!(!msgs.is_empty());
     let error_msg = &msgs[0];
@@ -236,11 +217,7 @@ async fn catch_error_message_detailed_content() {
     assert!(error_obj.contains_key("message"), "Error should contain 'message'");
     let message = error_obj.get("message").expect("Missing message");
     let message_str = message.as_str().expect("Message should be a string");
-    assert!(
-        !message_str.is_empty(),
-        "Error message should not be empty, got: {}",
-        message_str
-    );
+    assert!(!message_str.is_empty(), "Error message should not be empty, got: {}", message_str);
 
     assert!(error_obj.contains_key("source"), "Error should contain 'source'");
     let source = error_obj.get("source").expect("Missing source");
@@ -275,9 +252,7 @@ async fn catch_uncaught_as_fallback() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect("1", json!({"payload": "trigger"}), 1)
-        .await;
+    let msgs = harness.inject_and_collect("1", json!({"payload": "trigger"}), 1).await;
 
     assert!(!msgs.is_empty(), "Uncaught catch node should capture error from node 1");
     assert_msg_has(&msgs[0], "error");

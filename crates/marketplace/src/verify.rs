@@ -42,8 +42,8 @@ pub fn verify_wasm_plugin(wasm_bytes: &[u8]) -> Result<VerificationReport, Marke
     // 1. Compile the module
     let mut wasm_config = wasmtime::Config::new();
     wasm_config.epoch_interruption(true);
-    let engine = Engine::new(&wasm_config)
-        .map_err(|e| MarketplaceError::VerificationFailed(format!("engine creation: {e}")))?;
+    let engine =
+        Engine::new(&wasm_config).map_err(|e| MarketplaceError::VerificationFailed(format!("engine creation: {e}")))?;
 
     let module = Module::from_binary(&engine, wasm_bytes)
         .map_err(|e| MarketplaceError::VerificationFailed(format!("invalid WASM: {e}")))?;
@@ -52,9 +52,7 @@ pub fn verify_wasm_plugin(wasm_bytes: &[u8]) -> Result<VerificationReport, Marke
     let export_names: Vec<&str> = module.exports().map(|e| e.name()).collect();
     for req in REQUIRED_EXPORTS {
         if !export_names.iter().any(|e| *e == *req) {
-            return Err(MarketplaceError::VerificationFailed(format!(
-                "missing required export: {req}"
-            )));
+            return Err(MarketplaceError::VerificationFailed(format!("missing required export: {req}")));
         }
     }
 
@@ -64,11 +62,7 @@ pub fn verify_wasm_plugin(wasm_bytes: &[u8]) -> Result<VerificationReport, Marke
     // 3. Sandboxed execution test
     let sandbox_passed = run_sandbox_test(&engine, &module);
 
-    Ok(VerificationReport {
-        export_count,
-        import_count,
-        sandbox_passed,
-    })
+    Ok(VerificationReport { export_count, import_count, sandbox_passed })
 }
 
 /// Attempt to instantiate the module and call the lifecycle functions in order.
@@ -119,11 +113,7 @@ fn run_sandbox_test(engine: &Engine, module: &Module) -> bool {
 
 /// Register no-op stubs for all imports the module requires from the "env"
 /// module. This avoids unresolved-import errors during sandboxed instantiation.
-fn register_stub_imports(
-    engine: &Engine,
-    linker: &mut Linker<()>,
-    module: &Module,
-) -> Result<(), anyhow::Error> {
+fn register_stub_imports(engine: &Engine, linker: &mut Linker<()>, module: &Module) -> Result<(), anyhow::Error> {
     for import in module.imports() {
         if import.module() == "env" {
             let name = import.name();

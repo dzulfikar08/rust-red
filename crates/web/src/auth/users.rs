@@ -65,9 +65,9 @@ pub struct UserStore {
 
 #[derive(Debug)]
 struct UserStoreInner {
-    users: HashMap<String, User>,        // id -> User
+    users: HashMap<String, User>,            // id -> User
     username_index: HashMap<String, String>, // username -> user id
-    api_keys: HashMap<String, ApiKey>,   // prefix -> ApiKey
+    api_keys: HashMap<String, ApiKey>,       // prefix -> ApiKey
 }
 
 impl UserStore {
@@ -111,12 +111,7 @@ impl UserStore {
     // -- User management --------------------------------------------------
 
     /// Create a new user. Returns the user id on success.
-    pub async fn create_user(
-        &self,
-        username: &str,
-        password: &str,
-        role: Role,
-    ) -> Result<String, UserStoreError> {
+    pub async fn create_user(&self, username: &str, password: &str, role: Role) -> Result<String, UserStoreError> {
         let hash = hash_password(password)?;
 
         let mut guard = self.inner.write().await;
@@ -126,13 +121,7 @@ impl UserStore {
         }
 
         let id = Uuid::new_v4().to_string();
-        let user = User {
-            id: id.clone(),
-            username: username.to_string(),
-            password_hash: hash,
-            role,
-            active: true,
-        };
+        let user = User { id: id.clone(), username: username.to_string(), password_hash: hash, role, active: true };
         guard.username_index.insert(username.to_string(), id.clone());
         guard.users.insert(id.clone(), user);
 
@@ -141,22 +130,12 @@ impl UserStore {
 
     /// Look up a user by username and verify the password.
     /// Returns the user on success.
-    pub async fn authenticate(
-        &self,
-        username: &str,
-        password: &str,
-    ) -> Result<User, UserStoreError> {
+    pub async fn authenticate(&self, username: &str, password: &str) -> Result<User, UserStoreError> {
         let guard = self.inner.read().await;
 
-        let user_id = guard
-            .username_index
-            .get(username)
-            .ok_or(UserStoreError::InvalidCredentials)?;
+        let user_id = guard.username_index.get(username).ok_or(UserStoreError::InvalidCredentials)?;
 
-        let user = guard
-            .users
-            .get(user_id)
-            .ok_or(UserStoreError::InvalidCredentials)?;
+        let user = guard.users.get(user_id).ok_or(UserStoreError::InvalidCredentials)?;
 
         if !user.active {
             return Err(UserStoreError::AccountDisabled);
@@ -182,26 +161,16 @@ impl UserStore {
     /// Update a user's role.
     pub async fn set_role(&self, user_id: &str, role: Role) -> Result<(), UserStoreError> {
         let mut guard = self.inner.write().await;
-        let user = guard
-            .users
-            .get_mut(user_id)
-            .ok_or(UserStoreError::NotFound)?;
+        let user = guard.users.get_mut(user_id).ok_or(UserStoreError::NotFound)?;
         user.role = role;
         Ok(())
     }
 
     /// Update a user's password.
-    pub async fn set_password(
-        &self,
-        user_id: &str,
-        new_password: &str,
-    ) -> Result<(), UserStoreError> {
+    pub async fn set_password(&self, user_id: &str, new_password: &str) -> Result<(), UserStoreError> {
         let hash = hash_password(new_password)?;
         let mut guard = self.inner.write().await;
-        let user = guard
-            .users
-            .get_mut(user_id)
-            .ok_or(UserStoreError::NotFound)?;
+        let user = guard.users.get_mut(user_id).ok_or(UserStoreError::NotFound)?;
         user.password_hash = hash;
         Ok(())
     }
@@ -218,11 +187,7 @@ impl UserStore {
 
     /// Create a new API key for a user. Returns the raw key string
     /// (only shown once).
-    pub async fn create_api_key(
-        &self,
-        user_id: &str,
-        label: &str,
-    ) -> Result<String, UserStoreError> {
+    pub async fn create_api_key(&self, user_id: &str, label: &str) -> Result<String, UserStoreError> {
         // Verify user exists
         {
             let guard = self.inner.read().await;
@@ -251,10 +216,7 @@ impl UserStore {
     }
 
     /// Authenticate using an API key. Returns the user if the key is valid.
-    pub async fn authenticate_api_key(
-        &self,
-        raw_key: &str,
-    ) -> Result<User, UserStoreError> {
+    pub async fn authenticate_api_key(&self, raw_key: &str) -> Result<User, UserStoreError> {
         if raw_key.len() < 12 {
             return Err(UserStoreError::InvalidCredentials);
         }
@@ -264,10 +226,7 @@ impl UserStore {
 
         let guard = self.inner.read().await;
 
-        let api_key = guard
-            .api_keys
-            .get(prefix)
-            .ok_or(UserStoreError::InvalidCredentials)?;
+        let api_key = guard.api_keys.get(prefix).ok_or(UserStoreError::InvalidCredentials)?;
 
         if !api_key.active {
             return Err(UserStoreError::InvalidCredentials);
@@ -277,10 +236,7 @@ impl UserStore {
             return Err(UserStoreError::InvalidCredentials);
         }
 
-        let user = guard
-            .users
-            .get(&api_key.user_id)
-            .ok_or(UserStoreError::NotFound)?;
+        let user = guard.users.get(&api_key.user_id).ok_or(UserStoreError::NotFound)?;
 
         if !user.active {
             return Err(UserStoreError::AccountDisabled);
@@ -292,22 +248,13 @@ impl UserStore {
     /// List API keys for a user (prefixes and labels only).
     pub async fn list_api_keys(&self, user_id: &str) -> Vec<ApiKey> {
         let guard = self.inner.read().await;
-        guard
-            .api_keys
-            .values()
-            .filter(|k| k.user_id == user_id)
-            .cloned()
-            .collect()
+        guard.api_keys.values().filter(|k| k.user_id == user_id).cloned().collect()
     }
 
     /// Revoke an API key by prefix.
     pub async fn revoke_api_key(&self, prefix: &str) -> Result<(), UserStoreError> {
         let mut guard = self.inner.write().await;
-        guard
-            .api_keys
-            .remove(prefix)
-            .ok_or(UserStoreError::NotFound)
-            .map(|_| ())
+        guard.api_keys.remove(prefix).ok_or(UserStoreError::NotFound).map(|_| ())
     }
 }
 
@@ -344,9 +291,7 @@ fn hash_password(password: &str) -> Result<String, UserStoreError> {
 
 fn verify_password(password: &str, hash: &str) -> Result<(), UserStoreError> {
     let parsed = PasswordHash::new(hash).map_err(|e| UserStoreError::HashError(e.to_string()))?;
-    Argon2::default()
-        .verify_password(password.as_bytes(), &parsed)
-        .map_err(|_| UserStoreError::InvalidCredentials)
+    Argon2::default().verify_password(password.as_bytes(), &parsed).map_err(|_| UserStoreError::InvalidCredentials)
 }
 
 fn sha256_hex(data: &[u8]) -> String {

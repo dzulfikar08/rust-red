@@ -77,19 +77,10 @@ pub struct GossipEngine {
 impl GossipEngine {
     /// Create a new gossip engine from the cluster configuration.
     pub fn new(config: ClusterConfig, cancel: CancellationToken) -> Self {
-        let local_id = if config.node_id.is_empty() {
-            uuid::Uuid::new_v4().to_string()
-        } else {
-            config.node_id.clone()
-        };
+        let local_id =
+            if config.node_id.is_empty() { uuid::Uuid::new_v4().to_string() } else { config.node_id.clone() };
 
-        Self {
-            config,
-            local_id,
-            members: Arc::new(DashMap::new()),
-            listener: Arc::new(RwLock::new(None)),
-            cancel,
-        }
+        Self { config, local_id, members: Arc::new(DashMap::new()), listener: Arc::new(RwLock::new(None)), cancel }
     }
 
     /// Return the local node identifier.
@@ -451,9 +442,7 @@ impl GossipEngine {
                     if payload.incarnation > member.incarnation {
                         member.incarnation = payload.incarnation;
                     }
-                    if member.state == MemberState::Suspect
-                        && payload.state == MemberState::Alive
-                    {
+                    if member.state == MemberState::Suspect && payload.state == MemberState::Alive {
                         member.refute();
                     }
                     member.state = payload.state;
@@ -516,9 +505,7 @@ impl GossipEngine {
 
     /// Gracefully leave the cluster.
     pub async fn leave(&self) {
-        let leave_msg = GossipMessage::Leave(LeavePayload {
-            node_id: self.local_id.clone(),
-        });
+        let leave_msg = GossipMessage::Leave(LeavePayload { node_id: self.local_id.clone() });
         let data = match serde_json::to_vec(&leave_msg) {
             Ok(d) => d,
             Err(e) => {
@@ -578,34 +565,30 @@ async fn handle_connection(
     let msg: GossipMessage = serde_json::from_slice(&buf)?;
 
     match msg {
-        GossipMessage::Heartbeat(payload) => {
-            match members.get_mut(&payload.node_id) {
-                Some(mut member) => {
-                    if payload.incarnation >= member.incarnation {
-                        if payload.incarnation > member.incarnation {
-                            member.incarnation = payload.incarnation;
-                        }
-                        if member.state == MemberState::Suspect
-                            && payload.state == MemberState::Alive
-                        {
-                            member.refute();
-                        }
-                        member.state = payload.state;
-                        member.addr = payload.addr;
-                        member.record_heartbeat();
-                        member.metadata = payload.metadata;
+        GossipMessage::Heartbeat(payload) => match members.get_mut(&payload.node_id) {
+            Some(mut member) => {
+                if payload.incarnation >= member.incarnation {
+                    if payload.incarnation > member.incarnation {
+                        member.incarnation = payload.incarnation;
                     }
-                }
-                None => {
-                    log::info!("cluster: discovered new node {}", payload.node_id);
-                    let mut m = ClusterMember::new(payload.node_id.clone(), payload.addr);
-                    m.state = MemberState::Alive;
-                    m.incarnation = payload.incarnation;
-                    m.metadata = payload.metadata;
-                    members.insert(payload.node_id, m);
+                    if member.state == MemberState::Suspect && payload.state == MemberState::Alive {
+                        member.refute();
+                    }
+                    member.state = payload.state;
+                    member.addr = payload.addr;
+                    member.record_heartbeat();
+                    member.metadata = payload.metadata;
                 }
             }
-        }
+            None => {
+                log::info!("cluster: discovered new node {}", payload.node_id);
+                let mut m = ClusterMember::new(payload.node_id.clone(), payload.addr);
+                m.state = MemberState::Alive;
+                m.incarnation = payload.incarnation;
+                m.metadata = payload.metadata;
+                members.insert(payload.node_id, m);
+            }
+        },
         GossipMessage::FullSync(payload) => {
             for digest in payload.members {
                 match members.get_mut(&digest.node_id) {

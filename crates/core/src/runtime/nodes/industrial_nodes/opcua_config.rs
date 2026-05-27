@@ -86,19 +86,13 @@ impl OpcUaConfigNode {
             if let Some(ref cert) = opcua_config.cert_path {
                 let p = PathBuf::from(cert);
                 if !p.exists() {
-                    log::warn!(
-                        "[opcua-config] Certificate file not found: {}",
-                        cert
-                    );
+                    log::warn!("[opcua-config] Certificate file not found: {}", cert);
                 }
             }
             if let Some(ref key) = opcua_config.key_path {
                 let p = PathBuf::from(key);
                 if !p.exists() {
-                    log::warn!(
-                        "[opcua-config] Private key file not found: {}",
-                        key
-                    );
+                    log::warn!("[opcua-config] Private key file not found: {}", key);
                 }
             }
         }
@@ -111,11 +105,7 @@ impl OpcUaConfigNode {
             context: engine.get_context_manager().new_context(engine.context(), config.id.to_string()),
             disabled: config.disabled,
         };
-        Ok(Box::new(OpcUaConfigNode {
-            base: state,
-            config: opcua_config,
-            connection: Arc::new(RwLock::new(None)),
-        }))
+        Ok(Box::new(OpcUaConfigNode { base: state, config: opcua_config, connection: Arc::new(RwLock::new(None)) }))
     }
 
     pub async fn ensure_connected(&self) -> crate::Result<()> {

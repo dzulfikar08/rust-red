@@ -114,8 +114,8 @@ impl UdpOutNode {
         let target_ip = target_ip
             .ok_or_else(|| crate::RustRedError::InvalidOperation("No target IP address specified".to_string()))?;
 
-        let target_port = target_port
-            .ok_or_else(|| crate::RustRedError::InvalidOperation("No target port specified".to_string()))?;
+        let target_port =
+            target_port.ok_or_else(|| crate::RustRedError::InvalidOperation("No target port specified".to_string()))?;
 
         if target_port == 0 {
             return Err(crate::RustRedError::InvalidOperation("Invalid port number".to_string()).into());

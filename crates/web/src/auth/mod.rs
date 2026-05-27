@@ -23,6 +23,6 @@ pub mod users;
 
 pub use config::AuthConfig;
 pub use handlers::*;
-pub use middleware::{AuthenticatedUser, AuthState};
+pub use middleware::{AuthState, AuthenticatedUser};
 pub use roles::{Permission, Role};
 pub use users::UserStore;

@@ -47,14 +47,10 @@ impl<S: Send + Sync> FromRequestParts<S> for AuthenticatedUser {
     type Rejection = (StatusCode, String);
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts
-            .extensions
-            .get::<AuthenticatedUser>()
-            .cloned()
-            .ok_or((
-                StatusCode::UNAUTHORIZED,
-                serde_json::json!({"error":"unauthorized","message":"Not authenticated"}).to_string(),
-            ))
+        parts.extensions.get::<AuthenticatedUser>().cloned().ok_or((
+            StatusCode::UNAUTHORIZED,
+            serde_json::json!({"error":"unauthorized","message":"Not authenticated"}).to_string(),
+        ))
     }
 }
 
@@ -115,11 +111,8 @@ pub async fn auth_middleware(
 ) -> Response {
     // When auth is disabled, inject a synthetic admin user and continue.
     if !auth_state.auth_enabled {
-        let synthetic = AuthenticatedUser {
-            user_id: "__system".to_string(),
-            username: "anonymous".to_string(),
-            role: Role::Admin,
-        };
+        let synthetic =
+            AuthenticatedUser { user_id: "__system".to_string(), username: "anonymous".to_string(), role: Role::Admin };
         req.extensions_mut().insert(synthetic);
         return next.run(req).await;
     }
@@ -138,10 +131,7 @@ pub async fn auth_middleware(
         return next.run(req).await;
     }
 
-    let auth_header = req
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok());
+    let auth_header = req.headers().get(header::AUTHORIZATION).and_then(|v| v.to_str().ok());
 
     let Some(auth_value) = auth_header else {
         return unauthorized("Missing Authorization header");
@@ -155,11 +145,7 @@ pub async fn auth_middleware(
     if token.starts_with("rrk_") {
         match auth_state.user_store.authenticate_api_key(token).await {
             Ok(user) => {
-                let auth_user = AuthenticatedUser {
-                    user_id: user.id,
-                    username: user.username,
-                    role: user.role,
-                };
+                let auth_user = AuthenticatedUser { user_id: user.id, username: user.username, role: user.role };
                 req.extensions_mut().insert(auth_user);
                 return next.run(req).await;
             }
@@ -200,10 +186,8 @@ pub async fn auth_middleware(
 
 /// Check if a path should be publicly accessible without authentication.
 fn is_public_path(path: &str) -> bool {
-    matches!(
-        path,
-        "/auth/login" | "/auth/refresh" | "/auth/logout"
-    ) || path.starts_with("/api/health")
+    matches!(path, "/auth/login" | "/auth/refresh" | "/auth/logout")
+        || path.starts_with("/api/health")
         || path.starts_with("/api/info")
 }
 

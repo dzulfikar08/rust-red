@@ -13,8 +13,8 @@ use std::time::Duration;
 mod inner {
     use super::*;
     use once_cell::sync::OnceCell;
-    use opentelemetry::global;
     use opentelemetry::KeyValue;
+    use opentelemetry::global;
     use opentelemetry_otlp::WithExportConfig;
     use opentelemetry_sdk::metrics::SdkMeterProvider;
     use opentelemetry_sdk::resource::Resource;
@@ -30,9 +30,7 @@ mod inner {
     /// Call this once during application startup *before* any spans / metrics
     /// are created.  Returns `Ok(())` on success.
     pub fn init_telemetry(config: &super::TelemetryConfig) -> crate::Result<()> {
-        let resource = Resource::builder()
-            .with_service_name(config.service_name.clone())
-            .build();
+        let resource = Resource::builder().with_service_name(config.service_name.clone()).build();
 
         // -- Tracer (gRPC / OTLP on port 4317) --
         let span_exporter = opentelemetry_otlp::SpanExporter::builder()
@@ -45,9 +43,7 @@ mod inner {
         let tracer_provider = SdkTracerProvider::builder()
             .with_batch_exporter(span_exporter)
             .with_resource(resource.clone())
-            .with_sampler(opentelemetry_sdk::trace::Sampler::TraceIdRatioBased(
-                config.trace_ratio,
-            ))
+            .with_sampler(opentelemetry_sdk::trace::Sampler::TraceIdRatioBased(config.trace_ratio))
             .build();
 
         global::set_tracer_provider(tracer_provider.clone());
@@ -61,19 +57,13 @@ mod inner {
             .build()
             .map_err(|e| anyhow::anyhow!("Failed to create OTLP metric exporter: {e}"))?;
 
-        let meter_provider = SdkMeterProvider::builder()
-            .with_periodic_exporter(metric_exporter)
-            .with_resource(resource)
-            .build();
+        let meter_provider =
+            SdkMeterProvider::builder().with_periodic_exporter(metric_exporter).with_resource(resource).build();
 
         global::set_meter_provider(meter_provider.clone());
         let _ = METER_PROVIDER.set(meter_provider);
 
-        log::info!(
-            "OpenTelemetry initialised — endpoint={}, service={}",
-            config.endpoint,
-            config.service_name
-        );
+        log::info!("OpenTelemetry initialised — endpoint={}, service={}", config.endpoint, config.service_name);
         Ok(())
     }
 
@@ -100,10 +90,7 @@ mod inner {
     pub fn record_message_duration(node_type: &str, duration: Duration) {
         let meter = global::meter("rust-red");
         let histogram = meter.f64_histogram("rust_red_message_duration_seconds").build();
-        histogram.record(
-            duration.as_secs_f64(),
-            &[KeyValue::new("node_type", node_type.to_string())],
-        );
+        histogram.record(duration.as_secs_f64(), &[KeyValue::new("node_type", node_type.to_string())]);
     }
 
     pub fn record_flow_deployment() {
@@ -184,12 +171,8 @@ impl TelemetryConfig {
     pub fn from_config(cfg: &config::Config) -> Self {
         Self {
             enabled: cfg.get_bool("telemetry.enabled").unwrap_or(false),
-            endpoint: cfg
-                .get_string("telemetry.endpoint")
-                .unwrap_or_else(|_| "http://localhost:4317".to_string()),
-            service_name: cfg
-                .get_string("telemetry.service_name")
-                .unwrap_or_else(|_| "rust-red".to_string()),
+            endpoint: cfg.get_string("telemetry.endpoint").unwrap_or_else(|_| "http://localhost:4317".to_string()),
+            service_name: cfg.get_string("telemetry.service_name").unwrap_or_else(|_| "rust-red".to_string()),
             trace_ratio: cfg.get_float("telemetry.trace_ratio").unwrap_or(1.0),
         }
     }

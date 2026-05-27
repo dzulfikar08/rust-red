@@ -10,7 +10,9 @@ use rust_red_wasm_sdk::*;
 
 struct EchoNode;
 impl Default for EchoNode {
-    fn default() -> Self { EchoNode }
+    fn default() -> Self {
+        EchoNode
+    }
 }
 
 impl WasmNodeHandler for EchoNode {

@@ -9,7 +9,7 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
-use super::modbus_config::{ModbusDataType, resolve_modbus_config, downcast_modbus_config};
+use super::modbus_config::{ModbusDataType, downcast_modbus_config, resolve_modbus_config};
 
 #[derive(Deserialize, Debug, Clone)]
 struct ModbusFlexWriterConfig {
@@ -34,10 +34,7 @@ impl ModbusFlexWriterNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let cfg = ModbusFlexWriterConfig::deserialize(&config.rest)?;
-        Ok(Box::new(ModbusFlexWriterNode {
-            base: base_node,
-            config: cfg,
-        }))
+        Ok(Box::new(ModbusFlexWriterNode { base: base_node, config: cfg }))
     }
 }
 
@@ -48,22 +45,24 @@ impl FlowNodeBehavior for ModbusFlexWriterNode {
     }
 
     async fn run(self: Arc<Self>, stop_token: CancellationToken) {
-        let config_node: Arc<dyn GlobalNodeBehavior> = match resolve_modbus_config(self.flow().as_ref(), &self.config.config_node).await {
-            Ok(n) => n,
-            Err(e) => {
-                log::error!("[modbus-flex-writer:{}] {}", self.name(), e);
-                self.report_status(
-                    StatusObject {
-                        fill: Some(StatusFill::Red),
-                        shape: Some(StatusShape::Ring),
-                        text: Some(e.to_string()),
-                    },
-                    stop_token.clone(),
-                ).await;
-                stop_token.cancelled().await;
-                return;
-            }
-        };
+        let config_node: Arc<dyn GlobalNodeBehavior> =
+            match resolve_modbus_config(self.flow().as_ref(), &self.config.config_node).await {
+                Ok(n) => n,
+                Err(e) => {
+                    log::error!("[modbus-flex-writer:{}] {}", self.name(), e);
+                    self.report_status(
+                        StatusObject {
+                            fill: Some(StatusFill::Red),
+                            shape: Some(StatusShape::Ring),
+                            text: Some(e.to_string()),
+                        },
+                        stop_token.clone(),
+                    )
+                    .await;
+                    stop_token.cancelled().await;
+                    return;
+                }
+            };
 
         while !stop_token.is_cancelled() {
             let cancel = stop_token.child_token();
@@ -83,11 +82,9 @@ impl FlowNodeBehavior for ModbusFlexWriterNode {
 
                     let (address, fc, payload) = {
                         let guard = msg.read().await;
-                        let address = guard.get("address")
-                            .and_then(|v| v.as_f64())
-                            .map(|f| f as u16)
-                            .unwrap_or(0);
-                        let fc = guard.get("functionCode")
+                        let address = guard.get("address").and_then(|v| v.as_f64()).map(|f| f as u16).unwrap_or(0);
+                        let fc = guard
+                            .get("functionCode")
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string())
                             .unwrap_or_else(|| "writeSingleRegister".to_string());
@@ -109,10 +106,12 @@ impl FlowNodeBehavior for ModbusFlexWriterNode {
                             let arr = payload
                                 .and_then(|v| v.as_array().map(|a| a.iter().cloned().collect::<Vec<_>>()))
                                 .ok_or_else(|| anyhow::anyhow!("payload must be array of booleans"))?;
-                            let coils: Vec<bool> = arr.iter()
+                            let coils: Vec<bool> = arr
+                                .iter()
                                 .enumerate()
-                                .map(|(i, v)| v.as_bool()
-                                    .ok_or_else(|| anyhow::anyhow!("payload[{}] is not boolean", i)))
+                                .map(|(i, v)| {
+                                    v.as_bool().ok_or_else(|| anyhow::anyhow!("payload[{}] is not boolean", i))
+                                })
                                 .collect::<crate::Result<Vec<_>>>()?;
                             let count = coils.len();
                             conn.write_multiple_coils(address, &coils).await?;
@@ -149,17 +148,24 @@ impl FlowNodeBehavior for ModbusFlexWriterNode {
                     {
                         let mut guard = msg.write().await;
                         guard.set("payload".to_string(), write_result);
-                        guard.set("modbus".to_string(), Variant::from(serde_json::json!({
-                            "functionCode": fc,
-                            "address": address,
-                        })));
+                        guard.set(
+                            "modbus".to_string(),
+                            Variant::from(serde_json::json!({
+                                "functionCode": fc,
+                                "address": address,
+                            })),
+                        );
                     }
 
-                    node.report_status(StatusObject {
-                        fill: Some(StatusFill::Green),
-                        shape: Some(StatusShape::Dot),
-                        text: Some(format!("{} @ {}", address, fc)),
-                    }, cancel.child_token()).await;
+                    node.report_status(
+                        StatusObject {
+                            fill: Some(StatusFill::Green),
+                            shape: Some(StatusShape::Dot),
+                            text: Some(format!("{} @ {}", address, fc)),
+                        },
+                        cancel.child_token(),
+                    )
+                    .await;
 
                     Ok(())
                 }

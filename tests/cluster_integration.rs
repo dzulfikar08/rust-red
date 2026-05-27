@@ -6,10 +6,10 @@
 mod tests {
     use std::sync::Arc;
 
-    use rust_red_cluster::config::ClusterConfig;
-    use rust_red_cluster::partition::PartitionManager;
-    use rust_red_cluster::member::ClusterMember;
     use rust_red_cluster::bridge::ClusterPartitionerBridge;
+    use rust_red_cluster::config::ClusterConfig;
+    use rust_red_cluster::member::ClusterMember;
+    use rust_red_cluster::partition::PartitionManager;
     use rust_red_cluster::ClusterManager;
     use rust_red_core::runtime::cluster_aware::ClusterFlowPartitioner;
 
@@ -58,14 +58,10 @@ mod tests {
     async fn test_partition_manager_assigns_flows() {
         let members = Arc::new(DashMap::new());
 
-        members.insert(
-            "node-1".to_string(),
-            ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()),
-        );
-        members.insert(
-            "node-2".to_string(),
-            ClusterMember::new("node-2".to_string(), "127.0.0.1:7981".parse().unwrap()),
-        );
+        members
+            .insert("node-1".to_string(), ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()));
+        members
+            .insert("node-2".to_string(), ClusterMember::new("node-2".to_string(), "127.0.0.1:7981".parse().unwrap()));
 
         let pm = PartitionManager::new(members, "node-1".to_string());
 
@@ -84,10 +80,8 @@ mod tests {
     #[tokio::test]
     async fn test_partition_manager_owns_flow() {
         let members = Arc::new(DashMap::new());
-        members.insert(
-            "node-1".to_string(),
-            ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()),
-        );
+        members
+            .insert("node-1".to_string(), ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()));
 
         let pm = PartitionManager::new(members, "node-1".to_string());
 
@@ -103,10 +97,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_bridge_implements_partitioner_trait() {
         let members = Arc::new(DashMap::new());
-        members.insert(
-            "node-1".to_string(),
-            ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()),
-        );
+        members
+            .insert("node-1".to_string(), ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()));
 
         let pm = Arc::new(PartitionManager::new(members, "node-1".to_string()));
         let bridge = ClusterPartitionerBridge::new(pm.clone());
@@ -123,14 +115,10 @@ mod tests {
     #[tokio::test]
     async fn test_partition_manager_rebalance_after_failure() {
         let members = Arc::new(DashMap::new());
-        members.insert(
-            "node-1".to_string(),
-            ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()),
-        );
-        members.insert(
-            "node-2".to_string(),
-            ClusterMember::new("node-2".to_string(), "127.0.0.1:7981".parse().unwrap()),
-        );
+        members
+            .insert("node-1".to_string(), ClusterMember::new("node-1".to_string(), "127.0.0.1:7980".parse().unwrap()));
+        members
+            .insert("node-2".to_string(), ClusterMember::new("node-2".to_string(), "127.0.0.1:7981".parse().unwrap()));
 
         let pm = PartitionManager::new(Arc::clone(&members), "node-1".to_string());
 
@@ -139,10 +127,7 @@ mod tests {
         assert_eq!(assignments.len(), 4);
 
         // Mark node-2 as dead
-        members
-            .get_mut("node-2")
-            .unwrap()
-            .mark_dead();
+        members.get_mut("node-2").unwrap().mark_dead();
 
         let rebalanced = pm.rebalance_after_failure("node-2").await;
 

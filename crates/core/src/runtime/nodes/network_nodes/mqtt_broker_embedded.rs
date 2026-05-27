@@ -30,9 +30,15 @@ struct MqttBrokerNodeConfig {
     password: Option<String>,
 }
 
-fn default_host() -> String { "127.0.0.1".to_string() }
-fn default_port() -> u16 { 1883 }
-fn default_max_connections() -> usize { 100 }
+fn default_host() -> String {
+    "127.0.0.1".to_string()
+}
+fn default_port() -> u16 {
+    1883
+}
+fn default_max_connections() -> usize {
+    100
+}
 
 #[derive(Debug)]
 #[flow_node("mqtt broker embedded", red_name = "mqtt-broker-embedded", module = "node-red")]
@@ -51,11 +57,7 @@ impl MqttBrokerEmbeddedNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let cfg = MqttBrokerNodeConfig::deserialize(&config.rest)?;
-        Ok(Box::new(MqttBrokerEmbeddedNode {
-            base: state,
-            config: cfg,
-            bound_addr: Arc::new(RwLock::new(None)),
-        }))
+        Ok(Box::new(MqttBrokerEmbeddedNode { base: state, config: cfg, bound_addr: Arc::new(RwLock::new(None)) }))
     }
 
     /// The configured host/port (may differ from bound_addr when port=0).
@@ -107,7 +109,8 @@ impl FlowNodeBehavior for MqttBrokerEmbeddedNode {
                         text: Some(format!("listening :{}", addr.port())),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
 
                 // Emit startup event
                 let msg = self.make_event_msg(
@@ -147,7 +150,8 @@ impl FlowNodeBehavior for MqttBrokerEmbeddedNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
             }
         }

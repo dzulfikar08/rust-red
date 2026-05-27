@@ -46,25 +46,17 @@ impl PostgresQueryNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let query_config = PostgresQueryConfig::deserialize(&config.rest)?;
-        Ok(Box::new(PostgresQueryNode {
-            base: base_node,
-            config: query_config,
-        }))
+        Ok(Box::new(PostgresQueryNode { base: base_node, config: query_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         // Try parsing config_node as an ElementId (hex string)
         let eid_opt = ElementId::from_str(&self.config.config_node).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine.find_global_node_by_name(&self.config.config_node).ok().flatten()
-            })
+            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
             .ok_or_else(|| anyhow::anyhow!("Config node '{}' not found", self.config.config_node))?;
 
         Ok(global)
@@ -98,9 +90,7 @@ impl PostgresQueryNode {
         params
     }
 
-    fn rows_to_variant(
-        rows: Vec<tokio_postgres::Row>,
-    ) -> Variant {
+    fn rows_to_variant(rows: Vec<tokio_postgres::Row>) -> Variant {
         let result: Vec<Variant> = rows
             .into_iter()
             .map(|row| {
@@ -137,7 +127,8 @@ impl FlowNodeBehavior for PostgresQueryNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
@@ -159,11 +150,15 @@ impl FlowNodeBehavior for PostgresQueryNode {
                                 let mut guard = msg.write().await;
                                 guard.set("error".to_string(), Variant::String(e.to_string()));
                             }
-                            node.report_status(StatusObject {
-                                fill: Some(StatusFill::Red),
-                                shape: Some(StatusShape::Ring),
-                                text: Some(format!("{}", e)),
-                            }, cancel.child_token()).await;
+                            node.report_status(
+                                StatusObject {
+                                    fill: Some(StatusFill::Red),
+                                    shape: Some(StatusShape::Ring),
+                                    text: Some(format!("{}", e)),
+                                },
+                                cancel.child_token(),
+                            )
+                            .await;
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                             return Ok(());
@@ -173,7 +168,8 @@ impl FlowNodeBehavior for PostgresQueryNode {
                     let (query, params) = {
                         let guard = msg.read().await;
                         // Allow msg.query to override the configured query
-                        let query = guard.get("query")
+                        let query = guard
+                            .get("query")
                             .and_then(|v| v.as_str())
                             .map(|s| s.to_string())
                             .unwrap_or_else(|| node.config.query.clone());
@@ -184,11 +180,8 @@ impl FlowNodeBehavior for PostgresQueryNode {
                         params.iter().map(|p| p.as_ref() as &(dyn tokio_postgres::types::ToSql + Sync)).collect();
 
                     let timeout = Duration::from_millis(node.config.timeout_ms);
-                    let result: Result<std::result::Result<Vec<tokio_postgres::Row>, tokio_postgres::Error>, _> = tokio::time::timeout(
-                        timeout,
-                        pool_obj.query(&query, &param_refs),
-                    )
-                    .await;
+                    let result: Result<std::result::Result<Vec<tokio_postgres::Row>, tokio_postgres::Error>, _> =
+                        tokio::time::timeout(timeout, pool_obj.query(&query, &param_refs)).await;
 
                     match result {
                         Ok(Ok(rows)) => {
@@ -196,15 +189,20 @@ impl FlowNodeBehavior for PostgresQueryNode {
                                 let mut guard = msg.write().await;
                                 let variant_rows = Self::rows_to_variant(rows);
                                 guard.set("payload".to_string(), variant_rows);
-                                let count = guard.get("payload").and_then(|v| v.as_array().map(|a| a.len())).unwrap_or(0);
+                                let count =
+                                    guard.get("payload").and_then(|v| v.as_array().map(|a| a.len())).unwrap_or(0);
                                 guard.set("rowCount".to_string(), Variant::from(count as i64));
                                 count
                             };
-                            node.report_status(StatusObject {
-                                fill: Some(StatusFill::Green),
-                                shape: Some(StatusShape::Dot),
-                                text: Some(format!("{} rows", count)),
-                            }, cancel.child_token()).await;
+                            node.report_status(
+                                StatusObject {
+                                    fill: Some(StatusFill::Green),
+                                    shape: Some(StatusShape::Dot),
+                                    text: Some(format!("{} rows", count)),
+                                },
+                                cancel.child_token(),
+                            )
+                            .await;
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                         }
@@ -214,25 +212,37 @@ impl FlowNodeBehavior for PostgresQueryNode {
                                 let mut guard = msg.write().await;
                                 guard.set("error".to_string(), Variant::String(e.to_string()));
                             }
-                            node.report_status(StatusObject {
-                                fill: Some(StatusFill::Red),
-                                shape: Some(StatusShape::Ring),
-                                text: Some(format!("{}", e)),
-                            }, cancel.child_token()).await;
+                            node.report_status(
+                                StatusObject {
+                                    fill: Some(StatusFill::Red),
+                                    shape: Some(StatusShape::Ring),
+                                    text: Some(format!("{}", e)),
+                                },
+                                cancel.child_token(),
+                            )
+                            .await;
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                         }
                         Err(_) => {
-                            log::warn!("[postgres-query:{}] Query timed out after {}ms", node.name(), node.config.timeout_ms);
+                            log::warn!(
+                                "[postgres-query:{}] Query timed out after {}ms",
+                                node.name(),
+                                node.config.timeout_ms
+                            );
                             {
                                 let mut guard = msg.write().await;
                                 guard.set("error".to_string(), Variant::String("Query timed out".into()));
                             }
-                            node.report_status(StatusObject {
-                                fill: Some(StatusFill::Red),
-                                shape: Some(StatusShape::Ring),
-                                text: Some("timeout".into()),
-                            }, cancel.child_token()).await;
+                            node.report_status(
+                                StatusObject {
+                                    fill: Some(StatusFill::Red),
+                                    shape: Some(StatusShape::Ring),
+                                    text: Some("timeout".into()),
+                                },
+                                cancel.child_token(),
+                            )
+                            .await;
                             let envelope = Envelope { port: 0, msg };
                             node.fan_out_one(envelope, CancellationToken::new()).await?;
                         }

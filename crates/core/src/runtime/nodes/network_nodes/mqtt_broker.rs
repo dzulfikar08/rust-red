@@ -15,8 +15,8 @@ use std::sync::Arc;
 
 use crate::runtime::model::*;
 use crate::runtime::nodes::*;
-use rust_red_macro::*;
 use rumqttc::{AsyncClient, EventLoop, LastWill, MqttOptions, QoS, Transport};
+use rust_red_macro::*;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::Mutex;

@@ -21,7 +21,9 @@ pub struct TopicTrie {
 }
 
 impl TopicTrie {
-    pub fn new() -> Self { Self { root: TrieNode::default(), wildcard_subscriptions: Vec::new() } }
+    pub fn new() -> Self {
+        Self { root: TrieNode::default(), wildcard_subscriptions: Vec::new() }
+    }
 
     pub fn subscribe(&mut self, client_id: String, topic_filter: String, qos: crate::protocol::packets::QoS) {
         let levels: Vec<&str> = topic_filter.split('/').collect();
@@ -48,11 +50,8 @@ impl TopicTrie {
     pub fn unsubscribe(&mut self, client_id: &str, topic_filter: &str) {
         let levels: Vec<&str> = topic_filter.split('/').collect();
         if topic_filter.ends_with('#') {
-            let parent_levels = if levels.len() == 1 && levels[0] == "#" {
-                &[][..]
-            } else {
-                &levels[..levels.len() - 1]
-            };
+            let parent_levels =
+                if levels.len() == 1 && levels[0] == "#" { &[][..] } else { &levels[..levels.len() - 1] };
             if let Some(node) = self.find_node_mut(parent_levels) {
                 node.multi_subscriptions.retain(|s| s.client_id != client_id);
             }
@@ -152,8 +151,12 @@ impl TopicTrie {
     fn find_or_create_node<'a>(&'a mut self, levels: &[&str]) -> &'a mut TrieNode {
         let mut node = &mut self.root;
         for level in levels {
-            if *level == "+" { continue; }
-            if *level == "#" { continue; }
+            if *level == "+" {
+                continue;
+            }
+            if *level == "#" {
+                continue;
+            }
             node = node.children.entry(level.to_string()).or_default();
         }
         node
@@ -162,8 +165,12 @@ impl TopicTrie {
     fn find_node_mut<'a>(&'a mut self, levels: &[&str]) -> Option<&'a mut TrieNode> {
         let mut node = &mut self.root;
         for level in levels {
-            if *level == "+" { continue; }
-            if *level == "#" { continue; }
+            if *level == "+" {
+                continue;
+            }
+            if *level == "#" {
+                continue;
+            }
             match node.children.get_mut(*level) {
                 Some(child) => node = child,
                 None => return None,

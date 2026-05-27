@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_has, assert_msg_num, assert_msg_str, TestHarness};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_num, assert_msg_str};
 use rust_red_core::runtime::model::Variant;
 
 // ---------------------------------------------------------------------------
@@ -26,17 +26,15 @@ use rust_red_core::runtime::model::Variant;
 async fn start_test_server<F>(handler: F) -> String
 where
     F: Fn(
-            String,   // method
-            String,   // path
-            String,   // raw headers block
-            Vec<u8>,  // body
+            String,  // method
+            String,  // path
+            String,  // raw headers block
+            Vec<u8>, // body
         ) -> (u16, Vec<(String, String)>, Vec<u8>)
         + Send
         + 'static,
 {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("Failed to bind test server");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind test server");
     let port = listener.local_addr().unwrap().port();
 
     tokio::spawn(async move {
@@ -58,11 +56,7 @@ where
             let header_end = raw.find("\r\n\r\n").unwrap_or(0);
             let headers_block = raw[..header_end].to_string();
             let body_start = header_end + 4;
-            let body = if body_start < n {
-                buf[body_start..n].to_vec()
-            } else {
-                vec![]
-            };
+            let body = if body_start < n { buf[body_start..n].to_vec() } else { vec![] };
 
             let (status, resp_headers, resp_body) = handler(method, path, headers_block, body);
 
@@ -146,10 +140,8 @@ fn build_flow_node_url(url: &str, method: &str, ret: &str) -> serde_json::Value 
 /// Test 1: GET request returns response body as text.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn http_get_basic() {
-    let base_url = start_test_server(|_method, _path, _headers, _body| {
-        (200, vec![], b"hello from server".to_vec())
-    })
-    .await;
+    let base_url =
+        start_test_server(|_method, _path, _headers, _body| (200, vec![], b"hello from server".to_vec())).await;
 
     let flow = build_flow_with_url(&base_url, "GET");
     let harness = TestHarness::from_flow_json(flow);
@@ -166,11 +158,7 @@ async fn http_post_json() {
     let base_url = start_test_server(|method, _path, _headers, body| {
         let response = if method == "POST" {
             let body_str = String::from_utf8_lossy(&body);
-            if body_str.contains("test-key") {
-                "received".to_string()
-            } else {
-                "missing-key".to_string()
-            }
+            if body_str.contains("test-key") { "received".to_string() } else { "missing-key".to_string() }
         } else {
             "wrong-method".to_string()
         };
@@ -247,11 +235,7 @@ async fn http_put() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn http_delete() {
     let base_url = start_test_server(|method, _path, _headers, _body| {
-        if method == "DELETE" {
-            (200, vec![], b"deleted".to_vec())
-        } else {
-            (200, vec![], b"wrong-method".to_vec())
-        }
+        if method == "DELETE" { (200, vec![], b"deleted".to_vec()) } else { (200, vec![], b"wrong-method".to_vec()) }
     })
     .await;
 
@@ -296,10 +280,7 @@ async fn http_response_headers() {
 /// Test 6: Non-200 status code is captured in statusCode.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn http_status_code() {
-    let base_url = start_test_server(|_method, _path, _headers, _body| {
-        (404, vec![], b"not found".to_vec())
-    })
-    .await;
+    let base_url = start_test_server(|_method, _path, _headers, _body| (404, vec![], b"not found".to_vec())).await;
 
     let flow = build_flow_with_url(&base_url, "GET");
     let harness = TestHarness::from_flow_json(flow);
@@ -345,9 +326,7 @@ async fn http_timeout() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .run_with_timeout(1, Duration::from_secs(5))
-        .await;
+    let msgs = harness.run_with_timeout(1, Duration::from_secs(5)).await;
 
     // With a non-existent server the request should produce an error
     // message through the output or catch node.
@@ -366,10 +345,7 @@ async fn http_timeout() {
 async fn http_binary_response() {
     let body = vec![0x00, 0x01, 0x02, 0xFF, 0xFE];
     let body_clone = body.clone();
-    let base_url = start_test_server(move |_method, _path, _headers, _body| {
-        (200, vec![], body_clone.clone())
-    })
-    .await;
+    let base_url = start_test_server(move |_method, _path, _headers, _body| (200, vec![], body_clone.clone())).await;
 
     let flow = build_flow_node_url(&base_url, "GET", "bin");
     let harness = TestHarness::from_flow_json(flow);
@@ -383,8 +359,7 @@ async fn http_binary_response() {
             for (i, byte) in body.iter().enumerate() {
                 match &arr[i] {
                     Variant::Number(n) => {
-                        assert_eq!(n.as_u64().unwrap() as u8, *byte,
-                            "Byte mismatch at index {i}");
+                        assert_eq!(n.as_u64().unwrap() as u8, *byte, "Byte mismatch at index {i}");
                     }
                     other => panic!("Expected number at index {i}, got {:?}", other),
                 }
@@ -455,14 +430,7 @@ async fn http_error_no_url() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout(
-            "1",
-            json!({"payload": "test"}),
-            1,
-            Duration::from_secs(3),
-        )
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(3)).await;
 
     // With no URL, the node should error. It may produce a message through
     // catch node or through the regular output with error info.
@@ -477,11 +445,7 @@ async fn http_json_response() {
     let json_body = r#"{"name":"test","value":42}"#;
     let json_body_owned = json_body.to_string();
     let base_url = start_test_server(move |_method, _path, _headers, _body| {
-        (
-            200,
-            vec![("Content-Type".to_string(), "application/json".to_string())],
-            json_body_owned.clone().into_bytes(),
-        )
+        (200, vec![("Content-Type".to_string(), "application/json".to_string())], json_body_owned.clone().into_bytes())
     })
     .await;
 
@@ -492,11 +456,7 @@ async fn http_json_response() {
     assert_eq!(msgs.len(), 1, "Expected one message");
     let payload = msgs[0].get("payload").expect("Missing payload");
     let obj = payload.as_object().expect("Payload should be a parsed JSON object");
-    assert_eq!(
-        obj.get("name"),
-        Some(&Variant::String("test".to_string())),
-        "JSON 'name' field mismatch"
-    );
+    assert_eq!(obj.get("name"), Some(&Variant::String("test".to_string())), "JSON 'name' field mismatch");
 }
 
 /// Test 12: Custom headers from message are sent in the request.
@@ -506,11 +466,7 @@ async fn http_custom_headers() {
         let has_custom = headers.contains("X-Test-Header")
             || headers.contains("x-test-header")
             || headers.to_lowercase().contains("x-test-header");
-        let response = if has_custom {
-            "header-found"
-        } else {
-            "header-missing"
-        };
+        let response = if has_custom { "header-found" } else { "header-missing" };
         (200, vec![], response.to_string().into_bytes())
     })
     .await;
@@ -544,10 +500,7 @@ async fn http_custom_headers() {
 /// Test 13: responseUrl is set on the output message.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn http_response_url() {
-    let base_url = start_test_server(|_method, _path, _headers, _body| {
-        (200, vec![], b"ok".to_vec())
-    })
-    .await;
+    let base_url = start_test_server(|_method, _path, _headers, _body| (200, vec![], b"ok".to_vec())).await;
 
     let flow = build_flow_with_url(&base_url, "GET");
     let harness = TestHarness::from_flow_json(flow);
@@ -555,12 +508,7 @@ async fn http_response_url() {
 
     assert_eq!(msgs.len(), 1, "Expected one message");
     assert_msg_has(&msgs[0], "responseUrl");
-    let response_url = msgs[0]
-        .get("responseUrl")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string();
+    let response_url = msgs[0].get("responseUrl").unwrap().as_str().unwrap().to_string();
     assert!(
         response_url.starts_with("http://127.0.0.1:"),
         "responseUrl should start with http://127.0.0.1: got {response_url}"

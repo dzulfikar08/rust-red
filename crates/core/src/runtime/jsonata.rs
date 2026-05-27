@@ -5,13 +5,11 @@ use crate::*;
 
 pub fn evaluate(expression: &str, data: &serde_json::Value) -> crate::Result<serde_json::Value> {
     let arena = bumpalo::Bump::new();
-    let jsonata = jsonata_rs::JsonAta::new(expression, &arena)
-        .map_err(|e| anyhow::anyhow!("JSONata parse error: {e}"))?;
+    let jsonata =
+        jsonata_rs::JsonAta::new(expression, &arena).map_err(|e| anyhow::anyhow!("JSONata parse error: {e}"))?;
 
     let input = serde_json::to_string(data)?;
-    let result = jsonata
-        .evaluate(Some(&input), None)
-        .map_err(|e| anyhow::anyhow!("JSONata evaluation error: {e}"))?;
+    let result = jsonata.evaluate(Some(&input), None).map_err(|e| anyhow::anyhow!("JSONata evaluation error: {e}"))?;
 
     if result.is_undefined() {
         return Ok(serde_json::Value::Null);
@@ -23,16 +21,13 @@ pub fn evaluate(expression: &str, data: &serde_json::Value) -> crate::Result<ser
 }
 
 pub fn evaluate_variant(expression: &str, data: &Variant) -> crate::Result<Variant> {
-    let json_data = serde_json::to_value(data)
-        .map_err(|e| anyhow::anyhow!("Failed to serialize Variant to JSON: {e}"))?;
+    let json_data =
+        serde_json::to_value(data).map_err(|e| anyhow::anyhow!("Failed to serialize Variant to JSON: {e}"))?;
     let result = evaluate(expression, &json_data)?;
     Ok(Variant::from(result))
 }
 
-pub fn evaluate_with_env(
-    expression: &str,
-    env_vars: &HashMap<String, Variant>,
-) -> crate::Result<Variant> {
+pub fn evaluate_with_env(expression: &str, env_vars: &HashMap<String, Variant>) -> crate::Result<Variant> {
     let json_data: serde_json::Value = serde_json::to_value(env_vars)?;
     let result = evaluate(expression, &json_data)?;
     Ok(Variant::from(result))
@@ -93,10 +88,7 @@ mod tests {
             {"name": "c", "price": 30}
         ]});
         let result = evaluate("items[price > 15]", &data).unwrap();
-        assert_eq!(
-            result,
-            json!([{"name": "b", "price": 20}, {"name": "c", "price": 30}])
-        );
+        assert_eq!(result, json!([{"name": "b", "price": 20}, {"name": "c", "price": 30}]));
     }
 
     #[test]

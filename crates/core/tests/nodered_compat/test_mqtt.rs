@@ -386,24 +386,11 @@ async fn mqtt_out_connect_disconnect_actions() {
     let harness = TestHarness::from_flow_json(flow);
 
     // Send connect action
-    let _msgs = harness
-        .inject_and_collect_timeout(
-            "40",
-            json!({"action": "connect"}),
-            0,
-            Duration::from_secs(5),
-        )
-        .await;
+    let _msgs = harness.inject_and_collect_timeout("40", json!({"action": "connect"}), 0, Duration::from_secs(5)).await;
 
     // Send disconnect action
-    let _msgs = harness
-        .inject_and_collect_timeout(
-            "40",
-            json!({"action": "disconnect"}),
-            0,
-            Duration::from_secs(5),
-        )
-        .await;
+    let _msgs =
+        harness.inject_and_collect_timeout("40", json!({"action": "disconnect"}), 0, Duration::from_secs(5)).await;
 }
 
 // ---------------------------------------------------------------------------
@@ -477,11 +464,6 @@ async fn mqtt_in_get_subscriptions() {
     let harness = TestHarness::from_flow_json(flow);
 
     let _msgs = harness
-        .inject_and_collect_timeout(
-            "60",
-            json!({"action": "getSubscriptions"}),
-            1,
-            Duration::from_secs(5),
-        )
+        .inject_and_collect_timeout("60", json!({"action": "getSubscriptions"}), 1, Duration::from_secs(5))
         .await;
 }

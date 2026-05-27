@@ -29,7 +29,7 @@ use std::time::Duration;
 
 use serde_json::json;
 
-use super::harness::{assert_msg_has, assert_msg_not_has, assert_msg_num, TestHarness};
+use super::harness::{TestHarness, assert_msg_has, assert_msg_not_has, assert_msg_num};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,9 +67,7 @@ async fn timescaledb_connect_and_select() {
     let flow = build_ts_flow("SELECT 1 AS value;");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "test"}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "should get output from select");
     assert_msg_not_has(&msgs[0], "error");
@@ -110,9 +108,7 @@ async fn timescaledb_hypertable_insert_select() {
     ]);
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "start"}), 1, Duration::from_secs(20))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "start"}), 1, Duration::from_secs(20)).await;
 
     assert!(!msgs.is_empty(), "should get output from select");
     assert_msg_not_has(&msgs[0], "error");
@@ -126,13 +122,11 @@ async fn timescaledb_time_bucket_query() {
     // This test assumes ts_test_metrics was created by the hypertable test above
     let flow = build_ts_flow(
         "SELECT time_bucket('1 hour', time) AS bucket, AVG(value) AS avg_val \
-         FROM ts_test_metrics GROUP BY bucket ORDER BY bucket DESC LIMIT 5;"
+         FROM ts_test_metrics GROUP BY bucket ORDER BY bucket DESC LIMIT 5;",
     );
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "query"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "query"}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "should get time_bucket output");
     // This may error if the table doesn't exist yet, which is acceptable
@@ -145,9 +139,7 @@ async fn timescaledb_error_invalid_sql() {
     let flow = build_ts_flow("SELECT * FROM nonexistent_table_xyz;");
     let harness = TestHarness::from_flow_json(flow);
 
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "bad"}), 1, Duration::from_secs(10))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "bad"}), 1, Duration::from_secs(10)).await;
 
     assert!(!msgs.is_empty(), "node should forward message even on error");
     assert_msg_has(&msgs[0], "error");
@@ -176,12 +168,7 @@ async fn timescaledb_parameterized_query() {
     let harness = TestHarness::from_flow_json(flow);
 
     let msgs = harness
-        .inject_and_collect_timeout(
-            "2",
-            json!({"payload": "query", "queryParams": ["b"]}),
-            1,
-            Duration::from_secs(10),
-        )
+        .inject_and_collect_timeout("2", json!({"payload": "query", "queryParams": ["b"]}), 1, Duration::from_secs(10))
         .await;
 
     assert!(!msgs.is_empty(), "should get parameterized output");

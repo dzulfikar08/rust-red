@@ -42,16 +42,36 @@ pub struct PersistenceConfig {
     pub backend: String,
 }
 
-fn default_enabled() -> bool { false }
-fn default_bind() -> String { "127.0.0.1:1883".into() }
-fn default_max_connections() -> usize { 10000 }
-fn default_max_packet_size() -> usize { 268435 }
-fn default_keep_alive() -> u16 { 60 }
-fn default_session_expiry() -> u32 { 1800 }
-fn default_max_qos() -> u8 { 2 }
-fn default_true() -> bool { true }
-fn default_dispatch_capacity() -> usize { 256 }
-fn default_persistence_backend() -> String { "memory".into() }
+fn default_enabled() -> bool {
+    false
+}
+fn default_bind() -> String {
+    "127.0.0.1:1883".into()
+}
+fn default_max_connections() -> usize {
+    10000
+}
+fn default_max_packet_size() -> usize {
+    268435
+}
+fn default_keep_alive() -> u16 {
+    60
+}
+fn default_session_expiry() -> u32 {
+    1800
+}
+fn default_max_qos() -> u8 {
+    2
+}
+fn default_true() -> bool {
+    true
+}
+fn default_dispatch_capacity() -> usize {
+    256
+}
+fn default_persistence_backend() -> String {
+    "memory".into()
+}
 
 impl Default for BrokerConfig {
     fn default() -> Self {

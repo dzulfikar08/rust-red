@@ -59,24 +59,16 @@ impl BacnetReadNode {
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let read_config = BacnetReadConfig::deserialize(&config.rest)?;
-        Ok(Box::new(BacnetReadNode {
-            base: base_node,
-            config: read_config,
-        }))
+        Ok(Box::new(BacnetReadNode { base: base_node, config: read_config }))
     }
 
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-        let engine = self
-            .flow()
-            .and_then(|f| f.engine())
-            .ok_or_else(|| anyhow::anyhow!("No engine available"))?;
+        let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
         let eid_opt = ElementId::from_str(&self.config.config_node).ok();
         let global = eid_opt
             .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| {
-                engine.find_global_node_by_name(&self.config.config_node).ok().flatten()
-            })
+            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
             .ok_or_else(|| anyhow::anyhow!("Config node not found"))?;
 
         Ok(global)
@@ -84,11 +76,7 @@ impl BacnetReadNode {
 
     /// Resolve the effective COV lifetime: per-node override, else config default.
     fn effective_cov_lifetime(&self, cfg_inner: &BacnetConfigNode) -> u32 {
-        if self.config.cov_lifetime > 0 {
-            self.config.cov_lifetime
-        } else {
-            cfg_inner.cov_lifetime()
-        }
+        if self.config.cov_lifetime > 0 { self.config.cov_lifetime } else { cfg_inner.cov_lifetime() }
     }
 }
 
@@ -110,7 +98,8 @@ impl FlowNodeBehavior for BacnetReadNode {
                         text: Some(e.to_string()),
                     },
                     stop_token.clone(),
-                ).await;
+                )
+                .await;
                 stop_token.cancelled().await;
                 return;
             }
