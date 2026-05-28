@@ -203,6 +203,9 @@ export interface AppEvents {
 
   // Status
   "status:changed": { id: string; status: unknown };
+
+  // Search
+  "search:result-selected": { nodeId: string; flowId: string };
 }
 
 // ---------------------------------------------------------------------------
