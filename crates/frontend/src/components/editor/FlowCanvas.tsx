@@ -31,6 +31,7 @@ import { useEditorStore } from "../../store/editor-store";
 import { useBreakpoint, useTouchGestures } from "../../hooks";
 import { GenericNode } from "./GenericNode";
 import { NodeComponent } from "../canvas/NodeComponent";
+import { GroupComponent } from "../canvas/GroupComponent";
 import { WireComponent } from "../canvas/WireComponent";
 import { ZoomControls } from "../canvas/ZoomControls";
 import { eventBus } from "../../red/core/events";
@@ -43,6 +44,7 @@ import { nodeRegistry } from "../../red/nodes/registry";
 const nodeTypes = {
   generic: GenericNode,
   nrNode: NodeComponent,
+  group: GroupComponent,
 };
 
 const edgeTypes = {
