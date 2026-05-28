@@ -10,7 +10,7 @@ fn main() {
     set_git_revision_hash();
     check_patch();
     gen_use_plugins_file();
-    build_static_files();
+    build_static_files(&build_time);
 }
 
 fn gen_use_plugins_file() {
@@ -75,7 +75,7 @@ fn check_patch() {
     }
 }
 
-fn build_static_files() {
+fn build_static_files(build_time: &str) {
     use std::path::PathBuf;
 
     println!("cargo:rerun-if-changed=crates/web/public");
@@ -114,6 +114,14 @@ fn build_static_files() {
         // Incrementally copy from public directory
         if public_dir.exists() {
             copy_dir_contents_incremental(&public_dir, &static_dir).expect("Failed to copy public files");
+        }
+
+        // Inject build timestamp into index.html for cache busting
+        let index_html = static_dir.join("index.html");
+        if index_html.exists() {
+            let content = fs::read_to_string(&index_html).expect("Failed to read index.html");
+            let injected = content.replace("__BUILD_TIME__", &build_time);
+            fs::write(&index_html, injected).expect("Failed to write index.html");
         }
 
         // Incrementally copy from node-red directory
