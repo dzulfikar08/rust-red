@@ -3,11 +3,15 @@ import { ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { AppShell } from "./components/layout/AppShell";
 import { Notifications } from "./components/notifications/Notifications";
+import { ActionList } from "./components/search/ActionList";
 import { flowsApi } from "./api/flows";
 import { useFlowStore } from "./store/flow-store";
 import { useEditorStore } from "./store/editor-store";
+import { useActionStore } from "./store/action-store";
+import { useSidebarStore } from "./store/sidebar-store";
 import { DashboardPage } from "./dashboard/DashboardPage";
-import { useBreakpoint } from "./hooks";
+import { useBreakpoint, useKeyboard } from "./hooks";
+import { DEFAULT_KEYBINDINGS } from "./hooks/useKeyboard";
 
 type View = "flows" | "dashboard";
 
@@ -15,7 +19,9 @@ function AppInner() {
   const { setNodes, setEdges, setRevision } = useFlowStore();
   const { addNotification } = useEditorStore();
   const [view, setView] = useState<View>("flows");
+  const [actionListOpen, setActionListOpen] = useState(false);
   const { isMobile } = useBreakpoint();
+  const { bind } = useKeyboard();
 
   useEffect(() => {
     flowsApi
@@ -31,6 +37,80 @@ function AppInner() {
         addNotification({ type: "error", message });
       });
   }, [setNodes, setEdges, setRevision, addNotification]);
+
+  // Register default keybindings + core actions on mount
+  useEffect(() => {
+    const actionStore = useActionStore.getState();
+
+    // Register the action-list toggle action
+    actionStore.registerAction({
+      id: "core:action-list",
+      name: "Show Action List",
+      scope: "core",
+      key: "Ctrl-Shift-P",
+      handler: () => setActionListOpen((prev) => !prev),
+    });
+
+    // Register additional palette-only actions (no keyboard shortcuts)
+    actionStore.registerAction({
+      id: "core:import-flows",
+      name: "Import Flows",
+      scope: "core",
+      handler: () => {
+        // Placeholder: will be wired to clipboard/import store later
+      },
+    });
+    actionStore.registerAction({
+      id: "core:export-flows",
+      name: "Export Flows",
+      scope: "core",
+      handler: () => {
+        // Placeholder: will be wired to clipboard/export store later
+      },
+    });
+    actionStore.registerAction({
+      id: "core:toggle-sidebar",
+      name: "Toggle Sidebar",
+      scope: "core",
+      handler: () => {
+        useSidebarStore.getState().toggle();
+      },
+    });
+    actionStore.registerAction({
+      id: "core:toggle-fullscreen",
+      name: "Toggle Full Screen",
+      scope: "core",
+      handler: () => {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          document.documentElement.requestFullscreen();
+        }
+      },
+    });
+    actionStore.registerAction({
+      id: "core:manage-palette",
+      name: "Manage Palette",
+      scope: "core",
+      handler: () => {
+        // Placeholder: will be wired to palette manager later
+      },
+    });
+    actionStore.registerAction({
+      id: "core:search-flows",
+      name: "Search Flows",
+      scope: "core",
+      handler: () => {
+        // Placeholder: will be wired to global search later
+      },
+    });
+
+    // Bind default keybindings
+    const unbindFns = DEFAULT_KEYBINDINGS.map((b) => bind(b));
+    return () => {
+      unbindFns.forEach((fn) => fn());
+    };
+  }, [bind]);
 
   const handleDeploy = useCallback(async () => {
     const { nodes, edges, revision } = useFlowStore.getState();
@@ -90,6 +170,11 @@ function AppInner() {
 
       {/* Notifications overlay (top-right) */}
       <Notifications />
+
+      {/* Action list / command palette */}
+      {actionListOpen && (
+        <ActionList onClose={() => setActionListOpen(false)} />
+      )}
     </div>
   );
 }

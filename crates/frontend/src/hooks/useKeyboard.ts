@@ -38,6 +38,8 @@ export const DEFAULT_KEYBINDINGS: KeyBinding[] = [
   { key: "Escape", action: "core:deselect" },
   { key: "s", modifiers: { ctrl: true }, action: "core:deploy", preventDefault: true },
   { key: "?", action: "core:show-help" },
+  { key: "p", modifiers: { ctrl: true, shift: true }, action: "core:action-list", preventDefault: true },
+  { key: " ", modifiers: { ctrl: true, shift: true }, action: "core:action-list", preventDefault: true },
 ];
 
 // ---------------------------------------------------------------------------
