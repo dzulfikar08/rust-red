@@ -15,9 +15,11 @@ import { eventBus } from "../red/core/events";
 export interface WorkspaceFlow {
   id: string;
   label: string;
-  type: "tab";
+  type: "tab" | "subflow";
   disabled: boolean;
   info?: string;
+  /** For subflow tabs, the ID of the subflow definition */
+  subflowId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -43,6 +45,8 @@ interface WorkspaceStore {
 
   /** Create a new flow tab, returns its id */
   addFlow: (label?: string) => string;
+  /** Create a new subflow tab for editing a subflow */
+  addSubflowTab: (subflowId: string, label?: string) => string;
   /** Remove a flow tab by id */
   removeFlow: (id: string) => void;
   /** Rename a flow tab */
@@ -77,6 +81,22 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       flows: [...state.flows, flow],
       // Auto-activate the first flow added, or keep current active
       activeFlowId: state.activeFlowId ?? id,
+    }));
+    return id;
+  },
+
+  addSubflowTab: (subflowId: string, label?: string) => {
+    const id = generateFlowId();
+    const flow: WorkspaceFlow = {
+      id,
+      label: label ?? `Subflow`,
+      type: "subflow",
+      disabled: false,
+      subflowId,
+    };
+    set((state) => ({
+      flows: [...state.flows, flow],
+      activeFlowId: id,
     }));
     return id;
   },

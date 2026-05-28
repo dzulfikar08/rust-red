@@ -12,6 +12,7 @@ import { useContextMenuStore } from "../../store/context-menu-store";
 import { useClipboardStore } from "../../store/clipboard-store";
 import { useFlowStore } from "../../store/flow-store";
 import { useEditorStore } from "../../store/editor-store";
+import { useGroupStore } from "../../store/group-store";
 import { eventBus } from "../../red/core/events";
 import { ContextMenu } from "./ContextMenu";
 import {
@@ -25,6 +26,7 @@ import {
   Download,
   Import,
   CheckSquare,
+  Layers,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -106,6 +108,72 @@ function importNodes() {
   input.click();
 }
 
+/** Convert selected nodes into a subflow */
+function createSubflowFromNodes(selectedNodeIds: string[]) {
+  if (selectedNodeIds.length < 2) return;
+
+  // Import inline to avoid circular deps at module level
+  const { useSubflowStore } = require("../../store/subflow-store") as {
+    useSubflowStore: {
+      getState: () => {
+        convertToSubflow: (ids: string[]) => { subflow: { id: string; name: string } };
+      };
+    };
+  };
+  const result = useSubflowStore.getState().convertToSubflow(selectedNodeIds);
+
+  // Remove the original nodes from the canvas — they now live inside the subflow
+  const { nodes, edges } = useFlowStore.getState();
+  const ids = new Set(selectedNodeIds);
+  const remainingNodes = nodes.filter((n) => !ids.has(n.id));
+  const remainingEdges = edges.filter(
+    (e) => !ids.has(e.source) && !ids.has(e.target),
+  );
+  useFlowStore.setState({ nodes: remainingNodes, edges: remainingEdges });
+
+  // Add a subflow instance node to the canvas
+  useFlowStore.getState().addNode({
+    id: result.subflow.id,
+    type: "subflow",
+    position: { x: 100, y: 100 },
+    data: {
+      label: result.subflow.name,
+      subflowId: result.subflow.id,
+    },
+  });
+
+  eventBus.emit("subflow:created", {
+    id: result.subflow.id,
+    name: result.subflow.name,
+  });
+}
+
+/** Group selected nodes into a new visual group */
+function groupSelectedNodes(selectedNodeIds: string[]) {
+  if (selectedNodeIds.length < 2) return;
+
+  const groupId = useGroupStore.getState().createGroup(selectedNodeIds);
+  const group = useGroupStore.getState().groups.find((g) => g.id === groupId);
+  if (!group) return;
+
+  // Add a group node to the flow store so React Flow renders it
+  useFlowStore.getState().addNode({
+    id: groupId,
+    type: "group",
+    position: { x: group.x, y: group.y },
+    data: {
+      label: group.label,
+      nodes: group.nodes,
+      fill: group.style?.fill,
+      stroke: group.style?.stroke,
+    },
+    style: { width: group.w, height: group.h },
+    selectable: true,
+    draggable: false, // We handle drag ourselves
+    zIndex: -1, // Render behind regular nodes
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Menu item builders
 // ---------------------------------------------------------------------------
@@ -163,13 +231,13 @@ function buildNodeMenuItems(selectedNodeIds: string[]): MenuItem[] {
       ? [
           {
             label: "Create Subflow",
-            icon: <Group size={14} />,
-            disabled: true, // Not yet implemented
+            icon: <Layers size={14} />,
+            action: () => createSubflowFromNodes(selectedNodeIds),
           } as MenuItem,
           {
             label: "Group",
             icon: <Group size={14} />,
-            disabled: true, // Not yet implemented
+            action: () => groupSelectedNodes(selectedNodeIds),
           } as MenuItem,
           { label: "", separator: true } as MenuItem,
         ]
