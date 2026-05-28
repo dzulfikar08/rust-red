@@ -169,11 +169,25 @@ export interface AppEvents {
   "nodes:added": { id: string; type: string };
   "nodes:removed": { id: string };
   "nodes:changed": { id: string };
+  "node:edit-requested": { id: string };
+
+  // Canvas
+  "canvas:context-menu": {
+    x: number;
+    y: number;
+    flowX: number;
+    flowY: number;
+  };
 
   // Flows
   "flows:deploy": { revision: string };
   "flows:imported": { count: number };
   "flows:cleared": undefined;
+
+  // Deploy
+  "deploy:start": { mode: string };
+  "deploy:success": { mode: string };
+  "deploy:error": { mode: string; error: string };
 
   // Editor
   "editor:select": { id: string | null };

@@ -38,3 +38,24 @@ export const flowsApi = {
     return client.delete<void>(`/flow/${id}`);
   },
 };
+
+// ---------------------------------------------------------------------------
+// Convenience helpers for deploy flow
+// ---------------------------------------------------------------------------
+
+/**
+ * Deploy all flows by posting to the /flows endpoint.
+ * Accepts a simplified payload with flow definitions and nodes.
+ */
+export async function deployFlows(
+  flows: FlowsPayload,
+): Promise<FlowsResponse> {
+  return flowsApi.postFlows(flows);
+}
+
+/**
+ * Fetch the current flow state from the server.
+ */
+export async function getFlows(): Promise<FlowsResponse> {
+  return flowsApi.getFlows();
+}
