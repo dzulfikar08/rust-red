@@ -1,83 +1,225 @@
-import { Upload, Bug, Sun, Moon } from "lucide-react";
+/**
+ * Header -- Node-RED style toolbar.
+ *
+ * Layout:
+ *   [Hamburger] [Logo "Node-RED"]  ---  [Palette] [User] [Deploy] [Theme]
+ *
+ * Dark bar (#333 base) with white/light text.
+ */
+
+import { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Menu,
+  Package,
+  User,
+  Sun,
+  Moon,
+  PanelRightOpen,
+  PanelRightClose,
+} from "lucide-react";
 import { useThemeStore } from "../../store/theme-store";
-import { useEditorStore } from "../../store/editor-store";
+import { DeployButton } from "../deploy/Deploy";
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
 
 interface HeaderProps {
-  onDeploy: () => void;
+  /** Whether the right sidebar is currently open. */
+  sidebarOpen: boolean;
+  /** Toggle the right sidebar open / closed. */
+  onToggleSidebar: () => void;
 }
 
-export function Header({ onDeploy }: HeaderProps) {
+// ---------------------------------------------------------------------------
+// Dropdown menu (for hamburger / user / palette menus)
+// ---------------------------------------------------------------------------
+
+function DropdownMenu({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      ref={ref}
+      className="absolute top-full left-0 mt-1 min-w-[180px] rounded border border-gray-600 bg-gray-800 py-1 shadow-lg z-50"
+    >
+      {children}
+    </div>
+  );
+}
+
+function MenuItem({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="flex w-full items-center px-3 py-1.5 text-left text-xs text-gray-200 hover:bg-gray-700"
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
   const { theme, toggleTheme } = useThemeStore();
-  const debugMessages = useEditorStore((s) => s.debugMessages);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const closeUserMenu = useCallback(() => setUserMenuOpen(false), []);
 
   return (
     <header
-      className="flex items-center justify-between px-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-      style={{ height: "var(--header-height)" }}
+      className="flex items-center justify-between px-2 bg-[#333] dark:bg-[#2a2a2a] border-b border-[#444] relative z-30 select-none"
+      style={{ height: 40 }}
+      data-testid="header"
     >
-      <div className="flex items-center gap-2">
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 32 32"
-          className="flex-shrink-0"
-        >
-          <rect width="32" height="32" rx="6" fill="#8f0000" />
-          <text
-            x="16"
-            y="23"
-            fontFamily="Arial, Helvetica, sans-serif"
-            fontSize="22"
-            fontWeight="bold"
-            fill="white"
-            textAnchor="middle"
+      {/* Left section */}
+      <div className="flex items-center gap-1">
+        {/* Hamburger / main menu */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors"
+            title="Main menu"
+            data-testid="header-menu-btn"
           >
-            R
-          </text>
-        </svg>
-        <span className="font-bold text-sm tracking-tight select-none">
-          Rust-Red
-        </span>
+            <Menu size={18} className="text-gray-200" />
+          </button>
+          <DropdownMenu open={menuOpen} onClose={closeMenu}>
+            <MenuItem label="Flows" onClick={closeMenu} />
+            <MenuItem label="Import" onClick={closeMenu} />
+            <MenuItem label="Export" onClick={closeMenu} />
+            <hr className="my-1 border-gray-600" />
+            <MenuItem label="Settings" onClick={closeMenu} />
+          </DropdownMenu>
+        </div>
+
+        {/* Logo */}
+        <div className="flex items-center gap-1.5 ml-1">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 32 32"
+            className="flex-shrink-0"
+          >
+            <rect width="32" height="32" rx="6" fill="#8f0000" />
+            <text
+              x="16"
+              y="23"
+              fontFamily="Arial, Helvetica, sans-serif"
+              fontSize="22"
+              fontWeight="bold"
+              fill="white"
+              textAnchor="middle"
+            >
+              R
+            </text>
+          </svg>
+          <span className="font-bold text-sm tracking-tight text-gray-100 select-none">
+            Node-RED
+          </span>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Center section (empty or breadcrumb) */}
+      <div className="flex-1" />
+
+      {/* Right section */}
+      <div className="flex items-center gap-1">
+        {/* Manage palette */}
         <button
           type="button"
-          className="relative p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          title="Debug messages"
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors"
+          title="Manage palette"
+          data-testid="header-palette-btn"
         >
-          <Bug size={16} />
-          {debugMessages.length > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-red-600 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-              {debugMessages.length > 9 ? "9+" : debugMessages.length}
-            </span>
+          <Package size={16} className="text-gray-300" />
+        </button>
+
+        {/* User settings */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setUserMenuOpen((v) => !v)}
+            className="flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors"
+            title="User"
+            data-testid="header-user-btn"
+          >
+            <User size={16} className="text-gray-300" />
+          </button>
+          <DropdownMenu open={userMenuOpen} onClose={closeUserMenu}>
+            <MenuItem label="Preferences" onClick={closeUserMenu} />
+            <MenuItem label="Keyboard shortcuts" onClick={closeUserMenu} />
+            <hr className="my-1 border-gray-600" />
+            <MenuItem label="About" onClick={closeUserMenu} />
+          </DropdownMenu>
+        </div>
+
+        {/* Deploy button */}
+        <DeployButton />
+
+        {/* Sidebar toggle */}
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors"
+          title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          data-testid="header-sidebar-toggle"
+        >
+          {sidebarOpen ? (
+            <PanelRightClose size={16} className="text-gray-300" />
+          ) : (
+            <PanelRightOpen size={16} className="text-gray-300" />
           )}
         </button>
 
+        {/* Theme toggle */}
         <button
           type="button"
           onClick={toggleTheme}
-          className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors"
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          data-testid="header-theme-toggle"
         >
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-        </button>
-
-        <button
-          type="button"
-          onClick={onDeploy}
-          className="flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-white rounded transition-colors"
-          style={{ backgroundColor: "var(--color-primary)" }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor =
-              "var(--color-primary-hover)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = "var(--color-primary)";
-          }}
-        >
-          <Upload size={14} />
-          Deploy
+          {theme === "dark" ? (
+            <Sun size={16} className="text-gray-300" />
+          ) : (
+            <Moon size={16} className="text-gray-300" />
+          )}
         </button>
       </div>
     </header>
