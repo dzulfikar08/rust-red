@@ -1,15 +1,18 @@
 /**
  * Sidebar -- Right-side panel container matching Node-RED's sidebar.
  *
- * Features:
- *  - Hidden (collapsed) by default
- *  - Fixed width (~320px) when open, sits on the right side of the layout
- *  - Resizable via drag handle on left edge
- *  - Placeholder content for sidebar tabs (info, debug, config, context, help)
- *    -- actual tab implementations are Phase 2
+ * This layout component handles:
+ *  - Width and resizing (drag handle on left edge)
+ *  - Open/close visibility
+ *  - Delegates tab switching and content rendering to SidebarContainer
+ *
+ * When closed, only the thin tab strip (~36px) is visible so the user can
+ * click a tab to re-open the sidebar.
  */
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useSidebarStore } from "../../store/sidebar-store";
+import { SidebarContainer } from "../sidebar/SidebarContainer";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -23,16 +26,17 @@ interface SidebarProps {
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEFAULT_WIDTH = 320;
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 600;
+const TAB_BAR_WIDTH = 36; // width of the icon tab strip
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 export function Sidebar({ open }: SidebarProps) {
-  const [width, setWidth] = useState(DEFAULT_WIDTH);
+  const width = useSidebarStore((s) => s.width);
+  const setWidth = useSidebarStore((s) => s.setWidth);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +66,7 @@ export function Sidebar({ open }: SidebarProps) {
       document.addEventListener("mousemove", onMouseMove);
       document.addEventListener("mouseup", onMouseUp);
     },
-    [width],
+    [width, setWidth],
   );
 
   // ----- Prevent text selection while resizing -----
@@ -81,44 +85,30 @@ export function Sidebar({ open }: SidebarProps) {
     };
   }, [isResizing]);
 
-  if (!open) return null;
-
+  // Always render the sidebar (tab bar strip is always visible).
+  // When open, the content panel is shown alongside the tab bar.
   return (
     <aside
-      className="flex flex-col h-full border-l border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden relative"
-      style={{ width, minWidth: MIN_WIDTH, maxWidth: MAX_WIDTH }}
+      className="flex h-full relative"
       data-testid="sidebar"
+      style={{
+        width: open ? width + TAB_BAR_WIDTH : TAB_BAR_WIDTH,
+        minWidth: open ? MIN_WIDTH + TAB_BAR_WIDTH : TAB_BAR_WIDTH,
+        maxWidth: MAX_WIDTH + TAB_BAR_WIDTH,
+        transition: isResizing ? "none" : "width 150ms ease",
+      }}
     >
-      {/* Resize drag handle (left edge) */}
-      <div
-        ref={resizeRef}
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400/50 active:bg-blue-400 z-10"
-        onMouseDown={handleMouseDown}
-        data-testid="sidebar-resize-handle"
-      />
+      {/* Resize drag handle (left edge) -- only visible when open */}
+      {open && (
+        <div
+          ref={resizeRef}
+          className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400/50 active:bg-blue-400 z-10"
+          onMouseDown={handleMouseDown}
+          data-testid="sidebar-resize-handle"
+        />
+      )}
 
-      {/* Sidebar header (placeholder for tabs) */}
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
-        {["info", "debug", "config", "context"].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            className={`px-2 py-1 text-[11px] font-medium rounded transition-colors ${
-              tab === "info"
-                ? "bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100"
-                : "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-            }`}
-            data-testid={`sidebar-tab-${tab}`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Sidebar content placeholder */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <p className="text-sm text-gray-400">Sidebar</p>
-      </div>
+      <SidebarContainer />
     </aside>
   );
 }

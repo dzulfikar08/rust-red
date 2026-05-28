@@ -12,6 +12,7 @@ export class CommsClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelay = RECONNECT_DELAY_MS;
   private disposed = false;
+  private connectionCallback: ((status: "connected" | "disconnected" | "connecting") => void) | null = null;
 
   connect(): void {
     if (this.disposed) return;
@@ -20,9 +21,11 @@ export class CommsClient {
     const url = `${protocol}//${window.location.host}/comms`;
 
     this.ws = new WebSocket(url);
+    this.connectionCallback?.("connecting");
 
     this.ws.onopen = () => {
       this.reconnectDelay = RECONNECT_DELAY_MS;
+      this.connectionCallback?.("connected");
       // Re-subscribe to all active topics after reconnect
       for (const topic of this.activeSubscriptions) {
         this.ws!.send(JSON.stringify({ subscribe: topic }));
@@ -50,6 +53,7 @@ export class CommsClient {
     };
 
     this.ws.onclose = () => {
+      this.connectionCallback?.("disconnected");
       this.scheduleReconnect();
     };
 
@@ -113,6 +117,14 @@ export class CommsClient {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ unsubscribe: topic }));
     }
+  }
+
+  /**
+   * Register a callback that is called whenever the WebSocket connection
+   * state changes (connecting / connected / disconnected).
+   */
+  onConnectionChange(cb: (status: "connected" | "disconnected" | "connecting") => void): void {
+    this.connectionCallback = cb;
   }
 
   dispose(): void {

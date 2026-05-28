@@ -17,7 +17,7 @@
  *   Existing mobile layout with bottom tabs, hamburger, FAB, etc.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Node } from "@xyflow/react";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
@@ -27,8 +27,12 @@ import { WorkspaceTabs } from "../workspaces/WorkspaceTabs";
 import { DebugPanel } from "../debug/DebugPanel";
 import { MobileDebugPanel } from "../debug/MobileDebugPanel";
 import { AIAssistant } from "../ai/AIAssistant";
+import { StatusBar } from "./StatusBar";
+import { commsClient } from "../../ws/comms";
+import { useStatusStore } from "../../store/status-store";
 import { useEditorStore } from "../../store/editor-store";
 import { useFlowStore } from "../../store/flow-store";
+import { useSidebarStore } from "../../store/sidebar-store";
 import { useBreakpoint } from "../../hooks";
 import {
   BottomTabBar,
@@ -66,8 +70,9 @@ export function AppShell({ onDeploy, showHeader = false }: AppShellProps) {
   const debugVisible = debugMessages.length > 0;
   const { isMobile } = useBreakpoint();
 
-  // Sidebar state (right panel, hidden by default)
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Sidebar state from store (shared with Header and SidebarContainer)
+  const sidebarOpen = useSidebarStore((s) => s.isOpen);
+  const sidebarToggle = useSidebarStore((s) => s.toggle);
 
   // Mobile state
   const [mobileTab, setMobileTab] = useState<MobileTab>("flows");
@@ -121,8 +126,22 @@ export function AppShell({ onDeploy, showHeader = false }: AppShellProps) {
   });
 
   const handleToggleSidebar = useCallback(() => {
-    setSidebarOpen((v) => !v);
-  }, []);
+    sidebarToggle();
+  }, [sidebarToggle]);
+
+  // -----------------------------------------------------------------------
+  // WebSocket connection status tracking
+  // -----------------------------------------------------------------------
+
+  const setConnectionStatus = useStatusStore((s) => s.setConnectionStatus);
+
+  useEffect(() => {
+    // Wire up the comms client lifecycle to the status store so the
+    // StatusBar always shows the current connection state.
+    commsClient.onConnectionChange(setConnectionStatus);
+    // Default to disconnected until the WebSocket transitions.
+    setConnectionStatus("disconnected");
+  }, [setConnectionStatus]);
 
   // -----------------------------------------------------------------------
   // Desktop layout
@@ -152,6 +171,9 @@ export function AppShell({ onDeploy, showHeader = false }: AppShellProps) {
           {/* Right: Sidebar (collapsible, hidden by default) */}
           <Sidebar open={sidebarOpen} />
         </div>
+
+        {/* Status bar */}
+        <StatusBar />
       </div>
     );
   }
@@ -196,6 +218,9 @@ export function AppShell({ onDeploy, showHeader = false }: AppShellProps) {
         {mobileTab === "debug" && <MobileDebugPanel />}
         {mobileTab === "ai" && <AIAssistant />}
       </div>
+
+      {/* Status bar */}
+      <StatusBar />
 
       {/* Bottom tab bar */}
       <BottomTabBar
