@@ -270,6 +270,35 @@ function FlowCanvasInner() {
   );
 
   // -----------------------------------------------------------------------
+  // Right-click on node → context menu event (node context)
+  // -----------------------------------------------------------------------
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent | MouseEvent) => {
+      event.preventDefault();
+
+      let flowX = 0;
+      let flowY = 0;
+      if (reactFlowInstance.current) {
+        const pos = reactFlowInstance.current.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        });
+        flowX = pos.x;
+        flowY = pos.y;
+      }
+
+      eventBus.emit("canvas:context-menu", {
+        x: event.clientX,
+        y: event.clientY,
+        flowX,
+        flowY,
+      });
+    },
+    [],
+  );
+
+  // -----------------------------------------------------------------------
   // Delete selected nodes/edges on Delete key
   // -----------------------------------------------------------------------
 
@@ -374,6 +403,7 @@ function FlowCanvasInner() {
         onMoveEnd={onMoveEnd}
         onNodeDoubleClick={onNodeDoubleClick}
         onPaneContextMenu={onPaneContextMenu}
+        onNodeContextMenu={onNodeContextMenu}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: "wire" }}

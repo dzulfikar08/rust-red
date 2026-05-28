@@ -27,13 +27,19 @@ import { WorkspaceTabs } from "../workspaces/WorkspaceTabs";
 import { DebugPanel } from "../debug/DebugPanel";
 import { MobileDebugPanel } from "../debug/MobileDebugPanel";
 import { AIAssistant } from "../ai/AIAssistant";
+import { SearchDialog } from "../search/SearchDialog";
 import { StatusBar } from "./StatusBar";
 import { commsClient } from "../../ws/comms";
 import { useStatusStore } from "../../store/status-store";
 import { useEditorStore } from "../../store/editor-store";
 import { useFlowStore } from "../../store/flow-store";
 import { useSidebarStore } from "../../store/sidebar-store";
+import { useSearchStore } from "../../store/search-store";
+import { useActionStore } from "../../store/action-store";
+import { useClipboardStore } from "../../store/clipboard-store";
+import { initContextMenuListener } from "../../store/context-menu-store";
 import { useBreakpoint } from "../../hooks";
+import { ContextMenuManager } from "../context-menu/ContextMenuManager";
 import {
   BottomTabBar,
   type MobileTab,
@@ -144,6 +150,84 @@ export function AppShell({ onDeploy, showHeader = false }: AppShellProps) {
   }, [setConnectionStatus]);
 
   // -----------------------------------------------------------------------
+  // Initialize context menu listener (canvas right-click events)
+  // -----------------------------------------------------------------------
+
+  useEffect(() => {
+    initContextMenuListener();
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Ctrl+F keyboard shortcut to open search
+  // -----------------------------------------------------------------------
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        useSearchStore.getState().open();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Register clipboard actions (core:copy, core:paste, core:cut)
+  // -----------------------------------------------------------------------
+
+  useEffect(() => {
+    const clipboard = useClipboardStore.getState();
+    const actionStore = useActionStore.getState();
+
+    actionStore.registerAction({
+      id: "core:copy",
+      name: "Copy",
+      scope: "core",
+      key: "Ctrl-C",
+      handler: () => {
+        const selectedNodeId = useEditorStore.getState().selectedNodeId;
+        if (selectedNodeId) {
+          clipboard.copy([selectedNodeId]);
+        }
+      },
+    });
+
+    actionStore.registerAction({
+      id: "core:paste",
+      name: "Paste",
+      scope: "core",
+      key: "Ctrl-V",
+      handler: () => {
+        if (clipboard.hasClipboard) {
+          clipboard.paste();
+        }
+      },
+    });
+
+    actionStore.registerAction({
+      id: "core:cut",
+      name: "Cut",
+      scope: "core",
+      key: "Ctrl-X",
+      handler: () => {
+        const selectedNodeId = useEditorStore.getState().selectedNodeId;
+        if (selectedNodeId) {
+          clipboard.cut([selectedNodeId]);
+        }
+      },
+    });
+
+    // Cleanup is optional since the app shell lives for the app lifetime,
+    // but we return a cleanup function for correctness.
+    return () => {
+      useActionStore.getState().unregisterAction("core:copy");
+      useActionStore.getState().unregisterAction("core:paste");
+      useActionStore.getState().unregisterAction("core:cut");
+    };
+  }, []);
+
+  // -----------------------------------------------------------------------
   // Desktop layout
   // -----------------------------------------------------------------------
 
@@ -174,6 +258,12 @@ export function AppShell({ onDeploy, showHeader = false }: AppShellProps) {
 
         {/* Status bar */}
         <StatusBar />
+
+        {/* Global search dialog (Ctrl+F) */}
+        <SearchDialog />
+
+        {/* Context menu (right-click) */}
+        <ContextMenuManager />
       </div>
     );
   }
@@ -256,6 +346,9 @@ export function AppShell({ onDeploy, showHeader = false }: AppShellProps) {
           onClose={() => setCtxMenu(null)}
         />
       )}
+
+      {/* Global search dialog (Ctrl+F) */}
+      <SearchDialog />
     </div>
   );
 }
