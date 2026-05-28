@@ -23,6 +23,24 @@ vi.mock("../../deploy/Deploy", () => ({
   DeployButton: () => <button data-testid="deploy-button">Deploy</button>,
 }));
 
+vi.mock("../../clipboard", () => ({
+  ImportDialog: () => null,
+  ExportDialog: () => null,
+}));
+
+vi.mock("../../user-settings/UserSettingsDialog", () => ({
+  UserSettingsDialog: () => null,
+}));
+
+vi.mock("../../../store/clipboard-store", () => ({
+  useClipboardStore: {
+    getState: () => ({
+      importFromJson: vi.fn(),
+      exportToJson: () => "{}",
+    }),
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

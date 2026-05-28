@@ -19,6 +19,12 @@ import {
 } from "lucide-react";
 import { useThemeStore } from "../../store/theme-store";
 import { DeployButton } from "../deploy/Deploy";
+import { ImportDialog, ExportDialog } from "../clipboard";
+import { useClipboardStore } from "../../store/clipboard-store";
+import {
+  UserSettingsDialog,
+  type SettingsTab,
+} from "../user-settings/UserSettingsDialog";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -96,9 +102,32 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
   const { theme, toggleTheme } = useThemeStore();
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("editor");
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const closeUserMenu = useCallback(() => setUserMenuOpen(false), []);
+
+  const openSettings = useCallback(
+    (tab: SettingsTab = "editor") => {
+      setSettingsTab(tab);
+      setSettingsOpen(true);
+    },
+    [],
+  );
+
+  const handleImport = useCallback((json: string) => {
+    useClipboardStore.getState().importFromJson(json);
+    setImportOpen(false);
+  }, []);
+
+  const handleExportOpen = useCallback(() => {
+    setExportOpen(true);
+  }, []);
+
+  const exportJson = useClipboardStore.getState().exportToJson();
 
   return (
     <header
@@ -121,10 +150,10 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
           </button>
           <DropdownMenu open={menuOpen} onClose={closeMenu}>
             <MenuItem label="Flows" onClick={closeMenu} />
-            <MenuItem label="Import" onClick={closeMenu} />
-            <MenuItem label="Export" onClick={closeMenu} />
+            <MenuItem label="Import" onClick={() => { closeMenu(); setImportOpen(true); }} />
+            <MenuItem label="Export" onClick={() => { closeMenu(); handleExportOpen(); }} />
             <hr className="my-1 border-gray-600" />
-            <MenuItem label="Settings" onClick={closeMenu} />
+            <MenuItem label="Settings" onClick={() => { closeMenu(); openSettings("editor"); }} />
           </DropdownMenu>
         </div>
 
@@ -182,10 +211,10 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
             <User size={16} className="text-gray-300" />
           </button>
           <DropdownMenu open={userMenuOpen} onClose={closeUserMenu}>
-            <MenuItem label="Preferences" onClick={closeUserMenu} />
-            <MenuItem label="Keyboard shortcuts" onClick={closeUserMenu} />
+            <MenuItem label="Preferences" onClick={() => { closeUserMenu(); openSettings("editor"); }} />
+            <MenuItem label="Keyboard shortcuts" onClick={() => { closeUserMenu(); openSettings("shortcuts"); }} />
             <hr className="my-1 border-gray-600" />
-            <MenuItem label="About" onClick={closeUserMenu} />
+            <MenuItem label="About" onClick={() => { closeUserMenu(); openSettings("about"); }} />
           </DropdownMenu>
         </div>
 
@@ -222,6 +251,25 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
           )}
         </button>
       </div>
+
+      {/* Import/Export dialogs */}
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImport={handleImport}
+      />
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        json={exportJson}
+      />
+
+      {/* User Settings dialog */}
+      <UserSettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialTab={settingsTab}
+      />
     </header>
   );
 }
