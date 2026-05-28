@@ -120,7 +120,7 @@ fn build_static_files(build_time: &str) {
         let index_html = static_dir.join("index.html");
         if index_html.exists() {
             let content = fs::read_to_string(&index_html).expect("Failed to read index.html");
-            let injected = content.replace("__BUILD_TIME__", &build_time);
+            let injected = content.replace("__BUILD_TIME__", build_time);
             fs::write(&index_html, injected).expect("Failed to write index.html");
         }
 

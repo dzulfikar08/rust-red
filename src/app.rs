@@ -50,8 +50,7 @@ impl App {
     ) -> rust_red_core::Result<Self> {
         #[cfg(not(feature = "wasm_plugins"))]
         let reg = {
-            let reg = create_registry()?;
-            reg
+            create_registry()?
         };
         #[cfg(not(feature = "wasm_plugins"))]
         let _plugin_manager: Option<()> = None;
