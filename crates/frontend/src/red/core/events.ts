@@ -170,6 +170,7 @@ export interface AppEvents {
   "nodes:removed": { id: string };
   "nodes:changed": { id: string };
   "node:edit-requested": { id: string };
+  "node:select-requested": { id: string };
 
   // Canvas
   "canvas:context-menu": {
