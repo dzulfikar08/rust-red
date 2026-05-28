@@ -25,6 +25,8 @@ import {
   UserSettingsDialog,
   type SettingsTab,
 } from "../user-settings/UserSettingsDialog";
+import { PaletteEditorDialog } from "../palette/PaletteEditorDialog";
+import { DiffDialog } from "../diff/DiffDialog";
 
 // ---------------------------------------------------------------------------
 // Props
@@ -106,6 +108,8 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("editor");
+  const [paletteEditorOpen, setPaletteEditorOpen] = useState(false);
+  const [diffOpen, setDiffOpen] = useState(false);
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
   const closeUserMenu = useCallback(() => setUserMenuOpen(false), []);
@@ -152,6 +156,7 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
             <MenuItem label="Flows" onClick={closeMenu} />
             <MenuItem label="Import" onClick={() => { closeMenu(); setImportOpen(true); }} />
             <MenuItem label="Export" onClick={() => { closeMenu(); handleExportOpen(); }} />
+            <MenuItem label="Compare with deployed" onClick={() => { closeMenu(); setDiffOpen(true); }} />
             <hr className="my-1 border-gray-600" />
             <MenuItem label="Settings" onClick={() => { closeMenu(); openSettings("editor"); }} />
           </DropdownMenu>
@@ -192,6 +197,7 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
         {/* Manage palette */}
         <button
           type="button"
+          onClick={() => setPaletteEditorOpen(true)}
           className="flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors"
           title="Manage palette"
           data-testid="header-palette-btn"
@@ -269,6 +275,18 @@ export function Header({ sidebarOpen, onToggleSidebar }: HeaderProps) {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         initialTab={settingsTab}
+      />
+
+      {/* Palette Editor dialog */}
+      <PaletteEditorDialog
+        open={paletteEditorOpen}
+        onClose={() => setPaletteEditorOpen(false)}
+      />
+
+      {/* Diff dialog */}
+      <DiffDialog
+        open={diffOpen}
+        onClose={() => setDiffOpen(false)}
       />
     </header>
   );
