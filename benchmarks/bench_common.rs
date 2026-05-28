@@ -19,6 +19,7 @@ pub fn init_test_logger() {
 
 /// Statistics computed from a set of timing measurements.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Stats {
     pub mean: Duration,
     pub min: Duration,
@@ -30,6 +31,7 @@ pub struct Stats {
     pub iterations: usize,
 }
 
+#[allow(dead_code)]
 impl Stats {
     /// Compute statistics from a slice of durations.
     /// `msg_count` is the number of messages processed per iteration,

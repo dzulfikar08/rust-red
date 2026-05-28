@@ -274,7 +274,7 @@ fn benchmark_flow_throughput(flow_json: &str, label: &str, msg_count: usize) -> 
 
             inject_handle.await.ok();
 
-            if let Err(_) = recv_result {
+            if recv_result.is_err() {
                 eprintln!("  Iteration {}: TIMEOUT after {:?}", iter, elapsed);
             }
 

@@ -235,9 +235,7 @@ fn build_node_red(node_red_root: &Path) {
 /// Check if editor-client source JS files are newer than the built red.min.js.
 /// If so, run `npx grunt concat uglify` to rebuild the bundle.
 fn rebuild_editor_if_stale(node_red_root: &Path) {
-    let built_js = node_red_root.join(
-        "packages/node_modules/@node-red/editor-client/public/red/red.min.js",
-    );
+    let built_js = node_red_root.join("packages/node_modules/@node-red/editor-client/public/red/red.min.js");
     let src_js_dir = node_red_root.join("packages/node_modules/@node-red/editor-client/src/js");
 
     if !src_js_dir.exists() || !built_js.exists() {
@@ -254,10 +252,7 @@ fn rebuild_editor_if_stale(node_red_root: &Path) {
     if newest_src > built_time {
         println!("cargo:warning=Editor source files changed, rebuilding JS bundle...");
         let npx_cmd = if cfg!(target_os = "windows") { "npx.cmd" } else { "npx" };
-        let result = Command::new(npx_cmd)
-            .args(["grunt", "concat", "uglify"])
-            .current_dir(node_red_root)
-            .status();
+        let result = Command::new(npx_cmd).args(["grunt", "concat", "uglify"]).current_dir(node_red_root).status();
 
         match result {
             Ok(s) if s.success() => println!("cargo:warning=Editor JS bundle rebuilt."),

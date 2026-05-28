@@ -30,8 +30,9 @@ struct BenchWasmMessage {
     extra: std::collections::BTreeMap<String, BenchWasmValue>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 enum BenchWasmValue {
+    #[default]
     Null,
     Bool(bool),
     I64(i64),
@@ -41,12 +42,6 @@ enum BenchWasmValue {
     Bytes(Vec<u8>),
     Array(Vec<BenchWasmValue>),
     Object(std::collections::BTreeMap<String, BenchWasmValue>),
-}
-
-impl Default for BenchWasmValue {
-    fn default() -> Self {
-        BenchWasmValue::Null
-    }
 }
 
 fn create_sample_message(payload_size: usize) -> BenchWasmMessage {
