@@ -218,6 +218,74 @@ describe("SchemaForm", () => {
     expect(screen.getByText("Topic is required")).toBeInTheDocument();
   });
 
+  it("shows error icon for fields with errors", () => {
+    const schema = makeSchema({
+      topic: { value: "", required: true },
+    });
+    const values = { topic: "" };
+    const errors = { topic: "Topic is required" };
+
+    render(
+      <SchemaForm
+        schema={schema}
+        values={values}
+        onChange={vi.fn()}
+        errors={errors}
+      />,
+    );
+
+    // The input should have aria-invalid when there's an error
+    const inputs = screen.getAllByRole("textbox");
+    const topicInput = inputs.find((el) => el.id.includes("topic") || el.getAttribute("value") === "");
+    expect(topicInput).toBeTruthy();
+    expect(topicInput).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("does not show error styling for fields without errors", () => {
+    const schema = makeSchema({
+      topic: { value: "" },
+      name: { value: "" },
+    });
+    const values = { topic: "valid", name: "valid" };
+    const errors = { topic: "Topic has error" };
+
+    render(
+      <SchemaForm
+        schema={schema}
+        values={values}
+        onChange={vi.fn()}
+        errors={errors}
+      />,
+    );
+
+    // Topic input should have aria-invalid, name should not
+    const allInputs = screen.getAllByRole("textbox");
+    // Name comes first (sorted), then Topic
+    expect(allInputs[0]).not.toHaveAttribute("aria-invalid", "true");
+    expect(allInputs[1]).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("shows multiple field errors simultaneously", () => {
+    const schema = makeSchema({
+      name: { value: "", required: true },
+      topic: { value: "", required: true },
+    });
+    const values = { name: "", topic: "" };
+    const errors = { name: "Name is required", topic: "Topic is required" };
+
+    render(
+      <SchemaForm
+        schema={schema}
+        values={values}
+        onChange={vi.fn()}
+        errors={errors}
+      />,
+    );
+
+    expect(screen.getByText("Name is required")).toBeInTheDocument();
+    expect(screen.getByText("Topic is required")).toBeInTheDocument();
+  });
+
   it("disables all fields when disabled prop is true", () => {
     const schema = makeSchema({
       name: { value: "" },

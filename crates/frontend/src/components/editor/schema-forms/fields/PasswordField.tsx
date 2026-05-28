@@ -14,6 +14,11 @@ export function PasswordField({
 }: FieldProps) {
   const id = useId();
   const [visible, setVisible] = useState(false);
+  const hasError = !!error;
+  const border = hasError ? "border-red-500" : "border-[#555]";
+  const focusBorder = hasError
+    ? "focus:border-red-400 focus:ring-1 focus:ring-red-400"
+    : "focus:border-[#777] focus:ring-1 focus:ring-[#557da0]";
 
   return (
     <div className="flex flex-col gap-1">
@@ -31,14 +36,14 @@ export function PasswordField({
           type={visible ? "text" : "password"}
           className={
             "w-full rounded border px-2 py-1.5 pr-8 text-sm outline-none transition-colors " +
-            "bg-[#444] border-[#555] text-gray-100 placeholder-gray-400 " +
-            "focus:border-[#777] focus:ring-1 focus:ring-[#557da0] " +
+            "bg-[#444] text-gray-100 placeholder-gray-400 " +
+            `${border} ${focusBorder} ` +
             "disabled:opacity-50 disabled:cursor-not-allowed"
           }
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
-          aria-invalid={!!error}
+          aria-invalid={hasError}
         />
         <button
           type="button"
@@ -52,9 +57,17 @@ export function PasswordField({
         >
           {visible ? "\u25CF" : "\u25CB"}
         </button>
+        {hasError && (
+          <span
+            className="absolute right-8 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none select-none pointer-events-none"
+            aria-hidden="true"
+          >
+            !
+          </span>
+        )}
       </div>
 
-      {error && (
+      {hasError && (
         <span className="text-xs text-red-400">{error}</span>
       )}
     </div>

@@ -12,6 +12,8 @@ export function BooleanField({
   disabled,
 }: FieldProps) {
   const id = useId();
+  const hasError = !!error;
+  const border = hasError ? "border-red-500" : "border-[#555]";
 
   return (
     <div className="flex items-center gap-2">
@@ -19,14 +21,14 @@ export function BooleanField({
         id={id}
         type="checkbox"
         className={
-          "h-4 w-4 rounded border border-[#555] bg-[#444] text-[#557da0] " +
+          `h-4 w-4 rounded border ${border} bg-[#444] text-[#557da0] ` +
           "focus:ring-1 focus:ring-[#557da0] " +
           "disabled:opacity-50 disabled:cursor-not-allowed"
         }
         checked={Boolean(value)}
         onChange={(e) => onChange(e.target.checked)}
         disabled={disabled}
-        aria-invalid={!!error}
+        aria-invalid={hasError}
       />
 
       <label
@@ -36,8 +38,16 @@ export function BooleanField({
         {label}
       </label>
 
-      {error && (
-        <span className="text-xs text-red-400 ml-auto">{error}</span>
+      {hasError && (
+        <>
+          <span
+            className="w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none select-none"
+            aria-hidden="true"
+          >
+            !
+          </span>
+          <span className="text-xs text-red-400">{error}</span>
+        </>
       )}
     </div>
   );

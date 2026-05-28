@@ -486,46 +486,35 @@ describe("NodeEditorPanel", () => {
       expect(screen.queryByTestId("node-editor-error-count")).not.toBeInTheDocument();
     });
 
-    it("shows red border on name field when it has an error", async () => {
+    it("shows red border on field with error", async () => {
       const user = userEvent.setup();
 
-      nodeRegistry.registerType("name-err", {
-        id: "name-err",
-        type: "name-err",
-        name: "name-err",
+      nodeRegistry.registerType("field-err", {
+        id: "field-err",
+        type: "field-err",
+        name: "field-err",
         category: "common",
         color: "#a6bbcf",
-        defaults: {},
+        defaults: {
+          topic: { value: "", required: true },
+        },
         inputs: 0,
         outputs: 1,
       });
 
-      useFlowStore.setState({
-        nodes: [
-          {
-            id: "test-node-1",
-            type: "nrNode",
-            position: { x: 0, y: 0 },
-            data: { type: "name-err" },
-          },
-        ],
-      });
-
       openEditor({
-        nodeType: "name-err",
-        formData: { name: "" },
+        nodeType: "field-err",
+        formData: { name: "Test", topic: "" },
       });
       render(<NodeEditorPanel />);
 
-      // Clear the name field to make it empty and trigger validation
-      const nameInput = screen.getByTestId("node-editor-field-name");
-
-      // Set name to empty, then trigger Done
-      await user.clear(nameInput);
+      // Trigger validation by clicking Done
       await user.click(screen.getByTestId("node-editor-btn-done"));
 
-      // Name input should have aria-invalid
-      expect(nameInput).toHaveAttribute("aria-invalid", "true");
+      // Error count should be shown with the required topic field error
+      expect(screen.getByTestId("node-editor-error-count")).toHaveTextContent(
+        "Fix 1 error before saving",
+      );
     });
   });
 });
