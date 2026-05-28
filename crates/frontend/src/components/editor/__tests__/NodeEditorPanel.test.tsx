@@ -124,11 +124,13 @@ describe("NodeEditorPanel", () => {
       expect(desc).toHaveValue("Some description");
     });
 
-    it("renders dynamic fields from node defaults", () => {
-      nodeRegistry.registerType("inject", {
-        id: "inject",
-        type: "inject",
-        name: "inject",
+    it("renders dynamic fields from node defaults via SchemaDefaultEditor", () => {
+      // Use a type that does NOT have a custom editor, so SchemaDefaultEditor
+      // renders the node definition's defaults through SchemaForm.
+      nodeRegistry.registerType("custom-test", {
+        id: "custom-test",
+        type: "custom-test",
+        name: "custom-test",
         category: "common",
         color: "#a6bbcf",
         defaults: {
@@ -139,13 +141,14 @@ describe("NodeEditorPanel", () => {
         outputs: 1,
       });
       openEditor({
-        nodeType: "inject",
+        nodeType: "custom-test",
         formData: { name: "Test", topic: "sensor", payload: "data" },
       });
       render(<NodeEditorPanel />);
 
-      expect(screen.getByTestId("node-editor-field-topic")).toBeInTheDocument();
-      expect(screen.getByTestId("node-editor-field-payload")).toBeInTheDocument();
+      // SchemaForm renders fields with aria-label
+      expect(screen.getByLabelText("Topic")).toBeInTheDocument();
+      expect(screen.getByLabelText("Payload")).toBeInTheDocument();
     });
 
     it("updates form field when typing", async () => {
@@ -185,6 +188,21 @@ describe("NodeEditorPanel", () => {
     it("saves form data to flow store on Done", async () => {
       const user = userEvent.setup();
 
+      // Register a node type in the registry so validation can resolve the definition
+      nodeRegistry.registerType("custom-save", {
+        id: "custom-save",
+        type: "custom-save",
+        name: "custom-save",
+        category: "common",
+        color: "#a6bbcf",
+        defaults: {
+          name: { value: "" },
+          topic: { value: "" },
+        },
+        inputs: 0,
+        outputs: 1,
+      });
+
       // Add a node to the flow store so updateNodeData can find it
       useFlowStore.setState({
         nodes: [
@@ -192,12 +210,15 @@ describe("NodeEditorPanel", () => {
             id: "test-node-1",
             type: "nrNode",
             position: { x: 0, y: 0 },
-            data: { name: "Test", type: "inject" },
+            data: { name: "Test", type: "custom-save" },
           },
         ],
       });
 
-      openEditor({ formData: { name: "Updated Node", topic: "new-topic" } });
+      openEditor({
+        nodeType: "custom-save",
+        formData: { name: "Updated Node", topic: "new-topic" },
+      });
       render(<NodeEditorPanel />);
 
       await user.click(screen.getByTestId("node-editor-btn-done"));
@@ -319,6 +340,192 @@ describe("NodeEditorPanel", () => {
 
       await user.click(screen.getByTestId("node-editor-btn-close"));
       expect(useEditorPanelStore.getState().isOpen).toBe(false);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Validation on save
+  // -----------------------------------------------------------------------
+
+  describe("validation on save", () => {
+    it("prevents saving when required fields are empty", async () => {
+      const user = userEvent.setup();
+
+      // Register a node type with required fields
+      nodeRegistry.registerType("val-test", {
+        id: "val-test",
+        type: "val-test",
+        name: "val-test",
+        category: "common",
+        color: "#a6bbcf",
+        defaults: {
+          topic: { value: "", required: true },
+        },
+        inputs: 0,
+        outputs: 1,
+      });
+
+      useFlowStore.setState({
+        nodes: [
+          {
+            id: "test-node-1",
+            type: "nrNode",
+            position: { x: 0, y: 0 },
+            data: { name: "Test", type: "val-test", topic: "" },
+          },
+        ],
+      });
+
+      openEditor({
+        nodeType: "val-test",
+        formData: { name: "Test Node", topic: "" },
+      });
+      render(<NodeEditorPanel />);
+
+      // Click Done with empty required field
+      await user.click(screen.getByTestId("node-editor-btn-done"));
+
+      // Editor should still be open (save was prevented)
+      expect(useEditorPanelStore.getState().isOpen).toBe(true);
+
+      // Error count should be shown
+      expect(screen.getByTestId("node-editor-error-count")).toHaveTextContent(
+        "Fix 1 error before saving",
+      );
+    });
+
+    it("saves successfully when all required fields are filled", async () => {
+      const user = userEvent.setup();
+
+      nodeRegistry.registerType("val-ok", {
+        id: "val-ok",
+        type: "val-ok",
+        name: "val-ok",
+        category: "common",
+        color: "#a6bbcf",
+        defaults: {
+          topic: { value: "", required: true },
+        },
+        inputs: 0,
+        outputs: 1,
+      });
+
+      useFlowStore.setState({
+        nodes: [
+          {
+            id: "test-node-1",
+            type: "nrNode",
+            position: { x: 0, y: 0 },
+            data: { name: "Test", type: "val-ok", topic: "filled" },
+          },
+        ],
+      });
+
+      openEditor({
+        nodeType: "val-ok",
+        formData: { name: "Test Node", topic: "sensor/data" },
+      });
+      render(<NodeEditorPanel />);
+
+      await user.click(screen.getByTestId("node-editor-btn-done"));
+
+      // Editor should be closed (save succeeded)
+      expect(useEditorPanelStore.getState().isOpen).toBe(false);
+    });
+
+    it("shows error count for multiple errors", async () => {
+      const user = userEvent.setup();
+
+      nodeRegistry.registerType("multi-err", {
+        id: "multi-err",
+        type: "multi-err",
+        name: "multi-err",
+        category: "common",
+        color: "#a6bbcf",
+        defaults: {
+          topic: { value: "", required: true },
+          payload: { value: "", required: true },
+        },
+        inputs: 0,
+        outputs: 1,
+      });
+
+      openEditor({
+        nodeType: "multi-err",
+        formData: { name: "Test", topic: "", payload: "" },
+      });
+      render(<NodeEditorPanel />);
+
+      await user.click(screen.getByTestId("node-editor-btn-done"));
+
+      expect(screen.getByTestId("node-editor-error-count")).toHaveTextContent(
+        "Fix 2 errors before saving",
+      );
+    });
+
+    it("shows no error count when form is valid", () => {
+      nodeRegistry.registerType("no-err", {
+        id: "no-err",
+        type: "no-err",
+        name: "no-err",
+        category: "common",
+        color: "#a6bbcf",
+        defaults: {
+          topic: { value: "" },
+        },
+        inputs: 0,
+        outputs: 1,
+      });
+
+      openEditor({
+        nodeType: "no-err",
+        formData: { name: "Test", topic: "value" },
+      });
+      render(<NodeEditorPanel />);
+
+      expect(screen.queryByTestId("node-editor-error-count")).not.toBeInTheDocument();
+    });
+
+    it("shows red border on name field when it has an error", async () => {
+      const user = userEvent.setup();
+
+      nodeRegistry.registerType("name-err", {
+        id: "name-err",
+        type: "name-err",
+        name: "name-err",
+        category: "common",
+        color: "#a6bbcf",
+        defaults: {},
+        inputs: 0,
+        outputs: 1,
+      });
+
+      useFlowStore.setState({
+        nodes: [
+          {
+            id: "test-node-1",
+            type: "nrNode",
+            position: { x: 0, y: 0 },
+            data: { type: "name-err" },
+          },
+        ],
+      });
+
+      openEditor({
+        nodeType: "name-err",
+        formData: { name: "" },
+      });
+      render(<NodeEditorPanel />);
+
+      // Clear the name field to make it empty and trigger validation
+      const nameInput = screen.getByTestId("node-editor-field-name");
+
+      // Set name to empty, then trigger Done
+      await user.clear(nameInput);
+      await user.click(screen.getByTestId("node-editor-btn-done"));
+
+      // Name input should have aria-invalid
+      expect(nameInput).toHaveAttribute("aria-invalid", "true");
     });
   });
 });

@@ -3,20 +3,20 @@
  * pop-out modal dialog.
  *
  * Layout:
- *   ┌──────────────────────────────────┐
- *   │ X  Edit <type> node        [^]  │  Header
- *   ├──────────────────────────────────┤
- *   │ Node Properties                  │
- *   │  Name:   [____________]          │
- *   │  <dynamic fields from defaults>  │
- *   │ Description                      │
- *   │  [______________________]        │
- *   ├──────────────────────────────────┤
- *   │              [Cancel]  [Done]    │  Footer
- *   └──────────────────────────────────┘
+ *   +------------------------------------+
+ *   | X  Edit <type> node        [^]    |  Header
+ *   +------------------------------------+
+ *   | Node Properties                    |
+ *   |  Name:   [____________]            |
+ *   |  <dynamic fields from editor>      |
+ *   | Description                        |
+ *   |  [______________________]          |
+ *   +------------------------------------+
+ *   |              [Cancel]  [Done]      |  Footer
+ *   +------------------------------------+
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorPanelStore } from "../../store/editor-panel-store";
 import { useFlowStore } from "../../store/flow-store";
 import { useSidebarStore } from "../../store/sidebar-store";
@@ -24,6 +24,16 @@ import { useEditorStore } from "../../store/editor-store";
 import { nodeRegistry } from "../../red/nodes/registry";
 import { eventBus } from "../../red/core/events";
 import type { NodeDefault } from "../../red/nodes/types";
+import {
+  validateNodeForm,
+  errorsToMap,
+  type ValidationError,
+} from "./validation";
+import { getNodeEditor } from "./node-editors";
+import { SchemaDefaultEditor } from "./node-editors";
+
+// Ensure all built-in editors self-register by importing the barrel
+import "./node-editors";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -41,12 +51,38 @@ export function NodeEditorPanel() {
   const toggleModal = useEditorPanelStore((s) => s.toggleModal);
   const updateField = useEditorPanelStore((s) => s.updateField);
 
+  // Validation state
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [shakeDone, setShakeDone] = useState(false);
+  const shakeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Derive display info from registry (safe even when closed)
   const def = nodeType ? nodeRegistry.getType(nodeType) : undefined;
   const nodeColor = def?.color ?? "#a6bbcf";
   const nodeIcon = def?.icon;
   const paletteLabel = def?.paletteLabel ?? nodeType ?? "node";
   const defaults = def?.defaults ?? {};
+
+  const errorCount = Object.keys(errors).length;
+
+  // ----- Validation helpers -----
+
+  const runValidation = useCallback(
+    (data: Record<string, unknown>): ValidationError[] => {
+      if (!nodeType || !def) return [];
+      return validateNodeForm(nodeType, data, def);
+    },
+    [nodeType, def],
+  );
+
+  const clearFieldError = useCallback((field: string) => {
+    setErrors((prev) => {
+      if (!(field in prev)) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
 
   // ----- Handlers (must be defined before any conditional return) -----
 
@@ -58,17 +94,38 @@ export function NodeEditorPanel() {
       );
       if (!ok) return;
     }
+    setErrors({});
     closeEditor();
   }, [closeEditor]);
 
   const handleCancel = useCallback(() => {
+    setErrors({});
     closeEditor();
   }, [closeEditor]);
 
   const handleDone = useCallback(() => {
     const currentId = useEditorPanelStore.getState().nodeId;
     const currentFormData = useEditorPanelStore.getState().formData;
-    if (!currentId) return;
+    if (!currentId || !def) return;
+
+    // Validate before saving
+    const validationErrors = validateNodeForm(
+      useEditorPanelStore.getState().nodeType ?? "",
+      currentFormData,
+      def,
+    );
+
+    if (validationErrors.length > 0) {
+      const errorMap = errorsToMap(validationErrors);
+      setErrors(errorMap);
+
+      // Trigger shake animation on Done button
+      setShakeDone(true);
+      if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
+      shakeTimeoutRef.current = setTimeout(() => setShakeDone(false), 600);
+
+      return; // Prevent save
+    }
 
     // Persist form data back to the flow store
     useFlowStore
@@ -81,9 +138,48 @@ export function NodeEditorPanel() {
     // Emit node-edited event
     eventBus.emit("nodes:changed", { id: currentId });
 
-    // Close the editor
+    // Clear errors and close
+    setErrors({});
     closeEditor();
-  }, [closeEditor]);
+  }, [closeEditor, def]);
+
+  // Handler for field value changes: clear the error for that field
+  const handleFieldChange = useCallback(
+    (key: string, value: unknown) => {
+      updateField(key, value);
+      clearFieldError(key);
+    },
+    [updateField, clearFieldError],
+  );
+
+  // Handler for field blur: validate just that field
+  const handleFieldBlur = useCallback(
+    (field: string) => {
+      if (!def) return;
+      const schema = defaults[field];
+      if (!schema) return;
+
+      const currentValue = useEditorPanelStore.getState().formData[field];
+
+      // Simple inline validation
+      const allErrors = runValidation({
+        ...useEditorPanelStore.getState().formData,
+        [field]: currentValue,
+      });
+
+      const fieldErrors = allErrors.filter((e) => e.field === field);
+
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[field]; // Clear existing error for this field
+        for (const err of fieldErrors) {
+          next[err.field] = err.message;
+        }
+        return next;
+      });
+    },
+    [def, defaults, runValidation],
+  );
 
   // ----- Keyboard: Escape to close -----
 
@@ -97,9 +193,20 @@ export function NodeEditorPanel() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [handleClose]);
 
+  // Cleanup shake timeout
+  useEffect(() => {
+    return () => {
+      if (shakeTimeoutRef.current) clearTimeout(shakeTimeoutRef.current);
+    };
+  }, []);
+
   // ----- Early return AFTER all hooks -----
 
   if (!isOpen || !nodeId) return null;
+
+  // ----- Resolve editor component -----
+  const EditorComponent = nodeType ? getNodeEditor(nodeType) : null;
+  const FormEditor = EditorComponent ?? SchemaDefaultEditor;
 
   // ----- Body content -----
 
@@ -128,26 +235,44 @@ export function NodeEditorPanel() {
           >
             Name
           </label>
-          <input
-            id="node-editor-name"
-            type="text"
-            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            value={(formData.name as string) ?? ""}
-            onChange={(e) => updateField("name", e.target.value)}
-            data-testid="node-editor-field-name"
-          />
+          <div className="relative">
+            <input
+              id="node-editor-name"
+              type="text"
+              className={
+                "w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 " +
+                (errors.name
+                  ? "border-red-500 focus:ring-red-400"
+                  : "border-gray-300 dark:border-gray-600 focus:ring-blue-500")
+              }
+              value={(formData.name as string) ?? ""}
+              onChange={(e) => handleFieldChange("name", e.target.value)}
+              onBlur={() => handleFieldBlur("name")}
+              data-testid="node-editor-field-name"
+              aria-invalid={!!errors.name}
+            />
+            {errors.name && (
+              <span
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold leading-none select-none pointer-events-none"
+                aria-hidden="true"
+              >
+                !
+              </span>
+            )}
+          </div>
+          {errors.name && (
+            <span className="text-xs text-red-500 mt-0.5 block">{errors.name}</span>
+          )}
         </div>
 
-        {/* Dynamic property fields from node definition defaults */}
-        {Object.entries(defaults).map(([key, defVal]) => (
-          <DefaultField
-            key={key}
-            propKey={key}
-            nodeDefault={defVal}
-            value={formData[key]}
-            onChange={(v) => updateField(key, v)}
-          />
-        ))}
+        {/* Editor content -- custom or schema-driven default */}
+        <FormEditor
+          nodeId={nodeId}
+          nodeType={nodeType ?? ""}
+          values={formData as Record<string, any>}
+          onChange={handleFieldChange}
+          errors={errors}
+        />
 
         {/* Description */}
         <div>
@@ -161,7 +286,7 @@ export function NodeEditorPanel() {
             id="node-editor-description"
             className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y min-h-[60px]"
             value={(formData.info as string) ?? ""}
-            onChange={(e) => updateField("info", e.target.value)}
+            onChange={(e) => handleFieldChange("info", e.target.value)}
             placeholder="Optional description..."
             data-testid="node-editor-field-info"
           />
@@ -169,23 +294,40 @@ export function NodeEditorPanel() {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-gray-200 dark:border-gray-700">
-        <button
-          type="button"
-          className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-          onClick={handleCancel}
-          data-testid="node-editor-btn-cancel"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          className="px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-          onClick={handleDone}
-          data-testid="node-editor-btn-done"
-        >
-          Done
-        </button>
+      <div className="flex items-center justify-between gap-2 px-3 py-2 border-t border-gray-200 dark:border-gray-700">
+        {/* Error count indicator */}
+        <div className="flex-1 min-w-0">
+          {errorCount > 0 && (
+            <span
+              className="text-xs text-red-500 font-medium"
+              data-testid="node-editor-error-count"
+            >
+              Fix {errorCount} error{errorCount !== 1 ? "s" : ""} before saving
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+            onClick={handleCancel}
+            data-testid="node-editor-btn-cancel"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className={
+              "px-3 py-1 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 " +
+              (shakeDone ? "animate-shake" : "")
+            }
+            onClick={handleDone}
+            data-testid="node-editor-btn-done"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -274,45 +416,6 @@ function EditorHeader({
       >
         {isModal ? "\u21A9" : "\u2922"}
       </button>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// DefaultField -- simple renderer for node defaults
-// ---------------------------------------------------------------------------
-
-interface DefaultFieldProps {
-  propKey: string;
-  nodeDefault: NodeDefault;
-  value: unknown;
-  onChange: (value: unknown) => void;
-}
-
-function DefaultField({ propKey, nodeDefault, value, onChange }: DefaultFieldProps) {
-  // Render a basic text input for now.
-  // The schema-form engine (Phase 3 Task 3) will replace this with richer
-  // controls (typed-input, select, checkbox, etc.).
-  const strValue = value === undefined || value === null
-    ? String(nodeDefault.value ?? "")
-    : String(value);
-
-  return (
-    <div>
-      <label
-        className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1"
-        htmlFor={`node-editor-field-${propKey}`}
-      >
-        {propKey.charAt(0).toUpperCase() + propKey.slice(1)}
-      </label>
-      <input
-        id={`node-editor-field-${propKey}`}
-        type="text"
-        className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        value={strValue}
-        onChange={(e) => onChange(e.target.value)}
-        data-testid={`node-editor-field-${propKey}`}
-      />
     </div>
   );
 }
