@@ -14,6 +14,7 @@
  */
 
 import { useSidebarStore } from "../../store/sidebar-store";
+import { useEditorPanelStore } from "../../store/editor-panel-store";
 import { SidebarTabBar } from "./SidebarTabBar";
 import { InfoTab } from "./tabs/InfoTab";
 import { DebugTab } from "./tabs/DebugTab";
@@ -21,6 +22,7 @@ import { ConfigTab } from "./tabs/ConfigTab";
 import { ContextTab } from "./tabs/ContextTab";
 import { HelpTab } from "./tabs/HelpTab";
 import { OutlinerTab } from "./tabs/OutlinerTab";
+import { NodeEditorPanel } from "../editor/NodeEditorPanel";
 import type { SidebarTab } from "../../store/sidebar-store";
 
 // ---------------------------------------------------------------------------
@@ -43,8 +45,14 @@ const TAB_COMPONENTS: Record<SidebarTab, React.ComponentType> = {
 export function SidebarContainer() {
   const isOpen = useSidebarStore((s) => s.isOpen);
   const activeTab = useSidebarStore((s) => s.activeTab);
+  const editorOpen = useEditorPanelStore((s) => s.isOpen);
+  const editorModal = useEditorPanelStore((s) => s.isModal);
 
   const ContentComponent = TAB_COMPONENTS[activeTab];
+
+  // When the editor panel is open in sidebar mode, show it in place of the
+  // normal tab content. When in modal mode, it renders as an overlay.
+  const showEditorInline = editorOpen && !editorModal;
 
   return (
     <div
@@ -57,22 +65,32 @@ export function SidebarContainer() {
           className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-gray-800"
           data-testid="sidebar-content-panel"
         >
-          {/* Tab header */}
-          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
-            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-              {activeTab}
-            </span>
-          </div>
+          {showEditorInline ? (
+            /* Node editor replaces tab content when editing */
+            <NodeEditorPanel />
+          ) : (
+            <>
+              {/* Tab header */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
+                <span className="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                  {activeTab}
+                </span>
+              </div>
 
-          {/* Tab content */}
-          <div className="flex-1 flex flex-col overflow-auto">
-            <ContentComponent />
-          </div>
+              {/* Tab content */}
+              <div className="flex-1 flex flex-col overflow-auto">
+                <ContentComponent />
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* Tab bar strip (always visible) */}
       <SidebarTabBar />
+
+      {/* Modal-mode editor renders as an overlay outside the sidebar flow */}
+      {editorOpen && editorModal && <NodeEditorPanel />}
     </div>
   );
 }
