@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Rust-Powered, Node-RED compatible flow automation runtime. 10x less memory, WASM plugin system, single binary deployment.">
+  <meta name="description" content="RustRED is a Rust-powered, Node-RED compatible flow automation runtime. Open source, 11.8MB single binary, WASM plugins.">
   <meta name="theme-color" content="#111318">
-  <title>RustRED &mdash; Rust-Powered Flow Automation</title>
+  <title>RustRED &mdash; The Rust-Powered Flow Automation Runtime</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -22,11 +22,11 @@
         <span class="logo-text">Rust<span class="logo-accent">RED</span></span>
       </a>
       <ul class="nav-links" id="navLinks">
-        <li><a href="#why">Why RustRED</a></li>
-        <li><a href="#compare">Compare</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#architecture">Architecture</a></li>
         <li><a href="#plugins">Plugins</a></li>
         <li><a href="#get-started">Get Started</a></li>
-        <li><a href="https://github.com/dzulfikar08/edgelinkd" rel="noopener noreferrer" target="_blank">GitHub</a></li>
+        <li><a href="https://github.com/dzulfikar08/rust-red" rel="noopener noreferrer" target="_blank">GitHub</a></li>
       </ul>
       <div class="nav-actions">
         <button class="theme-toggle" id="themeToggle" aria-label="Toggle light/dark mode" type="button">
@@ -52,13 +52,13 @@
     </div>
     <div class="container hero-content">
       <div class="hero-badge animate-on-scroll">Open Source &bull; AGPL-3.0</div>
-      <h1 class="hero-title animate-on-scroll">Flow automation,<br><em>rewritten in Rust</em></h1>
-      <p class="hero-subtitle animate-on-scroll">Node-RED compatible runtime with 10&times; less memory, WASM plugin security, and single-binary deployment. Drop-in replacement for your existing flows.</p>
+      <h1 class="hero-title animate-on-scroll">The Rust-powered<br><em>flow automation runtime</em></h1>
+      <p class="hero-subtitle animate-on-scroll">A Node-RED compatible runtime built in Rust. Import your flows, run them faster, deploy anywhere.</p>
       <div class="hero-ctas animate-on-scroll">
-        <a href="#get-started" class="btn btn-primary btn-lg">Quick Start</a>
-        <a href="https://github.com/dzulfikar08/edgelinkd" class="btn btn-ghost btn-lg" rel="noopener noreferrer" target="_blank">
+        <a href="#get-started" class="btn btn-primary btn-lg">Get Started</a>
+        <a href="https://github.com/dzulfikar08/rust-red" class="btn btn-ghost btn-lg" rel="noopener noreferrer" target="_blank">
           <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-          Star on GitHub
+          View on GitHub
         </a>
       </div>
       <div class="hero-terminal animate-on-scroll">
@@ -69,7 +69,7 @@
         <div class="terminal-body">
           <div class="term-line"><span class="prompt">$</span><span class="cmd">cargo install rust-red</span></div>
           <div class="term-out">Compiling rust-red v0.1.0</div>
-          <div class="term-out success">&#10003; Installed. Binary: <span class="hl">~/.cargo/bin/rust-red</span> (22MB)</div>
+          <div class="term-out success">&#10003; Installed. Binary: <span class="hl">~/.cargo/bin/rust-red</span> (11.8MB)</div>
           <div class="term-line"><span class="prompt">$</span><span class="cmd">rust-red --import flows.json</span></div>
           <div class="term-out success">&#10003; 47 flows loaded. Dashboard: <span class="hl">http://localhost:1880</span></div>
           <div class="term-line"><span class="prompt">$</span><span class="cmd cursor-blink">_</span></div>
@@ -83,11 +83,11 @@
     <div class="container">
       <div class="stats-grid animate-on-scroll">
         <div class="stat-item">
-          <span class="stat-value metric-value" data-target="10" data-suffix="x">0x</span>
+          <span class="stat-value metric-value" data-target="7.5" data-suffix="x" data-decimal="true">0x</span>
           <span class="stat-label">Less Memory</span>
         </div>
         <div class="stat-item">
-          <span class="stat-value metric-value" data-target="22" data-suffix="MB">0MB</span>
+          <span class="stat-value metric-value" data-target="11.8" data-suffix="MB" data-decimal="true">0MB</span>
           <span class="stat-label">Binary Size</span>
         </div>
         <div class="stat-item">
@@ -102,48 +102,114 @@
     </div>
   </section>
 
-  <!-- Why RustRED -->
-  <section class="section" id="why">
+  <!-- What is RustRED? -->
+  <!-- Demo Video -->
+  <section class="section" id="demo">
     <div class="container">
       <div class="section-header animate-on-scroll">
-        <h2 class="section-title">Why RustRED?</h2>
-        <p class="section-desc">Node-RED changed how we think about flow-based programming. RustRED takes that vision and makes it production-ready.</p>
+        <h2 class="section-title">See it in action</h2>
+        <p class="section-desc">Watch RustRED run a Modbus-to-PostgreSQL flow with live memory and CPU monitoring.</p>
+      </div>
+      <div class="video-wrapper animate-on-scroll">
+        <iframe
+          src="https://www.youtube.com/embed/4EQTV3piRFE?autoplay=1&mute=1&loop=1&playlist=4EQTV3piRFE"
+          title="RustRED Demo — Modbus to PostgreSQL Flow"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen
+          loading="lazy"
+        ></iframe>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="whatis">
+    <div class="container">
+      <div class="whatis-grid animate-on-scroll">
+        <div class="whatis-text">
+          <h2 class="section-title">What is RustRED?</h2>
+          <p class="whatis-desc">RustRED is an open-source flow automation runtime built in Rust. It reads your Node-RED flow JSON files and executes them using a high-performance async engine powered by Tokio.</p>
+          <p class="whatis-desc">It is a drop-in runtime &mdash; import your existing Node-RED flows and run them with significantly lower memory usage, faster cold starts, and WASM-based plugin security. No Node.js required.</p>
+          <div class="whatis-badges">
+            <span class="whatis-badge">AGPL-3.0</span>
+            <span class="whatis-badge">Single Binary</span>
+            <span class="whatis-badge">Self-Hosted</span>
+          </div>
+        </div>
+        <div class="whatis-flow">
+          <div class="flow-diagram">
+            <div class="flow-node">
+              <div class="flow-node-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </div>
+              <span class="flow-node-label">Flow JSON</span>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">
+              <svg width="40" height="24" viewBox="0 0 40 24"><path d="M0 12h32m0 0l-6-6m6 6l-6 6" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            </div>
+            <div class="flow-node flow-node-brand">
+              <div class="flow-node-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              </div>
+              <span class="flow-node-label">RustRED Runtime</span>
+            </div>
+            <div class="flow-arrow" aria-hidden="true">
+              <svg width="40" height="24" viewBox="0 0 40 24"><path d="M0 12h32m0 0l-6-6m6 6l-6 6" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+            </div>
+            <div class="flow-node">
+              <div class="flow-node-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </div>
+              <span class="flow-node-label">Data Out</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="section section-dark" id="features">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <h2 class="section-title">Features</h2>
+        <p class="section-desc">Everything you need to run flow automation in production.</p>
       </div>
       <div class="features-grid">
         <article class="feature-card animate-on-scroll">
           <div class="feature-icon" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
           </div>
-          <h3 class="feature-title">Rust-Powered Performance</h3>
-          <p class="feature-desc">Zero-cost abstractions, async I/O, and no garbage collector. 10&times; throughput with 10&times; less memory than Node.js runtimes.</p>
+          <h3 class="feature-title">Rust Runtime</h3>
+          <p class="feature-desc">Built on Tokio async I/O with zero-cost abstractions. No garbage collector pauses, deterministic memory usage.</p>
         </article>
         <article class="feature-card animate-on-scroll">
           <div class="feature-icon" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
           </div>
-          <h3 class="feature-title">WASM Plugin Security</h3>
-          <p class="feature-desc">Custom nodes run in a sandboxed WASM runtime. No more supply-chain attacks through unrestricted npm packages.</p>
+          <h3 class="feature-title">WASM Plugin System</h3>
+          <p class="feature-desc">Write custom nodes in Rust, Go, or C/C++ that compile to WASM and run in a sandboxed runtime. Hot-reloadable without restarts.</p>
         </article>
         <article class="feature-card animate-on-scroll">
           <div class="feature-icon" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
           </div>
-          <h3 class="feature-title">Single Binary Deployment</h3>
-          <p class="feature-desc">No Node.js, no npm install, no Python. One 22MB static binary that runs on Linux, macOS, ARM, and WASI.</p>
+          <h3 class="feature-title">Single Binary</h3>
+          <p class="feature-desc">One 11.8MB static binary with no runtime dependencies. Runs on Linux, macOS, ARM, and WASI. Copy and deploy.</p>
         </article>
         <article class="feature-card animate-on-scroll">
           <div class="feature-icon" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           </div>
           <h3 class="feature-title">Node-RED Compatible</h3>
-          <p class="feature-desc">Import your existing flow JSON files directly. Compatible with the Node-RED editor and flow format.</p>
+          <p class="feature-desc">Import your existing flow JSON files directly. Compatible with the Node-RED flow format and editor.</p>
         </article>
         <article class="feature-card animate-on-scroll">
           <div class="feature-icon" aria-hidden="true">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
           </div>
-          <h3 class="feature-title">Feature-Gated Architecture</h3>
-          <p class="feature-desc">Compile only what you need. Disable Modbus, PostgreSQL, AI, or clustering with cargo feature flags.</p>
+          <h3 class="feature-title">Feature Gates</h3>
+          <p class="feature-desc">Compile only what you need. Disable Modbus, PostgreSQL, AI, or clustering with cargo feature flags to minimize binary size.</p>
         </article>
         <article class="feature-card animate-on-scroll">
           <div class="feature-icon" aria-hidden="true">
@@ -156,74 +222,62 @@
     </div>
   </section>
 
-  <!-- Compare -->
-  <section class="section section-dark" id="compare">
+  <!-- Architecture -->
+  <section class="section" id="architecture">
     <div class="container">
       <div class="section-header animate-on-scroll">
-        <h2 class="section-title">See the difference</h2>
-        <p class="section-desc">Side-by-side with the tools you're already using.</p>
+        <h2 class="section-title">Architecture</h2>
+        <p class="section-desc">How RustRED works under the hood.</p>
       </div>
-      <div class="table-wrapper animate-on-scroll">
-        <table class="compare-table" role="table">
-          <thead>
-            <tr>
-              <th>Capability</th>
-              <th class="col-highlight">RustRED</th>
-              <th>Node-RED</th>
-              <th>n8n</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Runtime</td>
-              <td class="col-highlight"><strong>Native Rust</strong></td>
-              <td>Node.js</td>
-              <td>Node.js</td>
-            </tr>
-            <tr>
-              <td>Memory Usage</td>
-              <td class="col-highlight"><strong>~22MB</strong></td>
-              <td>~150MB</td>
-              <td>~300MB</td>
-            </tr>
-            <tr>
-              <td>Plugin Security</td>
-              <td class="col-highlight"><strong>WASM Sandbox</strong></td>
-              <td>Unrestricted JS</td>
-              <td>Unrestricted JS</td>
-            </tr>
-            <tr>
-              <td>Industrial Protocols</td>
-              <td class="col-highlight"><strong>Modbus, MQTT</strong></td>
-              <td>Via plugins</td>
-              <td><span class="no-check" aria-label="No">&#10005;</span></td>
-            </tr>
-            <tr>
-              <td>Edge Deployment</td>
-              <td class="col-highlight"><strong>Single binary</strong></td>
-              <td>Requires Node.js</td>
-              <td><span class="no-check" aria-label="No">&#10005;</span></td>
-            </tr>
-            <tr>
-              <td>Cold Start</td>
-              <td class="col-highlight"><strong>&lt;5ms</strong></td>
-              <td>~2s</td>
-              <td>~5s</td>
-            </tr>
-            <tr>
-              <td>License</td>
-              <td class="col-highlight"><strong>AGPL-3.0</strong></td>
-              <td>Apache 2.0</td>
-              <td>Fair-code</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="arch-grid animate-on-scroll">
+        <article class="arch-card">
+          <div class="arch-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+          </div>
+          <h3 class="arch-title">Tokio Async Runtime</h3>
+          <p class="arch-desc">All I/O is non-blocking via Tokio. HTTP, MQTT, Modbus, and file operations run concurrently on a multi-threaded scheduler.</p>
+        </article>
+        <article class="arch-card">
+          <div class="arch-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <h3 class="arch-title">Flow Engine</h3>
+          <p class="arch-desc">Parses Node-RED flow JSON and builds an execution graph. Messages flow between nodes through typed input/output ports.</p>
+        </article>
+        <article class="arch-card">
+          <div class="arch-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          </div>
+          <h3 class="arch-title">WASM Sandbox</h3>
+          <p class="arch-desc">Custom plugins run inside a WASM sandbox with controlled capabilities. Each plugin gets its own memory space and cannot access the host system directly.</p>
+        </article>
+        <article class="arch-card">
+          <div class="arch-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 class="arch-title">Protocol Handlers</h3>
+          <p class="arch-desc">Built-in support for MQTT, Modbus TCP/RTU, and PostgreSQL. Each handler is a feature-gated module that compiles only when needed.</p>
+        </article>
+        <article class="arch-card">
+          <div class="arch-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          </div>
+          <h3 class="arch-title">Feature Flags</h3>
+          <p class="arch-desc">Every major subsystem is behind a cargo feature flag. Build minimal binaries for constrained devices by disabling unused features at compile time.</p>
+        </article>
+        <article class="arch-card">
+          <div class="arch-icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          </div>
+          <h3 class="arch-title">Editor &amp; Dashboard</h3>
+          <p class="arch-desc">Built-in web editor for designing flows and a dashboard for monitoring runtime status. Accessible at <code>localhost:1880</code>.</p>
+        </article>
       </div>
     </div>
   </section>
 
   <!-- Plugin System -->
-  <section class="section" id="plugins">
+  <section class="section section-dark" id="plugins">
     <div class="container">
       <div class="section-header animate-on-scroll">
         <h2 class="section-title">Extend with WASM Plugins</h2>
@@ -290,34 +344,120 @@
     </div>
   </section>
 
+  <!-- Migrate from Node-RED -->
+  <section class="section" id="migrate">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <h2 class="section-title">Migrate from Node-RED</h2>
+        <p class="section-desc">Your existing flows work in RustRED without modification.</p>
+      </div>
+      <div class="migrate-grid animate-on-scroll">
+        <div class="migrate-card">
+          <div class="migrate-num">1</div>
+          <div>
+            <h3>Export your flows</h3>
+            <p>In Node-RED, select all nodes and export as JSON. Or copy your <code>flows.json</code> file directly.</p>
+          </div>
+        </div>
+        <div class="migrate-card">
+          <div class="migrate-num">2</div>
+          <div>
+            <h3>Import into RustRED</h3>
+            <p>Run <code>rust-red --import flows.json</code>. RustRED parses the same JSON format and builds the execution graph.</p>
+          </div>
+        </div>
+        <div class="migrate-card">
+          <div class="migrate-num">3</div>
+          <div>
+            <h3>Run and verify</h3>
+            <p>Your flows execute with the same logic. Open <code>localhost:1880</code> to access the editor and dashboard.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Get Started -->
   <section class="section section-dark" id="get-started">
     <div class="container">
       <div class="section-header animate-on-scroll">
-        <h2 class="section-title">Get Started in 30 Seconds</h2>
+        <h2 class="section-title">Quick Start</h2>
         <p class="section-desc">Install, import your flows, and run.</p>
       </div>
-      <div class="get-started-terminal animate-on-scroll">
-        <div class="terminal-bar">
-          <span class="terminal-dots"><i></i><i></i><i></i></span>
-          <span class="terminal-title">terminal</span>
+      <div class="quickstart-grid animate-on-scroll">
+        <div class="quickstart-terminal">
+          <div class="terminal-bar">
+            <span class="terminal-dots"><i></i><i></i><i></i></span>
+            <span class="terminal-title">terminal</span>
+          </div>
+          <div class="terminal-body">
+            <div class="term-line"><span class="prompt">$</span><span class="cmd">cargo install rust-red</span></div>
+            <div class="term-out">Compiling rust-red v0.1.0 (&hellip;27s)</div>
+            <div class="term-out success">&#10003; Installed <span class="hl">rust-red</span> to ~/.cargo/bin</div>
+            <div class="term-line"><span class="prompt">$</span><span class="cmd">rust-red --import my-flows.json</span></div>
+            <div class="term-out">Imported 47 flows, 312 nodes from my-flows.json</div>
+            <div class="term-out success">&#10003; Server running at <span class="hl">http://localhost:1880</span></div>
+            <div class="term-line"><span class="prompt">$</span><span class="cmd cursor-blink">_</span></div>
+          </div>
         </div>
-        <div class="terminal-body">
-          <div class="term-line"><span class="prompt">$</span><span class="cmd">cargo install rust-red</span></div>
-          <div class="term-out">Compiling rust-red v0.1.0 (&hellip;27s)</div>
-          <div class="term-out success">&#10003; Installed <span class="hl">rust-red</span> to ~/.cargo/bin</div>
-          <div class="term-line"><span class="prompt">$</span><span class="cmd">rust-red --import my-flows.json</span></div>
-          <div class="term-out">Imported 47 flows, 312 nodes from my-flows.json</div>
-          <div class="term-out success">&#10003; Server running at <span class="hl">http://localhost:1880</span></div>
-          <div class="term-line"><span class="prompt">$</span><span class="cmd cursor-blink">_</span></div>
+        <div class="quickstart-steps">
+          <div class="quickstart-step">
+            <h4>Prerequisites</h4>
+            <p>Rust toolchain (<code>rustup</code>) or download a pre-built binary from GitHub Releases.</p>
+          </div>
+          <div class="quickstart-step">
+            <h4>Install</h4>
+            <p><code>cargo install rust-red</code> compiles and installs the binary to <code>~/.cargo/bin/</code>.</p>
+          </div>
+          <div class="quickstart-step">
+            <h4>Import flows</h4>
+            <p>Pass your Node-RED <code>flows.json</code> with <code>--import</code>. Your existing flows work as-is.</p>
+          </div>
+          <div class="quickstart-step">
+            <h4>Open the editor</h4>
+            <p>Navigate to <code>http://localhost:1880</code> to access the flow editor and dashboard.</p>
+          </div>
         </div>
       </div>
       <div class="get-started-links animate-on-scroll">
-        <a href="https://github.com/dzulfikar08/edgelinkd" class="btn btn-primary btn-lg" rel="noopener noreferrer" target="_blank">
+        <a href="https://github.com/dzulfikar08/rust-red" class="btn btn-primary btn-lg" rel="noopener noreferrer" target="_blank">
           <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           View on GitHub
         </a>
         <a href="#" class="btn btn-ghost btn-lg">Read the Docs</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Community -->
+  <section class="section" id="community">
+    <div class="container">
+      <div class="section-header animate-on-scroll">
+        <h2 class="section-title">Community</h2>
+        <p class="section-desc">RustRED is open source. Contribute, report issues, or just say hello.</p>
+      </div>
+      <div class="community-grid animate-on-scroll">
+        <a href="https://github.com/dzulfikar08/rust-red" class="community-card" rel="noopener noreferrer" target="_blank">
+          <div class="community-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          </div>
+          <h3>GitHub</h3>
+          <p>Source code, issues, and pull requests. Contributions welcome.</p>
+        </a>
+        <a href="#" class="community-card">
+          <div class="community-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z"/></svg>
+          </div>
+          <h3>Discord <span class="badge-soon">Soon</span></h3>
+          <p>Chat with the community and get help in real-time.</p>
+        </a>
+        <a href="#" class="community-card">
+          <div class="community-icon" aria-hidden="true">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+          </div>
+          <h3>Contributing</h3>
+          <p>Read the contribution guide and submit your first pull request.</p>
+        </a>
       </div>
     </div>
   </section>
@@ -331,15 +471,15 @@
             <img src="rustred.png" alt="RustRED" width="24" height="24">
             <span class="logo-text">Rust<span class="logo-accent">RED</span></span>
           </div>
-          <p class="footer-tagline">Rust-powered flow automation. Node-RED compatible, production ready.</p>
+          <p class="footer-tagline">The open-source, Rust-powered flow automation runtime.</p>
           <p class="footer-company">&copy; 2026 Joyo Digitama. All rights reserved.</p>
         </div>
         <div class="footer-links">
           <div class="footer-col">
             <h4>Project</h4>
             <ul>
-              <li><a href="#why">Why RustRED</a></li>
-              <li><a href="#compare">Compare</a></li>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#architecture">Architecture</a></li>
               <li><a href="#plugins">Plugins</a></li>
               <li><a href="#get-started">Get Started</a></li>
             </ul>
@@ -348,35 +488,37 @@
             <h4>Resources</h4>
             <ul>
               <li><a href="#">Documentation</a></li>
-              <li><a href="#">Plugin Guide</a></li>
-              <li><a href="#">Migration Guide</a></li>
+              <li><a href="#plugins">Plugin Guide</a></li>
+              <li><a href="#migrate">Migration Guide</a></li>
               <li><a href="#">API Reference</a></li>
             </ul>
           </div>
           <div class="footer-col">
             <h4>Community</h4>
             <ul>
-              <li><a href="https://github.com/dzulfikar08/edgelinkd" rel="noopener noreferrer" target="_blank">GitHub</a></li>
+              <li><a href="https://github.com/dzulfikar08/rust-red" rel="noopener noreferrer" target="_blank">GitHub</a></li>
               <li><a href="#">Discord <span class="badge-soon">Soon</span></a></li>
-              <li><a href="#">Twitter</a></li>
+              <li><a href="https://github.com/dzulfikar08/rust-red/issues" rel="noopener noreferrer" target="_blank">Issues</a></li>
             </ul>
           </div>
           <div class="footer-col">
             <h4>Commercial</h4>
             <ul>
-              <li><a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Voltrus Cloud</a></li>
-              <li><a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Voltrus Edge</a></li>
-              <li><a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Enterprise</a></li>
+              <li><a href="https://voltrus.id/rustred/" rel="noopener noreferrer" target="_blank">Voltrus Cloud</a></li>
+              <li><a href="https://voltrus.id/rustred/" rel="noopener noreferrer" target="_blank">Voltrus Edge</a></li>
+              <li><a href="https://voltrus.id/rustred/" rel="noopener noreferrer" target="_blank">Enterprise</a></li>
             </ul>
           </div>
         </div>
       </div>
       <div class="footer-voltrus-hint animate-on-scroll">
-        <p>Need managed hosting, RBAC, or fleet management? <a href="https://voltrus.id" rel="noopener noreferrer" target="_blank">Explore Voltrus <span aria-hidden="true">&rarr;</span></a></p>
+        <p>Need managed hosting, RBAC, or fleet management? <a href="https://voltrus.id/rustred/" rel="noopener noreferrer" target="_blank">Explore Voltrus for RustRED <span aria-hidden="true">&rarr;</span></a></p>
       </div>
     </div>
   </footer>
 
   <script src="main.js"></script>
+  <script defer src="https://assets.onedollarstats.com/stonks.js"></script>
+  <script defer data-site-id="c6cd43a4-25ca-4c3b-9a03-346e62f76a4a" src="https://app.revklik.com/klikapa.js"></script>
 </body>
 </html>

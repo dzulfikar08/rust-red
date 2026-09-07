@@ -921,6 +921,303 @@ code {
   color: var(--c-brand-hover);
 }
 
+/* --- Video Embed --- */
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding-bottom: 56.25%; /* 16:9 */
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  background: var(--c-surface-dark);
+}
+
+.video-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* --- What is RustRED? --- */
+.whatis-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4xl);
+  align-items: center;
+}
+
+.whatis-text .section-title {
+  text-align: left;
+}
+
+.whatis-desc {
+  font-size: 1.0625rem;
+  color: var(--c-text-secondary);
+  line-height: 1.7;
+  margin-bottom: var(--space-lg);
+}
+
+.whatis-badges {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.whatis-badge {
+  display: inline-block;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--c-brand-dim);
+  border: 1px solid var(--c-brand-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--c-brand);
+}
+
+/* Flow Diagram */
+.flow-diagram {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  padding: var(--space-2xl);
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+}
+
+.flow-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  background: var(--c-bg-elevated);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  min-width: 100px;
+  text-align: center;
+}
+
+.flow-node-brand {
+  border-color: var(--c-brand-border);
+  background: var(--c-brand-dim);
+}
+
+.flow-node-icon {
+  color: var(--c-text-secondary);
+}
+
+.flow-node-brand .flow-node-icon {
+  color: var(--c-brand);
+}
+
+.flow-node-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--c-text-secondary);
+}
+
+.flow-node-brand .flow-node-label {
+  color: var(--c-brand);
+}
+
+.flow-arrow {
+  color: var(--c-text-muted);
+  flex-shrink: 0;
+}
+
+/* --- Architecture Cards --- */
+.arch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+.arch-card {
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2xl);
+  transition: all var(--duration) var(--ease);
+}
+
+.arch-card:hover {
+  background: var(--c-bg-card-hover);
+  border-color: var(--c-border-hover);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
+.arch-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--c-brand-dim);
+  border-radius: var(--radius-md);
+  color: var(--c-brand);
+  margin-bottom: var(--space-lg);
+}
+
+.arch-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: var(--space-sm);
+  letter-spacing: -0.01em;
+}
+
+.arch-desc {
+  font-size: 0.9375rem;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+}
+
+/* --- Migration Section --- */
+.migrate-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+.migrate-card {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: flex-start;
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2xl);
+  transition: all var(--duration) var(--ease);
+}
+
+.migrate-card:hover {
+  border-color: var(--c-border-hover);
+  background: var(--c-bg-card-hover);
+}
+
+.migrate-num {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-brand);
+  color: #fff;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.migrate-card h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+  letter-spacing: -0.01em;
+}
+
+.migrate-card p {
+  font-size: 0.875rem;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+}
+
+/* --- Quick Start Grid --- */
+.quickstart-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3xl);
+  align-items: start;
+  margin-bottom: var(--space-3xl);
+}
+
+.quickstart-terminal {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--c-border);
+  background: var(--c-surface-dark);
+  text-align: left;
+}
+
+.quickstart-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.quickstart-step h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+  letter-spacing: -0.01em;
+}
+
+.quickstart-step p {
+  font-size: 0.875rem;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+}
+
+/* --- Community --- */
+.community-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+}
+
+.community-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: var(--c-bg-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2xl);
+  transition: all var(--duration) var(--ease);
+  text-decoration: none;
+  color: inherit;
+}
+
+.community-card:hover {
+  background: var(--c-bg-card-hover);
+  border-color: var(--c-border-hover);
+  transform: translateY(-3px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+}
+
+.community-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: var(--c-brand-dim);
+  border-radius: var(--radius-md);
+  color: var(--c-brand);
+  margin-bottom: var(--space-lg);
+}
+
+.community-card h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-bottom: var(--space-sm);
+  letter-spacing: -0.01em;
+}
+
+.community-card p {
+  font-size: 0.875rem;
+  color: var(--c-text-secondary);
+  line-height: 1.6;
+}
+
 /* --- Scroll Animations --- */
 .animate-on-scroll {
   opacity: 0;
@@ -934,11 +1231,18 @@ code {
 }
 
 /* Stagger */
-.features-grid .animate-on-scroll:nth-child(2) { transition-delay: 0.08s; }
-.features-grid .animate-on-scroll:nth-child(3) { transition-delay: 0.16s; }
-.features-grid .animate-on-scroll:nth-child(4) { transition-delay: 0.24s; }
-.features-grid .animate-on-scroll:nth-child(5) { transition-delay: 0.32s; }
-.features-grid .animate-on-scroll:nth-child(6) { transition-delay: 0.40s; }
+.features-grid .animate-on-scroll:nth-child(2),
+.arch-grid .animate-on-scroll:nth-child(2),
+.migrate-grid .animate-on-scroll:nth-child(2) { transition-delay: 0.08s; }
+.features-grid .animate-on-scroll:nth-child(3),
+.arch-grid .animate-on-scroll:nth-child(3),
+.migrate-grid .animate-on-scroll:nth-child(3) { transition-delay: 0.16s; }
+.features-grid .animate-on-scroll:nth-child(4),
+.arch-grid .animate-on-scroll:nth-child(4) { transition-delay: 0.24s; }
+.features-grid .animate-on-scroll:nth-child(5),
+.arch-grid .animate-on-scroll:nth-child(5) { transition-delay: 0.32s; }
+.features-grid .animate-on-scroll:nth-child(6),
+.arch-grid .animate-on-scroll:nth-child(6) { transition-delay: 0.40s; }
 
 /* --- Mobile Navigation --- */
 @media (max-width: 768px) {
@@ -976,7 +1280,9 @@ code {
 
 /* --- Responsive --- */
 @media (max-width: 1024px) {
-  .plugin-showcase {
+  .plugin-showcase,
+  .quickstart-grid,
+  .whatis-grid {
     grid-template-columns: 1fr;
   }
 
@@ -990,6 +1296,14 @@ code {
 
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .flow-diagram {
+    flex-direction: column;
+  }
+
+  .flow-arrow svg {
+    transform: rotate(90deg);
   }
 }
 
@@ -1005,7 +1319,10 @@ code {
     padding-bottom: var(--space-3xl);
   }
 
-  .features-grid {
+  .features-grid,
+  .arch-grid,
+  .migrate-grid,
+  .community-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1021,12 +1338,6 @@ code {
   .hero-ctas .btn, .get-started-links .btn {
     width: 100%;
     max-width: 300px;
-  }
-
-  .compare-table th,
-  .compare-table td {
-    padding: var(--space-sm) var(--space-md);
-    font-size: 0.8125rem;
   }
 }
 
