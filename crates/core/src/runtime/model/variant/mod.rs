@@ -582,15 +582,9 @@ impl Variant {
         };
 
         // If create_missing is true and first_prop doesn't exist, we should create it here.
-        // TODO FIXME
-        let first_prop = match (self.get_nav_mut(first_prop_name, &[]), create_missing, segs.len()) {
-            (Some(prop), _, _) => prop,
-            (None, true, 1) => {
-                // Only one level of the property
-                self.as_object_mut().unwrap().insert(first_prop_name.to_string(), value);
-                return Ok(());
-            }
-            (None, true, _) => {
+        let first_prop = match (self.get_nav_mut(first_prop_name, &[]), create_missing) {
+            (Some(prop), _) => prop,
+            (None, true) => {
                 let next_seg = segs.get(1);
                 let var = match next_seg {
                     // the next level property is an object
@@ -601,10 +595,18 @@ impl Variant {
                             .with_context(|| format!("Not allowed to set first property: '{first_prop_name}'"));
                     }
                 };
-                self.as_object_mut().unwrap().insert(first_prop_name.to_string(), var);
-                self.get_nav_mut(first_prop_name, &[]).unwrap()
+                self.as_object_mut()
+                    .ok_or_else(|| {
+                        RustRedError::InvalidOperation(format!(
+                            "Cannot create the property '{first_prop_name}' beneath a non-object value"
+                        ))
+                    })?
+                    .insert(first_prop_name.to_string(), var);
+                self.get_nav_mut(first_prop_name, &[]).ok_or_else(|| {
+                    RustRedError::InvalidOperation(format!("Failed to create the property '{first_prop_name}'"))
+                })?
             }
-            (None, _, _) => {
+            (None, _) => {
                 return Err(crate::RustRedError::BadArgument("segs"))
                     .with_context(|| format!("Failed to set first property: '{first_prop_name}'"));
             }
@@ -789,6 +791,17 @@ pub fn expand_propex_segments(segs: &mut [PropexSegment], eval_env: &[PropexEnv]
 mod tests {
     use super::*;
     use serde_json::*;
+
+    #[test]
+    fn set_missing_nested_property_on_a_non_object_is_an_error() {
+        let segs = crate::runtime::model::propex::parse("a.b").unwrap();
+        let mut var = Variant::Null;
+        assert!(var.set_segs_property(&segs, Variant::from(1), true).is_err());
+
+        let mut obj = Variant::empty_object();
+        obj.set_segs_property(&segs, Variant::from(1), true).unwrap();
+        assert_eq!(*obj.get_nav("a.b", &[]).unwrap(), Variant::from(1));
+    }
 
     #[test]
     fn variant_clone_should_be_ok() {

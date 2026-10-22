@@ -111,12 +111,14 @@ impl<'js> js::IntoJs<'js> for Variant {
             Variant::Bytes(bytes) => Ok(js::ArrayBuffer::new(ctx.clone(), bytes)?.into_value()),
 
             Variant::Number(num) => {
-                if let Some(f) = num.as_f64() {
-                    f.into_js(ctx)
-                } else if let Some(i) = num.as_i64() {
+                // Integers must be tested before floats: `serde_json::Number::as_f64` also answers
+                // for integers, and going through f64 silently rounds anything above 2^53 (ids).
+                if let Some(i) = num.as_i64() {
                     i.into_js(ctx)
                 } else if let Some(u) = num.as_u64() {
                     u.into_js(ctx)
+                } else if let Some(f) = num.as_f64() {
+                    f.into_js(ctx)
                 } else {
                     0f64.into_js(ctx)
                 }

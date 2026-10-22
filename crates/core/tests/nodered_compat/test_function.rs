@@ -428,3 +428,22 @@ async fn function_env_get() {
     assert_eq!(msgs.len(), 1);
     assert_msg_str(&msgs[0], "payload", "not-set");
 }
+
+/// Function: `_msgid` stays a readable string across the JS bridge.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn function_msgid_stays_a_string() {
+    let flow = function_flow("msg.idtype = typeof msg._msgid; return msg;");
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness
+        .inject_and_collect_timeout(
+            "1",
+            json!({"payload": "x", "_msgid": "0123456789abcdef"}),
+            1,
+            Duration::from_secs(2),
+        )
+        .await;
+    assert_eq!(msgs.len(), 1);
+    assert_msg_str(&msgs[0], "idtype", "string");
+    assert_msg_str(&msgs[0], "_msgid", "0123456789abcdef");
+    assert!(msgs[0].id().is_some(), "msg id must be readable by the runtime");
+}
