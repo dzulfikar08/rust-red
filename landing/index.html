@@ -67,7 +67,7 @@
           <span class="terminal-title">terminal</span>
         </div>
         <div class="terminal-body">
-          <div class="term-line"><span class="prompt">$</span><span class="cmd">tar xzf rust-red-0.2.0-linux-x86_64.tar.gz &amp;&amp; cd rust-red-0.2.0-linux-x86_64</span></div>
+          <div class="term-line"><span class="prompt">$</span><span class="cmd">tar xzf rust-red-0.2.1-linux-x86_64.tar.gz &amp;&amp; cd rust-red-0.2.1-linux-x86_64</span></div>
           <div class="term-line"><span class="prompt">$</span><span class="cmd">./rust-red run flows.json</span></div>
           <div class="term-out">Editor: <span class="hl">http://127.0.0.1:1888</span> (default bind address)</div>
           <div class="term-line"><span class="prompt">$</span><span class="cmd cursor-blink">_</span></div>
@@ -127,7 +127,7 @@
         <div class="whatis-text">
           <h2 class="section-title">What is RustRED?</h2>
           <p class="whatis-desc">RustRED is an open-source flow runtime written in Rust. It reads Node-RED flow JSON files and executes them on an async engine built on Tokio.</p>
-          <p class="whatis-desc">Flows built from core Node-RED nodes import and run, without Node.js. Modbus, PostgreSQL and MQTT use RustRED&rsquo;s own node types, so flows from the Node-RED contrib packages need those nodes changed by hand.</p>
+          <p class="whatis-desc">Flows exported from Node-RED import and run, without Node.js. That covers the core nodes, the stock MQTT nodes, <code>node-red-contrib-modbus</code> and <code>node-red-contrib-postgresql</code>. Credentials in <code>flows_cred.json</code> are not read, so a flow exported without them needs them added.</p>
           <p class="whatis-desc">RustRED is a fork of <a href="https://github.com/oldrev/edgelinkd" rel="noopener noreferrer" target="_blank">EdgeLinkd</a> by Li Wei, licensed under Apache-2.0, and is not affiliated with the Node-RED project.</p>
           <div class="whatis-badges">
             <span class="whatis-badge">Apache-2.0</span>
@@ -201,7 +201,7 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           </div>
           <h3 class="feature-title">Node-RED Compatible</h3>
-          <p class="feature-desc">Uses the Node-RED flow format and editor. Core nodes import and run; Modbus, PostgreSQL and MQTT use RustRED node types.</p>
+          <p class="feature-desc">Uses the Node-RED flow format and editor. Core nodes, stock MQTT, node-red-contrib-modbus and node-red-contrib-postgresql flows import and run.</p>
         </article>
         <article class="feature-card animate-on-scroll">
           <div class="feature-icon" aria-hidden="true">
@@ -369,7 +369,7 @@
           <div class="migrate-num">3</div>
           <div>
             <h3>Run and verify</h3>
-            <p>Open <code>http://127.0.0.1:1888</code> for the editor. For Modbus, PostgreSQL and MQTT nodes, switch to the RustRED node types (for example <code>modbus read</code>, <code>postgres-query</code>) and check the config. A stock Node-RED <code>mqtt-broker</code> config node currently stops startup.</p>
+            <p>Open <code>http://127.0.0.1:1888</code> for the editor. Stock MQTT, node-red-contrib-modbus and node-red-contrib-postgresql nodes run as exported. Add the database and broker credentials to the config nodes, because <code>flows_cred.json</code> is not read. A config node that fails to load is logged and disabled, and the rest of the flow keeps running.</p>
           </div>
         </div>
       </div>
@@ -390,7 +390,7 @@
             <span class="terminal-title">terminal</span>
           </div>
           <div class="terminal-body">
-            <div class="term-line"><span class="prompt">$</span><span class="cmd">tar xzf rust-red-0.2.0-linux-x86_64.tar.gz &amp;&amp; cd rust-red-0.2.0-linux-x86_64</span></div>
+            <div class="term-line"><span class="prompt">$</span><span class="cmd">tar xzf rust-red-0.2.1-linux-x86_64.tar.gz &amp;&amp; cd rust-red-0.2.1-linux-x86_64</span></div>
             <div class="term-line"><span class="prompt">$</span><span class="cmd">./rust-red run flows.json</span></div>
             <div class="term-out">Editor: <span class="hl">http://127.0.0.1:1888</span> (default bind address)</div>
             <div class="term-line"><span class="prompt">$</span><span class="cmd cursor-blink">_</span></div>
