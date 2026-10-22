@@ -30,6 +30,16 @@ async fn exec_keeps_trailing_newline() {
     assert_msg_str(&msgs[0], "payload", "hi\n");
 }
 
+/// Spawn mode: stdout is forwarded as raw chunks, not split into lines with the newline stripped.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn exec_spawn_forwards_raw_chunks() {
+    let harness = TestHarness::from_flow_json(exec_flow("printf", "", "a\\nb\\n", true));
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": ""}), 1, Duration::from_secs(5)).await;
+
+    assert_eq!(msgs.len(), 1);
+    assert_msg_str(&msgs[0], "payload", "a\nb\n");
+}
+
 /// Output that is not valid UTF-8 is delivered as a buffer, not lossily converted to text.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn exec_binary_output_is_a_buffer() {
