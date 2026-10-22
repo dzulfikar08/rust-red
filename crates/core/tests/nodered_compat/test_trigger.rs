@@ -126,3 +126,77 @@ async fn trigger_extend() {
     assert!(!msgs.is_empty(), "Expected messages with extend");
     assert_msg_str(&msgs[0], "payload", "1");
 }
+
+fn trigger_flow(op1type: &str, op1: &str, extra: serde_json::Value) -> serde_json::Value {
+    let mut node = json!({
+        "id": "1", "z": "100", "type": "trigger",
+        "op1": op1, "op2": "0", "op1type": op1type, "op2type": "str",
+        "duration": "100", "units": "ms",
+        "extend": false, "overrideDelay": false,
+        "outputs": 1,
+        "wires": [["99"]]
+    });
+    for (k, v) in extra.as_object().unwrap() {
+        node[k] = v.clone();
+    }
+    json!([
+        {"id": "100", "type": "tab", "env": [{"name": "TRIG_ENV", "type": "str", "value": "from-env"}]},
+        node,
+        {"id": "99", "z": "100", "type": "test-once"}
+    ])
+}
+
+/// Trigger: the `jsonata` value type evaluates an expression against the message.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn trigger_op1_jsonata() {
+    let harness = TestHarness::from_flow_json(trigger_flow("jsonata", "payload & \"!\"", json!({})));
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "hi"}), 1, Duration::from_secs(2)).await;
+
+    assert!(!msgs.is_empty(), "Expected op1 message");
+    assert_msg_str(&msgs[0], "payload", "hi!");
+}
+
+/// Trigger: the `bin` value type builds a buffer from a JSON array.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn trigger_op1_bin() {
+    let harness = TestHarness::from_flow_json(trigger_flow("bin", "[1,2,3]", json!({})));
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "x"}), 1, Duration::from_secs(2)).await;
+
+    assert!(!msgs.is_empty(), "Expected op1 message");
+    let payload = msgs[0].get("payload").expect("payload");
+    assert_eq!(payload.as_bytes().expect("payload must be a buffer"), &[1u8, 2, 3][..]);
+}
+
+/// Trigger: the `env` value type reads an environment variable.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn trigger_op1_env() {
+    let harness = TestHarness::from_flow_json(trigger_flow("env", "TRIG_ENV", json!({})));
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "x"}), 1, Duration::from_secs(2)).await;
+
+    assert!(!msgs.is_empty(), "Expected op1 message");
+    assert_msg_str(&msgs[0], "payload", "from-env");
+}
+
+/// Trigger: the `date` value type honours the requested format instead of always using the
+/// epoch milliseconds.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn trigger_op1_date_iso() {
+    let harness = TestHarness::from_flow_json(trigger_flow("date", "iso", json!({})));
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "x"}), 1, Duration::from_secs(2)).await;
+
+    assert!(!msgs.is_empty(), "Expected op1 message");
+    let payload = msgs[0].get("payload").and_then(|v| v.as_str()).expect("iso date must be a string").to_string();
+    assert!(payload.contains('T'), "not an ISO date: {payload}");
+}
+
+/// Trigger: with `overrideDelay`, `msg.delay` is in milliseconds (it used to be multiplied by 1000).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn trigger_override_delay_is_milliseconds() {
+    let flow = trigger_flow("nul", "", json!({"overrideDelay": true, "duration": "10", "units": "s"}));
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs =
+        harness.inject_and_collect_timeout("1", json!({"payload": "x", "delay": 100}), 1, Duration::from_secs(3)).await;
+
+    assert!(!msgs.is_empty(), "Expected op2 after the 100ms override delay");
+    assert_msg_str(&msgs[0], "payload", "0");
+}
