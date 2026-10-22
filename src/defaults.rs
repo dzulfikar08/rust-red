@@ -88,6 +88,8 @@ memory = { provider = "memory" }
 
 [runtime.flow]
 node_msg_queue_capacity = 16
+# Max messages buffered across incomplete message groups by sort (Node-RED nodeMessageBufferMaxLength); 0 = unlimited
+node_message_buffer_max_length = 0
 
 [ui-host]
 host = "127.0.0.1"

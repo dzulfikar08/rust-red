@@ -58,6 +58,34 @@ impl TestHarness {
         Self { engine }
     }
 
+    /// An engine configuration with the in-memory context store the engine requires, plus the
+    /// given integer overrides (e.g. `("runtime.flow.node_message_buffer_max_length", 2)`).
+    #[allow(dead_code)]
+    pub fn config_with_int_overrides(overrides: &[(&str, i64)]) -> config::Config {
+        let mut builder = config::Config::builder()
+            .set_override("runtime.context.default", "memory")
+            .unwrap()
+            .set_override("runtime.context.stores.memory.provider", "memory")
+            .unwrap();
+        for (key, value) in overrides {
+            builder = builder.set_override(*key, *value).unwrap();
+        }
+        builder.build().unwrap()
+    }
+
+    /// Build a test engine from a raw flow JSON array and an engine configuration, e.g. to set
+    /// `runtime.flow.*` knobs.
+    #[allow(dead_code)]
+    pub fn from_flow_json_with_config(json: serde_json::Value, cfg: config::Config) -> Self {
+        let engine = Engine::with_json(
+            &rust_red_core::runtime::registry::RegistryBuilder::default().build().unwrap(),
+            json,
+            Some(cfg),
+        )
+        .expect("Failed to build test engine");
+        Self { engine }
+    }
+
     /// Build a test engine from a JSON string.
     #[allow(dead_code)]
     pub fn from_flow_json_str(json_str: &str) -> Self {

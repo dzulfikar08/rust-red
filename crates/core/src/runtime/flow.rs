@@ -31,7 +31,18 @@ pub type NodeCandidates = SmallVec<[(usize, Arc<dyn FlowNodeBehavior>); 8]>;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct FlowSettings {
+    #[serde(default = "default_node_msg_queue_capacity")]
     pub node_msg_queue_capacity: usize,
+
+    /// How many messages a node may keep buffered while it works on message sequences; `0` means no
+    /// limit. This is Node-RED's `nodeMessageBufferMaxLength` settings.js property, which upstream
+    /// applies to the nodes operating on sequences (sort, batch, join).
+    #[serde(default)]
+    pub node_message_buffer_max_length: usize,
+}
+
+fn default_node_msg_queue_capacity() -> usize {
+    16
 }
 
 impl FlowSettings {
@@ -49,7 +60,7 @@ impl FlowSettings {
 
 impl Default for FlowSettings {
     fn default() -> Self {
-        Self { node_msg_queue_capacity: 16 }
+        Self { node_msg_queue_capacity: default_node_msg_queue_capacity(), node_message_buffer_max_length: 0 }
     }
 }
 
@@ -530,6 +541,11 @@ impl Flow {
 
     pub fn get_envs(&self) -> &RedEnvs {
         &self.inner.envs
+    }
+
+    /// The runtime settings (`runtime.flow`) this flow was built with.
+    pub fn settings(&self) -> &FlowSettings {
+        &self.inner._args
     }
 
     pub fn get_env(&self, key: &str) -> Option<Variant> {

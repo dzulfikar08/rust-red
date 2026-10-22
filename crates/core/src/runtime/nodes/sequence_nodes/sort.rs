@@ -68,6 +68,15 @@ struct SortNodeState {
     seq: u64,                               // Sequence counter
 }
 
+impl SortNodeState {
+    /// Upstream `removeOldestPending()`: take the incomplete group that was created first, so the
+    /// buffer can make room for the newer messages.
+    fn remove_oldest_pending(&mut self) -> Option<PendingGroup> {
+        let oldest_id = self.pending.iter().min_by_key(|(_id, group)| group.seq_no).map(|(id, _)| id.clone())?;
+        self.pending.remove(&oldest_id)
+    }
+}
+
 #[derive(Debug)]
 #[allow(dead_code)]
 struct PendingGroup {
@@ -81,18 +90,27 @@ struct PendingGroup {
 pub struct SortNode {
     base: BaseFlowNodeState,
     config: SortNodeConfig,
+    /// How many messages may stay buffered across incomplete groups before the oldest group is
+    /// dropped: Node-RED's `nodeMessageBufferMaxLength` (`0` = no limit).
+    max_kept_msgs: usize,
     state: Mutex<SortNodeState>,
 }
 
 impl SortNode {
     pub fn build(
-        _flow: &Flow,
+        flow: &Flow,
         base_node: BaseFlowNodeState,
         config: &RedFlowNodeConfig,
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
         let config = SortNodeConfig::deserialize(&config.rest)?;
-        Ok(Box::new(SortNode { base: base_node, config, state: Mutex::new(SortNodeState::default()) }))
+        let node = SortNode {
+            base: base_node,
+            config,
+            max_kept_msgs: flow.settings().node_message_buffer_max_length,
+            state: Mutex::new(SortNodeState::default()),
+        };
+        Ok(Box::new(node))
     }
 
     fn cmp_variant(&self, a: &Variant, b: &Variant) -> std::cmp::Ordering {
@@ -212,6 +230,23 @@ impl FlowNodeBehavior for SortNode {
                                 for m in sorted {
                                     let env = Envelope { port: 0, msg: MsgHandle::new(m) };
                                     node.fan_out_one(env, cancel.child_token()).await?;
+                                }
+                            } else if node.max_kept_msgs > 0 && state.pending_count > node.max_kept_msgs {
+                                // Upstream `removeOldestPending()`: the buffer grew past
+                                // `nodeMessageBufferMaxLength`, so drop the group that has been waiting
+                                // longest and report the reason on its last message. The other
+                                // messages of the dropped group are just discarded.
+                                if let Some(dropped) = state.remove_oldest_pending() {
+                                    state.pending_count -= dropped.msgs.len();
+                                    drop(state);
+                                    if let Some(last) = dropped.msgs.last() {
+                                        node.report_error(
+                                            "Too many pending messages in sort node".to_owned(),
+                                            last.clone(),
+                                            cancel.child_token(),
+                                        )
+                                        .await;
+                                    }
                                 }
                             }
                             return Ok(());

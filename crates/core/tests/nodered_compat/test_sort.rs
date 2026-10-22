@@ -246,3 +246,29 @@ async fn sort_two_groups_in_a_row() {
     let values: Vec<i64> = msgs.iter().map(|m| m.get("payload").unwrap().as_i64().unwrap()).collect();
     assert_eq!(values, vec![1, 2, 3, 4]);
 }
+
+/// Sort: once the buffer holds more messages than `nodeMessageBufferMaxLength`, the oldest
+/// incomplete group is dropped and reported on its last message.
+// Mirrors: Node-RED 18-sort_spec.js "should handle too many pending messages"
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn sort_too_many_pending_reports_error() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "z": "100", "type": "sort", "order": "ascending", "as_num": false,
+         "target": "payload", "targetType": "seq", "seqKey": "payload", "seqKeyType": "msg",
+         "wires": [["99"]]},
+        {"id": "2", "z": "100", "type": "catch", "scope": ["1"], "uncaught": false, "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+    let cfg = TestHarness::config_with_int_overrides(&[("runtime.flow.node_message_buffer_max_length", 2)]);
+
+    let harness = TestHarness::from_flow_json_with_config(flow, cfg);
+    let injections: Vec<(String, serde_json::Value)> = (0..4)
+        .map(|i| ("1".to_string(), json!({"payload": format!("V{i}"), "parts": {"id": "X", "index": i, "count": 4}})))
+        .collect();
+    let msgs = harness.run_with_inject(1, injections).await;
+
+    assert_eq!(msgs.len(), 1);
+    let err = msgs[0].get("error").expect("error property").as_object().expect("error object");
+    assert_eq!(err.get("message").unwrap().as_str().unwrap(), "Too many pending messages in sort node");
+}
