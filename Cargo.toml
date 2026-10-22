@@ -1,14 +1,14 @@
 [package]
 name = "rust-red"
-version = "0.1.99"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.77.2"
 readme = "README.md"
 homepage = "https://github.com/dzulfikar08/rust-red"
 description = "Rust-Red is a Node-RED compatible run-time engine in Rust."
 build = "build.rs"
-license = "Apache 2.0"
-authors = ["Dzulfikar Ats Tsauri"]
+license = "Apache-2.0"
+authors = ["Dzulfikar Ats Tsauri", "Li Wei <oldrev@gmail.com> (EdgeLinkd)"]
 
 
 [[bin]]

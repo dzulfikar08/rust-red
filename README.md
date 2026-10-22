@@ -1,35 +1,81 @@
-# Rust-Red: Node-RED Reimplemented in Rust
+# RustRED
 
-[![Build Status]][actions]
+[![CI]][actions]
 [![GitHub Release]][releases]
-[![GitHub Downloads]][releases]
+[![License]][license]
 
-[Build Status]: https://img.shields.io/github/actions/workflow/status/dzulfikar08/rust-red/CICD.yml?branch=master
-[actions]: https://github.com/dzulfikar08/rust-red/actions?query=branch%3Amaster
+[CI]: https://img.shields.io/github/actions/workflow/status/dzulfikar08/rust-red/ci.yml?branch=master&label=CI
+[actions]: https://github.com/dzulfikar08/rust-red/actions/workflows/ci.yml
 [GitHub Release]: https://img.shields.io/github/v/release/dzulfikar08/rust-red?include_prereleases
 [releases]: https://github.com/dzulfikar08/rust-red/releases
-[GitHub Downloads]: https://img.shields.io/github/downloads/dzulfikar08/rust-red/total
+[License]: https://img.shields.io/badge/license-Apache--2.0-blue
+[license]: LICENSE
+
+## Fork notice
+
+**RustRED is a fork of [EdgeLinkd](https://github.com/oldrev/edgelinkd) by Li Wei, licensed under Apache-2.0.** The runtime core, the Node-RED compatible node implementations and most of the repository history come from EdgeLinkd. The upstream copyright is kept in [LICENSE](LICENSE) and [NOTICE](NOTICE). This fork is not affiliated with or endorsed by the EdgeLinkd authors or the Node-RED project.
+
+What this fork adds on top of EdgeLinkd (see the Git history for details):
+
+- Renamed crates and binary (`rust-red`).
+- A Modbus server node and an embedded MQTT broker node.
+- Clustering with gossip membership and flow failover (opt-in `cluster` feature).
+- An AI assistant, authentication/user management, and a dashboard data node.
+- A React based editor experiment in `crates/frontend` (not part of the shipped binary).
+- CI, release builds and benchmarks.
+
+The fork is about 115 commits behind upstream EdgeLinkd and does not track its releases. Upstream fixes are not merged automatically.
 
 ## Overview
 
-**Rust-Red** is a high-performance, memory-efficient Node-RED compatible runtime engine built from the ground up in Rust, featuring an integrated web UI for complete standalone operation.
+RustRED is a Node-RED compatible flow runtime written in Rust. It runs flows from `flows.json` and serves the Node-RED editor from a directory next to the binary. It can also run headless.
 
-**Why Rust-Red?**
-- **10x less memory usage** than Node-RED (only 10% of Node-RED's memory footprint)
-- **Native performance** with Rust's zero-cost abstractions
-- **Integrated web interface** - full Node-RED UI built-in for flow design and management
-- **Standalone operation** - no external Node-RED installation required
-- **Drop-in replacement** - use your existing `flows.json` files
-- **Perfect for edge devices** with limited resources
-- **Built-in clustering & HA** - run multiple nodes for fault tolerance and horizontal scaling
-- **259+ passing tests** — comprehensive Node-RED compatibility test suite
-- **Node-RED compatibility** - design, deploy, and run flows all in one application
+Only the `function` node runs JavaScript (through the QuickJS interpreter); the other nodes are native Rust.
 
-Rust-Red includes the complete Node-RED web editor, allowing you to design flows directly in the browser while executing them with native Rust performance. You can also run it headless for production deployments on resource-constrained devices.
+### Measured footprint
 
-Only the `function` node uses the lightweight QuickJS JS interpreter to run JavaScript code; all other functionalities are implemented in native Rust code for maximum performance.
+These are measurements from one Linux x86_64 machine (12 cores), not a general guarantee. Resident memory is `VmRSS` from `/proc/<pid>/status`.
+
+| Build | Binary size (stripped, LTO, opt-level z) | Idle RSS, empty flow, 30 s, web server on |
+|-------|------------------------------------------|-------------------------------------------|
+| default features | 16.3 MB | 15.0 MB |
+| `--features full` | 24.2 MB | 17.8 MB |
+
+Modbus TCP to PostgreSQL comparison (10 holding registers polled every 500 ms, a function node builds the INSERT, one row per poll, about 2 rows/s on both sides, verified by row counts). Method: 30 s warm-up, then 60 s sampled once per second; CPU is (utime + stime) / wall-clock.
+
+| Runtime | Average RSS | CPU |
+|---------|-------------|-----|
+| RustRED (full build) | 20.4 MB (max 20.5 MB) | 0.20% |
+| Node-RED (Node v26.11.1, node-red-contrib-modbus, node-red-contrib-postgresql) | 126 MB (max 149 MB) | 0.71% |
+
+That is roughly 6x less memory in this one test. The RustRED flow used RustRED's own node types, the Node-RED flow used the contrib nodes. Simulator: pymodbus 3.6.9; database: `postgres:16-alpine` in Docker.
+
+### Node-RED flow compatibility
+
+- Flows built from core nodes (inject, function, change, switch, debug and similar) import and run.
+- Modbus, PostgreSQL and MQTT use RustRED's own node types (`modbus read`, `modbus write`, `postgres-query`, `mqtt in`, ...). Node-RED contrib flows for these (`node-red-contrib-modbus`, `node-red-contrib-postgresql`) are not recognised and need their node types changed by hand.
+- A stock Node-RED `mqtt-broker` config node (`broker`/`port` fields) currently aborts startup with `missing field url`.
+- Context storage to the local file system, and part of `RED.util`, are not implemented (see roadmap below).
+
+### Release builds
+
+GitHub Releases ship the **default feature set** for Linux x86_64/aarch64 and macOS x86_64/aarch64, as `tar.gz` archives with the binary, the editor files (`ui_static/`) and a SHA-256 checksum. The `full` feature set (adds clustering, WASM plugins and `rqjs_bindgen`) is built from source with `cargo build --release --features full`.
 
 ## Quick Start
+
+### Download a release
+
+Download the archive for your platform from [Releases](https://github.com/dzulfikar08/rust-red/releases), verify it against `checksums-sha256.txt`, then:
+
+```bash
+tar xzf rust-red-*.tar.gz
+cd rust-red-*/
+./rust-red run flows.json
+```
+
+Open [http://127.0.0.1:1888](http://127.0.0.1:1888).
+
+### Or build from source
 
 ### 0. Clone the Repository
 
@@ -49,22 +95,17 @@ git submodule update --init --recursive
 
 ### 1. Build
 
-**Prerequisites**: Rust 1.80 or later
+**Prerequisites**: Rust 1.80 or later, and Node.js with npm (the build compiles the Node-RED editor from the `3rd-party/node-red` submodule; without the submodule the binary still builds but has no editor files).
 
 ```bash
 cargo build --release
 ```
 
-**Windows users**: Ensure `patch.exe` is in your PATH (included with Git) and install Visual Studio for MSVC.
+**Windows**: not shipped in releases and not tested by CI. Building needs `patch.exe` in PATH (included with Git) and MSVC.
 
-**Supported platforms**:
+**Release and CI platforms**: Linux x86_64 and aarch64, macOS x86_64 and aarch64.
 
-- `x86_64-pc-windows-msvc`
-- `x86_64-pc-windows-gnu`
-- `x86_64-unknown-linux-gnu`
-- `aarch64-unknown-linux-gnu`
-- `armv7-unknown-linux-gnueabihf`
-- `armv7-unknown-linux-gnueabi`
+`cargo install --git https://github.com/dzulfikar08/rust-red` installs only the binary. The editor files are generated in `target/ui_static` during a repository build and are looked up next to the executable, so use a release archive or a repository build if you want the editor.
 
 ### 2. Run
 
@@ -104,7 +145,7 @@ By default, your browser will open the Node-RED frontend at [http://127.0.0.1:18
 # Unit and integration tests
 cargo test --all
 
-# Node-RED compatibility test suite (259 tests)
+# Node-RED compatibility test suite
 cargo test --package rust-red-core --features internal-testing
 
 # Cluster integration tests
@@ -145,7 +186,7 @@ Rust-Red has built-in clustering. Run multiple instances as a single logical uni
 | Deployment downtime | Stop -> deploy -> start | Zero-downtime rolling deploys |
 | Single point of failure | Yes | No — automatic failover |
 
-Node-RED runs as a single process — if it crashes, everything stops. Rust-Red's clustering fixes this: run 10+ Rust-Red instances where 1 Node-RED instance runs today, using roughly the same total memory.
+Node-RED runs as a single process; if it crashes, everything stops. RustRED's clustering lets several instances share the flows. Clustering is only compiled in with `--features cluster`, and it has not been benchmarked against Node-RED here.
 
 ### How It Works
 
@@ -410,7 +451,7 @@ cargo build --release --features full          # Everything
 
 ## Test Suite
 
-Rust-Red includes a comprehensive Node-RED compatibility test suite with **259 passing tests** covering flow execution, node behavior, and edge cases — all ported from the official Node-RED spec tests.
+RustRED includes a Node-RED compatibility test suite ported from the Node-RED spec tests, covering flow execution and node behavior. CI runs it on every push (`cargo nextest run --workspace --features default,internal-testing`).
 
 ```bash
 # Run the full compatibility suite
@@ -435,19 +476,18 @@ Refer to [REDNODES-SPECS-DIFF.md](tests/REDNODES-SPECS-DIFF.md) for the detailed
 - [x] Real-time debug panel and status monitoring
 - [x] Node palette with all supported nodes
 - [x] Import/Export flows
-- [x] Clustering & high availability with gossip protocol
-- [x] Authentication & RBAC (JWT, API keys, user management)
-- [x] AI assistant integration (multi-provider chat, suggestions)
+- [x] Clustering with gossip membership (`cluster` feature, not in the default build)
+- [x] Authentication and user management code (experimental)
+- [x] AI assistant integration (`ai` feature, experimental)
 - [x] Dashboard node with real-time data widgets
-- [x] Audit logging subsystem
-- [x] OpenTelemetry tracing (optional)
+- [x] Audit logging subsystem (experimental)
+- [x] OpenTelemetry tracing (optional, `otel` feature)
 - [x] Frontend plugin registry
-- [x] Flow versioning with rollback and diff
+- [x] Flow versioning with rollback and diff (experimental)
 - [x] Industrial protocol nodes: Modbus, OPC-UA, BACnet
 - [x] Database nodes: PostgreSQL, TimescaleDB, MSSQL, SQLite, InfluxDB
-- [x] WASM plugin host/sdk
-- [x] Built-in MQTT broker
-- [x] 259+ Node-RED compatibility tests passing
+- [x] WASM plugin host/sdk (`wasm_plugins` feature, not in the default build)
+- [x] Built-in MQTT broker node
 
 ### Node-RED Features Roadmap
 

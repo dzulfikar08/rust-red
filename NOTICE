@@ -1,0 +1,18 @@
+RustRED
+Copyright (C) 2026 Dzulfikar Ats Tsauri
+
+This product is a fork of EdgeLinkd (https://github.com/oldrev/edgelinkd),
+licensed under the Apache License, Version 2.0.
+
+EdgeLinkd
+Copyright (C) 2023-TODAY Li Wei and the EdgeLinkd contributors.
+
+Changes made by RustRED are listed in the Git history of
+https://github.com/dzulfikar08/rust-red. They include renaming the project,
+a Modbus server node, an embedded MQTT broker node, clustering, an AI
+assistant, authentication, a dashboard data node, and CI and release tooling.
+
+This product includes software developed as part of Node-RED
+(https://nodered.org), Copyright OpenJS Foundation and other contributors,
+licensed under the Apache License, Version 2.0. The Node-RED editor is
+included through the 3rd-party/node-red Git submodule.

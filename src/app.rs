@@ -49,9 +49,7 @@ impl App {
         _flows_path: Option<String>,
     ) -> rust_red_core::Result<Self> {
         #[cfg(not(feature = "wasm_plugins"))]
-        let reg = {
-            create_registry()?
-        };
+        let reg = { create_registry()? };
         #[cfg(not(feature = "wasm_plugins"))]
         let _plugin_manager: Option<()> = None;
 

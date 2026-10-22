@@ -1,5 +1,5 @@
 // Licensed under the Apache License, Version 2.0
-// Copyright Rust-Red contributors
+// Copyright EdgeLink contributors; RustRED changes (C) Dzulfikar Ats Tsauri
 // Based on Node-RED 06-httpproxy.js HTTP Proxy Config node
 
 //! HTTP Proxy Configuration Node

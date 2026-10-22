@@ -145,7 +145,7 @@ main() {
     curl -fsSL --progress-bar -o "$archive_path" "$download_url" || {
         error "Download failed. URL: ${download_url}"
         error "This combination of OS/architecture may not have a pre-built binary."
-        error "Try building from source: cargo install rust-red"
+        error "Try building from source: cargo install --git https://github.com/dzulfikar08/rust-red"
         exit 1
     }
 
@@ -196,7 +196,7 @@ main() {
     fi
 
     # ── Locate binary ───────────────────────────────────────────────────
-    binary_file="$(find "${tmp_dir}/extracted" -name "${BINARY_NAME}${exe_suffix}" -type f 2>/dev/null | head -1)"
+    binary_file="$(find "${tmp_dir}/extracted" -name "${BINARY_NAME}" -type f 2>/dev/null | head -1)"
     if [ -z "$binary_file" ]; then
         # On windows, try with .exe
         if [ "$os" = "windows" ]; then
@@ -229,6 +229,17 @@ main() {
         exit 1
     fi
     chmod +x "$dest"
+
+    # The web editor is served from a ui_static directory next to the binary.
+    local ui_src
+    ui_src="$(dirname "$binary_file")/ui_static"
+    if [ -d "$ui_src" ]; then
+        if [ -w "$install_dir" ]; then
+            rm -rf "${install_dir}/ui_static" && cp -R "$ui_src" "${install_dir}/ui_static"
+        else
+            sudo rm -rf "${install_dir}/ui_static" && sudo cp -R "$ui_src" "${install_dir}/ui_static"
+        fi
+    fi
 
     # ── Verify installation ─────────────────────────────────────────────
     if check_cmd rust-red; then
