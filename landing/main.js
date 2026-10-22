@@ -106,9 +106,10 @@
   var statsAnimated = false;
 
   function animateCounter(el) {
-    var target = parseInt(el.getAttribute('data-target'), 10);
+    var target = parseFloat(el.getAttribute('data-target'));
     var suffix = el.getAttribute('data-suffix') || '';
     var prefix = el.getAttribute('data-prefix') || '';
+    var isDecimal = el.getAttribute('data-decimal') === 'true';
     var duration = 1500;
     var startTime = null;
 
@@ -120,9 +121,13 @@
       if (!startTime) startTime = timestamp;
       var progress = Math.min((timestamp - startTime) / duration, 1);
       var easedProgress = easeOutExpo(progress);
-      var current = Math.round(easedProgress * target);
+      var current = easedProgress * target;
 
-      el.textContent = prefix + current + suffix;
+      if (isDecimal) {
+        el.textContent = prefix + current.toFixed(1) + suffix;
+      } else {
+        el.textContent = prefix + Math.round(current) + suffix;
+      }
 
       if (progress < 1) {
         requestAnimationFrame(step);
