@@ -81,8 +81,9 @@ regex = "1"
 thiserror = "2"
 nom = "^8.0"
 tokio-cron-scheduler = "^0.14"
-bumpalo = "3"
-jsonata-rs = "0.3"
+# JSONata expression evaluation. `default-features = false` drops the `simd` feature: we
+# convert through serde_json, so simd-json would only add weight to the binary.
+jsonata-core = { version = "2.2", default-features = false }
 dirs-next = "2"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"

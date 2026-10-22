@@ -196,7 +196,11 @@ impl RedEnvStoreBuilder {
                 Ok(Variant::Bytes(bytes))
             }
 
-            RedPropertyType::Jsonata => crate::runtime::jsonata::evaluate_with_env(value, &self.envs),
+            RedPropertyType::Jsonata => {
+                let expression = crate::runtime::jsonata::JsonataExpression::compile(value)?;
+                let host = crate::runtime::jsonata::JsonataHost::default();
+                Ok(expression.evaluate(None, &host)?.unwrap_or(Variant::Null))
+            }
 
             RedPropertyType::Env => match self.normalized_and_get_existed(value) {
                 Some(ev) => Ok(ev),
@@ -369,5 +373,23 @@ mod tests {
         // is a miss even when the plain name resolves.
         assert_eq!(node.get_raw_env("MY_FOO").unwrap().as_str().unwrap(), "aaa");
         assert!(node.get_raw_env("${MY_FOO}").is_none());
+    }
+}
+
+#[cfg(test)]
+mod jsonata_tests {
+    use serde_json::json;
+
+    use super::RedEnvStoreBuilder;
+
+    #[test]
+    fn test_env_store_jsonata_value() {
+        let json = json!([
+            {"name": "NOW", "value": "$millis()", "type": "jsonata"},
+            {"name": "PLAIN", "value": "1 + 1", "type": "jsonata"}
+        ]);
+        let envs = RedEnvStoreBuilder::default().load_json(&json).build();
+        assert!(envs.evalute_env("NOW").unwrap().is_number());
+        assert_eq!(envs.evalute_env("PLAIN").unwrap().as_i64(), Some(2));
     }
 }

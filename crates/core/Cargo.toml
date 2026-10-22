@@ -28,7 +28,6 @@ log.workspace = true
 tokio-util.workspace = true
 thiserror.workspace = true
 nom.workspace = true
-bumpalo.workspace = true
 regex.workspace = true
 tokio-cron-scheduler.workspace = true
 chrono = { workspace = true, features = ["serde"] }
@@ -60,7 +59,7 @@ serde-xml-rs = { workspace = true, optional = true }
 # Crates in this project
 rust-red-macro = { path = "../macro" }
 dashmap.workspace = true
-jsonata-rs.workspace = true
+jsonata-core.workspace = true
 itertools.workspace = true
 smallvec.workspace = true
 smallstr.workspace = true

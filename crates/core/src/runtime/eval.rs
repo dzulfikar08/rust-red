@@ -119,14 +119,7 @@ pub async fn evaluate_raw_node_property(
 
         RedPropertyType::Bool => Ok(Variant::Bool(value.trim_ascii().parse::<bool>()?)),
 
-        RedPropertyType::Jsonata => {
-            if let Some(msg) = msg {
-                crate::runtime::jsonata::evaluate_variant(value, msg.as_variant())
-            } else {
-                Err(RustRedError::BadArgument("msg"))
-                    .with_context(|| "JSONata evaluation requires a msg context".to_owned())
-            }
-        }
+        RedPropertyType::Jsonata => evaluate_jsonata(value, node, flow, msg),
 
         RedPropertyType::Env => match evaluate_env_property(value, node, flow) {
             Some(ev) => Ok(ev),
@@ -210,14 +203,9 @@ pub async fn evaluate_node_property_value(
             }
         }
 
-        (RedPropertyType::Jsonata, RedPropertyValue::Runtime(ref expr))
-        | (RedPropertyType::Jsonata, RedPropertyValue::Constant(Variant::String(ref expr))) => {
-            if let Some(msg) = msg {
-                crate::runtime::jsonata::evaluate_variant(expr.as_str(), msg.as_variant())?
-            } else {
-                return Err(RustRedError::BadArgument("msg"))
-                    .with_context(|| "JSONata evaluation requires a msg context".to_owned());
-            }
+        (RedPropertyType::Jsonata, RedPropertyValue::Runtime(expr))
+        | (RedPropertyType::Jsonata, RedPropertyValue::Constant(Variant::String(expr))) => {
+            evaluate_jsonata(expr.as_str(), node, flow, msg)?
         }
         (RedPropertyType::Jsonata, _) => {
             return Err(RustRedError::BadArgument("value"))
@@ -239,6 +227,24 @@ pub async fn evaluate_node_property_value(
     };
 
     Ok(res)
+}
+
+/// Evaluate a JSONata expression the way Node-RED's `evaluateJSONataExpression` does.
+///
+/// JSONata `undefined` (an unmatched path, a context variable that does not exist) has no
+/// `Variant` counterpart, so it becomes `Variant::Null`, as in the JS bridge. Without a message
+/// (for example an `inject` property) the expression is evaluated against an empty object.
+fn evaluate_jsonata(
+    source: &str,
+    node: Option<&dyn FlowNodeBehavior>,
+    flow: Option<&Flow>,
+    msg: Option<&Msg>,
+) -> crate::Result<Variant> {
+    use crate::runtime::jsonata::{JsonataExpression, JsonataHost};
+
+    let expr = JsonataExpression::compile(source)?;
+    let host = JsonataHost::new(flow, node);
+    Ok(expr.evaluate(msg, &host)?.unwrap_or(Variant::Null))
 }
 
 #[cfg(test)]

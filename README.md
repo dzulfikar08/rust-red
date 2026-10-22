@@ -516,7 +516,10 @@ Refer to [REDNODES-SPECS-DIFF.md](tests/REDNODES-SPECS-DIFF.md) for the detailed
     - [x] `RED.util.cloneMessage()`
     - [x] `RED.util.generateId()`
 - [x] Plug-in subsystem
-- [ ] JSONata
+- [x] JSONata (via the pure-Rust `jsonata-core` engine)
+    - [x] `$flowContext()`, `$globalContext()`, `$env()`, `$clone()`, `$I`/`$N` bindings
+    - [x] `change` / `switch` / `inject` properties, and environment variables
+    - [ ] `$moment()`: an expression calling it fails with an error instead of a value
 
 ### Supported Nodes
 

@@ -33,6 +33,7 @@ mod test_function;
 mod test_http_request;
 mod test_inject;
 mod test_json;
+mod test_jsonata;
 mod test_link;
 mod test_range;
 mod test_rbe;
