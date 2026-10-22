@@ -180,3 +180,44 @@ async fn inject_multiple_properties() {
     assert_msg_str(&msgs[0], "topic", "test-topic");
     assert_msg_num(&msgs[0], "count", 5);
 }
+
+/// Inject: the Node-RED editor exports `onceDelay` (and `repeat`) as strings once they were edited.
+/// A node exactly as the editor saves it must load and fire.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn inject_once_delay_as_string_from_editor_export() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "inject", "z": "100", "name": "",
+         "props": [{"p": "payload"}, {"p": "topic", "vt": "str"}],
+         "repeat": "", "crontab": "", "once": true, "onceDelay": "0.1",
+         "topic": "t", "payload": "hello", "payloadType": "str",
+         "x": 140, "y": 80, "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness.run(1).await;
+
+    assert_eq!(msgs.len(), 1);
+    assert_msg_str(&msgs[0], "payload", "hello");
+}
+
+/// Inject: `repeat` as a numeric string repeats, as the editor saves it.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn inject_repeat_as_string_from_editor_export() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "inject", "z": "100", "name": "",
+         "props": [{"p": "payload"}],
+         "repeat": "0.1", "crontab": "", "once": true, "onceDelay": 1,
+         "topic": "", "payload": "tick", "payloadType": "str",
+         "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness.run_with_timeout(2, std::time::Duration::from_secs(3)).await;
+
+    assert_eq!(msgs.len(), 2);
+    assert_msg_str(&msgs[0], "payload", "tick");
+}

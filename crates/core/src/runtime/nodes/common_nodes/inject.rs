@@ -30,16 +30,16 @@ struct InjectNodeConfig {
     #[serde(default)]
     props: Vec<RedPropertyTriple>,
 
-    #[serde(default, deserialize_with = "json::deser::str_to_option_f64")]
+    #[serde(default, deserialize_with = "json::deser::lenient_opt_f64")]
     repeat: Option<f64>,
 
     #[serde(default)]
     crontab: String,
 
-    #[serde(default)]
+    #[serde(default, deserialize_with = "json::deser::lenient_bool")]
     once: bool,
 
-    #[serde(rename = "onceDelay", default)]
+    #[serde(rename = "onceDelay", default, deserialize_with = "json::deser::lenient_opt_f64")]
     once_delay: Option<f64>,
 }
 

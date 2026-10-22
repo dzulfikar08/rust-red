@@ -857,6 +857,30 @@ where
     }
 }
 
+/// Accepts a number or a numeric string. Empty strings become `None`.
+pub fn lenient_opt_f64<'de, D>(deserializer: D) -> Result<Option<f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    match Option::<JsonValue>::deserialize(deserializer)? {
+        None | Some(JsonValue::Null) => Ok(None),
+        Some(JsonValue::Number(n)) => {
+            n.as_f64().map(Some).ok_or_else(|| Error::custom(format!("expected a number, got {n}")))
+        }
+        Some(JsonValue::String(s)) => {
+            let s = s.trim();
+            if s.is_empty() {
+                Ok(None)
+            } else {
+                s.parse::<f64>().map(Some).map_err(|_| Error::custom(format!("expected a number, got '{s}'")))
+            }
+        }
+        Some(other) => Err(Error::custom(format!("expected a number or numeric string, got {other}"))),
+    }
+}
+
 pub fn lenient_opt_u16<'de, D>(deserializer: D) -> Result<Option<u16>, D::Error>
 where
     D: Deserializer<'de>,
