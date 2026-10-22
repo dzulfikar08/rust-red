@@ -12,7 +12,7 @@
 //!
 //! Configuration:
 //! - `tag`: CSS selector for extracting elements
-//! - `ret`: Return format - "html" for markup, "text" for text content
+//! - `ret`: Return format - "html" for inner markup, "text", "attr" for an object of attributes, "compl" for the complete element
 //! - `as`: Output mode - "single" for one message with array, "multi" for separate messages
 //!
 //! Behavior matches Node-RED:
@@ -42,6 +42,12 @@ enum HtmlRetFormat {
 
     #[serde(rename = "text")]
     Text, // Return text content
+
+    #[serde(rename = "attr")]
+    Attr, // Return an object with the attributes
+
+    #[serde(rename = "compl")]
+    Compl, // Return the complete element
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
@@ -60,7 +66,7 @@ enum HtmlOutputMode {
 ///
 /// Configuration:
 /// - `tag`: CSS selector string (e.g. "h1", ".classname", "#id")
-/// - `ret`: Return format - "html" (default) or "text"
+/// - `ret`: Return format - "html" (default, inner markup), "text", "attr" (object of attributes) or "compl" (complete element)
 /// - `as`: Output mode - "single" (default) for array, "multi" for separate messages
 /// - `property`: Property to operate on (default: "payload")
 ///
@@ -96,7 +102,7 @@ struct HtmlNodeConfig {
     #[serde(default)]
     tag: String,
 
-    /// Return format: "html" for markup, "text" for text content
+    /// Return format: "html" inner markup, "text", "attr" object of attributes, "compl" complete element
     #[serde(default)]
     ret: HtmlRetFormat,
 
@@ -108,6 +114,10 @@ struct HtmlNodeConfig {
     /// Property name to operate on (default: "payload")
     #[serde(default = "default_property")]
     property: String,
+
+    /// Property that receives the result (default: the input property)
+    #[serde(default)]
+    outproperty: Option<String>,
 
     /// Number of outputs (usually 1)
     #[serde(default = "default_outputs")]
@@ -125,11 +135,24 @@ fn default_outputs() -> usize {
 
 #[cfg(feature = "nodes_html")]
 impl HtmlNode {
+    /// The value of one matched element for the configured `ret`, as Node-RED returns it:
+    /// the inner html, the text, an object of the attributes, or the complete element.
+    fn element_value(element: scraper::ElementRef<'_>, ret: HtmlRetFormat) -> Variant {
+        match ret {
+            HtmlRetFormat::Html => Variant::String(element.inner_html()),
+            HtmlRetFormat::Text => Variant::String(element.text().collect::<String>()),
+            HtmlRetFormat::Attr => Variant::Object(
+                element.value().attrs().map(|(k, v)| (k.to_string(), Variant::String(v.to_string()))).collect(),
+            ),
+            HtmlRetFormat::Compl => Variant::String(element.html()),
+        }
+    }
+
     async fn process_html(&self, msg: MsgHandle) -> crate::Result<()> {
         let msg_guard = msg.read().await;
 
         // Get the HTML string from the configured property
-        let html_string = match msg_guard.get(&self.config.property) {
+        let html_string = match msg_guard.get_nav_stripped(&self.config.property) {
             Some(Variant::String(s)) => s.clone(),
             Some(Variant::Bytes(bytes)) => match String::from_utf8(bytes.clone()) {
                 Ok(s) => s,
@@ -188,25 +211,22 @@ impl HtmlNode {
 
         // Parse the HTML document and extract results in a fully synchronous block
         // to ensure the non-Send scraper::Html is dropped before any await
-        let results: Vec<String> = {
+        let results: Vec<Variant> = {
             let document = Html::parse_document(&html_string);
-            document
-                .select(&selector)
-                .map(|element| match self.config.ret {
-                    HtmlRetFormat::Html => element.html(),
-                    HtmlRetFormat::Text => element.text().collect::<String>(),
-                })
-                .collect()
+            document.select(&selector).map(|element| Self::element_value(element, self.config.ret)).collect()
         };
+
+        // The result goes to `outproperty`, which defaults to the input property
+        let out_property =
+            self.config.outproperty.as_deref().filter(|p| !p.is_empty()).unwrap_or(&self.config.property);
 
         // Build the response message
         let mut response_msg = msg.read().await.clone();
 
         match self.config.output {
             HtmlOutputMode::Single => {
-                // Return a single message with array payload
-                let variants: Vec<Variant> = results.into_iter().map(Variant::String).collect();
-                response_msg.set("payload".to_string(), Variant::Array(variants));
+                // Return a single message with an array of the matches
+                response_msg.set_nav_stripped(out_property, Variant::Array(results), true)?;
 
                 let response_handle = MsgHandle::new(response_msg);
                 self.fan_out_one(Envelope { port: 0, msg: response_handle }, CancellationToken::new()).await?;
@@ -215,14 +235,14 @@ impl HtmlNode {
                 // Send separate messages for each matched element
                 if results.is_empty() {
                     // No matches - send empty array
-                    response_msg.set("payload".to_string(), Variant::Array(vec![]));
+                    response_msg.set_nav_stripped(out_property, Variant::Array(vec![]), true)?;
                     let response_handle = MsgHandle::new(response_msg);
                     self.fan_out_one(Envelope { port: 0, msg: response_handle }, CancellationToken::new()).await?;
                 } else {
                     let count = results.len();
                     for (i, result) in results.into_iter().enumerate() {
                         let mut individual_msg = response_msg.clone();
-                        individual_msg.set("payload".to_string(), Variant::String(result));
+                        individual_msg.set_nav_stripped(out_property, result, true)?;
 
                         // Add parts information for split/join compatibility
                         let mut parts = BTreeMap::new();
@@ -297,6 +317,16 @@ mod tests {
         assert_eq!(config.tag, "h1");
         assert_eq!(config.ret, HtmlRetFormat::Text);
         assert_eq!(config.output, HtmlOutputMode::Multi);
+    }
+
+    #[test]
+    fn test_html_config_attr_compl_and_outproperty() {
+        let attr: HtmlNodeConfig = serde_json::from_value(json!({"ret": "attr", "outproperty": "bar"})).unwrap();
+        assert_eq!(attr.ret, HtmlRetFormat::Attr);
+        assert_eq!(attr.outproperty.as_deref(), Some("bar"));
+        let compl: HtmlNodeConfig = serde_json::from_value(json!({"ret": "compl"})).unwrap();
+        assert_eq!(compl.ret, HtmlRetFormat::Compl);
+        assert!(compl.outproperty.is_none());
     }
 
     #[cfg(feature = "nodes_html")]
