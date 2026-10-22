@@ -24,7 +24,7 @@ What this fork adds on top of EdgeLinkd (see the Git history for details):
 - A React based editor experiment in `crates/frontend` (not part of the shipped binary).
 - CI, release builds and benchmarks.
 
-The fork is about 115 commits behind upstream EdgeLinkd and does not track its releases. Upstream fixes are not merged automatically.
+The fork does not track EdgeLinkd releases. Upstream fixes are ported by hand, see [Ported from EdgeLinkd](#ported-from-edgelinkd) below.
 
 ## Overview
 
@@ -66,7 +66,7 @@ How the three packages differ from Node-RED:
 - **Credentials.** The user and password are read from a `credentials` object on the config node, from plain `user` and `password` properties, or from environment variables when the field type is `env` (PostgreSQL). The encrypted `flows_cred.json` is not read, so a flow exported without credentials needs them added by one of these ways.
 - **A broken config node** is logged as an error and disabled. Nodes that use it report that it is missing. The rest of the flows keep running.
 - **Node ids** do not have to be hex. Ids such as `p1` are accepted on both flow nodes and config nodes.
-- **MQTT.** Every `mqtt in` and `mqtt out` node opens its own connection, where Node-RED shares one. A configured client id gets a suffix per node for that reason. As in Node-RED, a topic set on `mqtt out` wins over `msg.topic`. `protocolVersion` 5 is accepted, but the connection uses MQTT 3.1.1. Birth and close messages are not sent.
+- **MQTT.** Every `mqtt in` and `mqtt out` node opens its own connection, where Node-RED shares one. A configured client id gets a suffix per node for that reason. As in Node-RED, a topic set on `mqtt out` wins over `msg.topic`. `protocolVersion` 5 is supported: the node connects with MQTT 5 and carries response topic, correlation data, content type, message expiry and user properties both ways. The embedded `mqtt-broker` node is MQTT 3.1.1 only, so use an external broker (for example Mosquitto 2) for MQTT 5. Birth and close messages are not sent.
 - **Modbus.** `msg.payload` holds the values (an array of numbers, or booleans for coils) and `msg.responseBuffer` holds `{data, buffer}`. Only TCP and RTU serial transports exist, not UDP or ASCII. `msg.modbusRequest` and `msg.input` hold numbers where Node-RED holds the strings from the editor. The nodes `modbus-flex-connector`, `modbus-flex-sequencer`, `modbus-flex-fc`, `modbus-response`, `modbus-queue-info`, `modbus-io-config` and the I/O file options are not available.
 - **PostgreSQL.** `numeric` columns come back as text, like node-postgres, and `bigint` beyond 2^53 as text. Timestamps come back as ISO 8601 text, not as Date objects. A query with several statements runs, but returns every column as text. `ssl` is supported (`true`, or `{"rejectUnauthorized": false}`).
 - Context storage to the local file system, and part of `RED.util`, are not implemented (see roadmap below).
@@ -533,6 +533,34 @@ The heavy check mark (:heavy_check_mark:) indicates the node has passed the Node
 - **Storage nodes**: File, File In, Watch
 - **Database nodes**: PostgreSQL, TimescaleDB, MSSQL, SQLite, InfluxDB
 - **Industrial nodes**: Modbus (Read/Write/Flex/Server), OPC-UA (Read/Write), BACnet (Read/Write)
+
+## Changelog
+
+### 0.3.0
+
+#### Ported from EdgeLinkd
+
+Each item is a hand port of an upstream [EdgeLinkd](https://github.com/oldrev/edgelinkd) commit, with tests. The upstream commit hash is in the Git message of the matching commit here (`port(upstream <sha>): ...`).
+
+| Upstream | What changed |
+|----------|--------------|
+| `a165109` | `sort` reads the editor's `seqKey`, `msgKey` and `targetType`. A message group no longer always sorts by `payload`. |
+| `2990687`, `c9cf68e` | New `runtime.flow.node_message_buffer_max_length` setting (Node-RED's `nodeMessageBufferMaxLength`). `sort` drops the oldest incomplete group when the buffer is full. A redeploy from the web UI keeps the engine configuration. |
+| `27bc07e` | `join` reads `joiner`, takes its count from `msg.parts` in auto mode and from the node in manual mode, flushes on `msg.complete`, and keeps array holes. |
+| `d446881`, `544c68b` | `batch` clones messages emitted with overlap, runs interval mode on a real timer, supports `allowEmptySequence`, and reports overflow as `batch.too-many`. |
+| `90403a7` | `delay` calls `done()` at the right time and supports the queue and timed rate modes. |
+| `9b1fa42`, `f93287a` | `exec` keeps trailing newlines, returns binary output as a buffer, and waits for stdout and stderr so output is not dropped. |
+| `456da27` | `tcp request` in time mode collects the whole response. |
+| `1ed579a` | `env.get()` in the function node looks the name up literally, without interpolation. |
+| `f3a80f5` | Fewer panics and silent misconfigurations in the kernel: string `_msgid`, zero queue capacity rejected, nested property set on a non-object returns an error. |
+| `35075ea` | `trigger` supports the missing property types (JSONata, binary, env, ISO date). |
+| `b1867f7` | A node with several output ports sends to all ports at the same time, so one full port does not block the others. |
+| `e7f780a`, `7e92f0b` | `file` and `file in` support `hex`, `ucs2` and `utf-16be` encodings. |
+| `5e14079` | MQTT 5 in `mqtt in` and `mqtt out` (`protocolVersion` 5 is really used). |
+| `f410c40` | JSONata runs on the pure-Rust `jsonata-core` engine, with `$flowContext()`, `$globalContext()`, `$env()`, `$clone()`, `$I` and `$N`. |
+| `84614a2` | `html` node: `attr` and `compl` returns, `outproperty`, inner HTML. |
+
+Checked and not needed: `218db7d` (our `debug` node has no JSONata error state to fix).
 
 ## Contribution
 
