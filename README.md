@@ -38,8 +38,10 @@ These are measurements from one Linux x86_64 machine (12 cores), not a general g
 
 | Build | Binary size (stripped, LTO, opt-level z) | Idle RSS, empty flow, 30 s, web server on |
 |-------|------------------------------------------|-------------------------------------------|
-| default features | 16.3 MB | 15.0 MB |
+| default features | 17.0 MB (0.3.0; 16.8 MB in 0.2.1) | 15.0 MB |
 | `--features full` | 24.2 MB | 17.8 MB |
+
+The default size was re-measured for 0.3.0 from `cargo build --release`. The `full` size and the RSS columns come from an earlier release and were not repeated for 0.3.0.
 
 Modbus TCP to PostgreSQL comparison (10 holding registers polled every 500 ms, a function node builds the INSERT, one row per poll, about 2 rows/s on both sides, verified by row counts). Method: 30 s warm-up, then 60 s sampled once per second; CPU is (utime + stime) / wall-clock.
 
