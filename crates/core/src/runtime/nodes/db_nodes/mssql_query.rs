@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -47,10 +46,8 @@ impl MssqlQueryNode {
     async fn resolve_config_node(&self) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
         let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
-        let eid_opt = ElementId::from_str(&self.config.config_node).ok();
-        let global = eid_opt
-            .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| engine.find_global_node_by_name(&self.config.config_node).ok().flatten())
+        let global = engine
+            .find_global_node_by_ref(&self.config.config_node)
             .ok_or_else(|| anyhow::anyhow!("Config node '{}' not found", self.config.config_node))?;
 
         Ok(global)

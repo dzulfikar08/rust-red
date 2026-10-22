@@ -253,7 +253,20 @@ impl Engine {
             );
 
             let global_node = match meta_node.factory {
-                NodeFactory::Global(factory) => factory(self, &global_config, settings)?,
+                NodeFactory::Global(factory) => match factory(self, &global_config, settings) {
+                    Ok(node) => node,
+                    Err(err) => {
+                        // A broken configuration node must not take the whole runtime down.
+                        // Nodes that reference it will report that it is missing.
+                        log::error!(
+                            "Failed to load global node (id=`{}`, type=`{}`, name='{}'), the node is disabled: {err}",
+                            global_config.id,
+                            global_config.type_name,
+                            global_config.name
+                        );
+                        continue;
+                    }
+                },
                 _ => {
                     return Err(RustRedError::NotSupported(format!(
                         "Must be a global node: Node(id={0}, type='{1}')",
@@ -427,6 +440,16 @@ impl Engine {
 
     pub fn find_global_node_by_id(&self, id: &ElementId) -> Option<Arc<dyn GlobalNodeBehavior>> {
         self.inner.global_nodes.get(id).map(|x| x.value().clone())
+    }
+
+    /// Resolve a config node reference as written in a flow node (`broker`, `server`, `postgreSQLConfig`...).
+    ///
+    /// Uses the same id mapping as the flow loader, so ids that are not hex (for example `p1`)
+    /// resolve to the config node that was registered under them. Falls back to the node name.
+    pub fn find_global_node_by_ref(&self, reference: &str) -> Option<Arc<dyn GlobalNodeBehavior>> {
+        crate::runtime::model::json::deser::parse_red_id_str(reference)
+            .and_then(|id| self.find_global_node_by_id(&id))
+            .or_else(|| self.find_global_node_by_name(reference).ok().flatten())
     }
 
     pub fn find_global_node_by_name(&self, name: &str) -> crate::Result<Option<Arc<dyn GlobalNodeBehavior>>> {

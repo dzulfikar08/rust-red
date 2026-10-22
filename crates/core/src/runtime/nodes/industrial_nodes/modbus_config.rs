@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -217,9 +218,44 @@ impl ModbusDataType {
     }
 }
 
+/// Raw data of a read, before any data type conversion.
+#[derive(Debug, Clone)]
+pub(crate) enum ModbusRaw {
+    Bits(Vec<bool>),
+    Words(Vec<u16>),
+}
+
+impl ModbusRaw {
+    /// The values as plain numbers or booleans, like the `data` array of the contrib nodes.
+    pub(crate) fn to_variant(&self) -> Variant {
+        match self {
+            Self::Bits(bits) => Variant::Array(bits.iter().map(|b| Variant::Bool(*b)).collect()),
+            Self::Words(words) => Variant::Array(words.iter().map(|w| Variant::from(*w as i64)).collect()),
+        }
+    }
+
+    /// The bytes of the response body: big endian registers, or coils packed eight to a byte, lowest bit first.
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        match self {
+            Self::Bits(bits) => {
+                let mut bytes = vec![0u8; bits.len().div_ceil(8)];
+                for (index, bit) in bits.iter().enumerate() {
+                    if *bit {
+                        bytes[index / 8] |= 1 << (index % 8);
+                    }
+                }
+                bytes
+            }
+            Self::Words(words) => words.iter().flat_map(|w| w.to_be_bytes()).collect(),
+        }
+    }
+}
+
 pub(crate) struct ModbusConnection {
     context: Option<tokio_modbus::client::Context>,
     config: ModbusConfig,
+    /// Unit (slave) id used for the next request. Reset per request by `select_unit`.
+    unit: u8,
 }
 
 impl std::fmt::Debug for ModbusConnection {
@@ -231,19 +267,67 @@ impl std::fmt::Debug for ModbusConnection {
     }
 }
 
+/// Run one request with the configured timeout. A timeout counts as a transport error.
+async fn timed<T>(limit: Duration, call: impl Future<Output = tokio_modbus::Result<T>>) -> tokio_modbus::Result<T> {
+    tokio::time::timeout(limit, call).await.unwrap_or_else(|_| {
+        Err(tokio_modbus::Error::Transport(std::io::Error::new(std::io::ErrorKind::TimedOut, "request timed out")))
+    })
+}
+
+/// Send a request on the connection. A transport failure or timeout drops the connection,
+/// reconnects and tries once more. A Modbus exception response is returned as an error
+/// right away, because the device did answer and the link is fine.
+macro_rules! modbus_op {
+    ($conn:expr, $label:expr, |$ctx:ident| $call:expr) => {{
+        let conn: &mut ModbusConnection = $conn;
+        conn.ensure_connected().await?;
+        conn.apply_unit();
+        let limit = Duration::from_millis(conn.config.timeout_ms);
+        let first = {
+            let $ctx = conn.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+            timed(limit, $call).await
+        };
+        match first {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(code)) => Err(anyhow::anyhow!("{} failed: Modbus exception {code:?}", $label)),
+            Err(error) => {
+                log::warn!("[modbus-config] {} failed ({error}), reconnecting", $label);
+                if conn.try_reconnect().await {
+                    conn.apply_unit();
+                    let $ctx = conn.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
+                    match timed(limit, $call).await {
+                        Ok(Ok(value)) => Ok(value),
+                        Ok(Err(code)) => Err(anyhow::anyhow!("{} failed: Modbus exception {code:?}", $label)),
+                        Err(error) => Err(anyhow::anyhow!("{} failed: {error}", $label)),
+                    }
+                } else {
+                    Err(anyhow::anyhow!("{} failed: {error}", $label))
+                }
+            }
+        }
+    }};
+}
+
 impl ModbusConnection {
     pub(crate) async fn ensure_connected(&mut self) -> crate::Result<()> {
         if self.context.is_some() {
             return Ok(());
         }
-        let auto_connect = self.config.auto_connect.unwrap_or(true);
-        if !auto_connect {
+        if !self.config.auto_connect.unwrap_or(true) {
             return Err(anyhow::anyhow!("Not connected and auto_connect is disabled"));
         }
-        if let Some(reconnect_ms) = self.config.reconnect_timeout {
-            tokio::time::sleep(std::time::Duration::from_millis(reconnect_ms)).await;
-        }
         self.connect().await
+    }
+
+    /// Use `unit` for the next requests, or the unit id of the config node when it is `None`.
+    pub(crate) fn select_unit(&mut self, unit: Option<u8>) {
+        self.unit = unit.unwrap_or(self.config.unit_id);
+    }
+
+    fn apply_unit(&mut self) {
+        if let Some(ctx) = self.context.as_mut() {
+            ctx.set_slave(Slave(self.unit));
+        }
     }
 
     async fn connect(&mut self) -> crate::Result<()> {
@@ -258,29 +342,31 @@ impl ModbusConnection {
     }
 
     async fn connect_tcp(&mut self) -> crate::Result<()> {
-        let socket_addr = format!("{}:{}", self.config.host, self.config.port);
-        let addr: std::net::SocketAddr =
-            socket_addr.parse().map_err(|e: std::net::AddrParseError| anyhow::anyhow!("Invalid address: {e}"))?;
+        let target = format!("{}:{}", self.config.host, self.config.port);
+        let limit = Duration::from_millis(self.config.timeout_ms);
 
-        let result = tokio::time::timeout(
-            std::time::Duration::from_millis(self.config.timeout_ms),
-            tcp::connect_slave(addr, Slave(self.config.unit_id)),
-        )
-        .await;
+        let connect = async {
+            let addr = tokio::net::lookup_host(&target)
+                .await
+                .map_err(|e| anyhow::anyhow!("Cannot resolve '{target}': {e}"))?
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("Cannot resolve '{target}'"))?;
+            tcp::connect_slave(addr, Slave(self.unit)).await.map_err(|e| anyhow::anyhow!("Connection failed: {e}"))
+        };
 
-        match result {
+        match tokio::time::timeout(limit, connect).await {
             Ok(Ok(mut ctx)) => {
-                ctx.set_slave(Slave(self.config.unit_id));
+                ctx.set_slave(Slave(self.unit));
                 self.context = Some(ctx);
-                log::info!("[modbus-config] Connected to {}", socket_addr);
+                log::info!("[modbus-config] Connected to {target}");
                 Ok(())
             }
             Ok(Err(e)) => {
-                log::warn!("[modbus-config] Connection failed to {}: {}", socket_addr, e);
-                Err(anyhow::anyhow!("Connection failed: {}", e))
+                log::warn!("[modbus-config] {e} ({target})");
+                Err(e)
             }
             Err(_) => {
-                log::warn!("[modbus-config] Connection timeout to {}", socket_addr);
+                log::warn!("[modbus-config] Connection timeout to {target}");
                 Err(anyhow::anyhow!("Connection timeout after {}ms", self.config.timeout_ms))
             }
         }
@@ -301,15 +387,10 @@ impl ModbusConnection {
         let port = tokio_serial::SerialStream::open(&builder)
             .map_err(|e| anyhow::anyhow!("Failed to open serial port '{}': {}", serial_port, e))?;
 
-        let ctx = rtu::attach_slave(port, Slave(self.config.unit_id));
+        let ctx = rtu::attach_slave(port, Slave(self.unit));
         self.context = Some(ctx);
 
-        log::info!(
-            "[modbus-config] Connected RTU to {} @ {} baud, unit {}",
-            serial_port,
-            baud_rate,
-            self.config.unit_id
-        );
+        log::info!("[modbus-config] Connected RTU to {} @ {} baud, unit {}", serial_port, baud_rate, self.unit);
         Ok(())
     }
 
@@ -319,19 +400,17 @@ impl ModbusConnection {
         }
     }
 
-    /// Attempt to reconnect after a failure. Returns true if reconnection succeeded.
+    /// Drop the connection and connect again, after the configured reconnect delay.
+    /// Returns true if reconnection succeeded.
     async fn try_reconnect(&mut self) -> bool {
         self.disconnect();
         if !self.config.auto_connect.unwrap_or(true) {
             return false;
         }
         if let Some(reconnect_ms) = self.config.reconnect_timeout {
-            tokio::time::sleep(std::time::Duration::from_millis(reconnect_ms)).await;
+            tokio::time::sleep(Duration::from_millis(reconnect_ms)).await;
         }
-        match self.connect().await {
-            Ok(()) => true,
-            Err(_) => false,
-        }
+        self.connect().await.is_ok()
     }
 
     /// Returns true if the connection appears to be alive.
@@ -342,182 +421,142 @@ impl ModbusConnection {
 
     /// FC1 – Read Coils (bits).
     pub(crate) async fn read_coils(&mut self, address: u16, quantity: u16) -> crate::Result<Vec<bool>> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.read_coils(address, quantity).await {
-            Ok(Ok(response)) => Ok(response),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.read_coils(address, quantity)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Read failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Read error: {}", e)))
-                } else {
-                    map_modbus_err(err)
-                }
-            }
-        }
+        modbus_op!(self, "Read coils", |ctx| ctx.read_coils(address, quantity))
     }
 
     /// FC2 – Read Discrete Inputs (read-only bits).
     pub(crate) async fn read_discrete_inputs(&mut self, address: u16, quantity: u16) -> crate::Result<Vec<bool>> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.read_discrete_inputs(address, quantity).await {
-            Ok(Ok(response)) => Ok(response),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.read_discrete_inputs(address, quantity)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Read discrete inputs failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Read discrete inputs error: {}", e)))
-                } else {
-                    map_modbus_err(err)
-                }
-            }
-        }
+        modbus_op!(self, "Read discrete inputs", |ctx| ctx.read_discrete_inputs(address, quantity))
     }
 
     /// FC3 – Read Holding Registers.
     pub(crate) async fn read_holding_registers(&mut self, address: u16, quantity: u16) -> crate::Result<Vec<u16>> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.read_holding_registers(address, quantity).await {
-            Ok(Ok(response)) => Ok(response),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.read_holding_registers(address, quantity)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Read failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Read error: {}", e)))
-                } else {
-                    map_modbus_err(err)
-                }
-            }
-        }
+        modbus_op!(self, "Read holding registers", |ctx| ctx.read_holding_registers(address, quantity))
     }
 
     /// FC4 – Read Input Registers (read-only).
     pub(crate) async fn read_input_registers(&mut self, address: u16, quantity: u16) -> crate::Result<Vec<u16>> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.read_input_registers(address, quantity).await {
-            Ok(Ok(response)) => Ok(response),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.read_input_registers(address, quantity)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Read failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Read error: {}", e)))
-                } else {
-                    map_modbus_err(err)
-                }
-            }
-        }
+        modbus_op!(self, "Read input registers", |ctx| ctx.read_input_registers(address, quantity))
     }
 
     /// FC5 – Write Single Coil.
     pub(crate) async fn write_single_coil(&mut self, address: u16, value: bool) -> crate::Result<()> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.write_single_coil(address, value).await {
-            Ok(Ok(())) => Ok(()),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.write_single_coil(address, value)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Write coil failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Write coil error: {}", e)))
-                } else {
-                    map_modbus_err_unit(err)
-                }
-            }
-        }
+        modbus_op!(self, "Write coil", |ctx| ctx.write_single_coil(address, value))
     }
 
     /// FC6 – Write Single Register.
     pub(crate) async fn write_single_register(&mut self, address: u16, value: u16) -> crate::Result<()> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.write_single_register(address, value).await {
-            Ok(Ok(())) => Ok(()),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.write_single_register(address, value)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Write failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Write error: {}", e)))
-                } else {
-                    map_modbus_err_unit(err)
-                }
-            }
-        }
+        modbus_op!(self, "Write register", |ctx| ctx.write_single_register(address, value))
     }
 
     /// FC15 – Write Multiple Coils.
     pub(crate) async fn write_multiple_coils(&mut self, address: u16, values: &[bool]) -> crate::Result<()> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.write_multiple_coils(address, values).await {
-            Ok(Ok(())) => Ok(()),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.write_multiple_coils(address, values)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Write multiple coils failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Write multiple coils error: {}", e)))
-                } else {
-                    map_modbus_err_unit(err)
-                }
-            }
-        }
+        modbus_op!(self, "Write multiple coils", |ctx| ctx.write_multiple_coils(address, values))
     }
 
     /// FC16 – Write Multiple Registers.
     pub(crate) async fn write_multiple_registers(&mut self, address: u16, values: &[u16]) -> crate::Result<()> {
-        self.ensure_connected().await?;
-        let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-        match ctx.write_multiple_registers(address, values).await {
-            Ok(Ok(())) => Ok(()),
-            err => {
-                if self.try_reconnect().await {
-                    let ctx = self.context.as_mut().ok_or_else(|| anyhow::anyhow!("Not connected"))?;
-                    ctx.write_multiple_registers(address, values)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Write failed: {}", e))
-                        .and_then(|r| r.map_err(|e| anyhow::anyhow!("Write error: {}", e)))
-                } else {
-                    map_modbus_err_unit(err)
-                }
+        modbus_op!(self, "Write multiple registers", |ctx| ctx.write_multiple_registers(address, values))
+    }
+
+    /// Read by function code number (1 to 4) from `unit`, or the config node's unit when `None`.
+    pub(crate) async fn read_raw(
+        &mut self,
+        unit: Option<u8>,
+        fc: u8,
+        address: u16,
+        quantity: u16,
+    ) -> crate::Result<ModbusRaw> {
+        self.select_unit(unit);
+        match fc {
+            1 => {
+                let mut bits = self.read_coils(address, quantity).await?;
+                bits.truncate(quantity as usize);
+                Ok(ModbusRaw::Bits(bits))
             }
+            2 => {
+                let mut bits = self.read_discrete_inputs(address, quantity).await?;
+                bits.truncate(quantity as usize);
+                Ok(ModbusRaw::Bits(bits))
+            }
+            3 => Ok(ModbusRaw::Words(self.read_holding_registers(address, quantity).await?)),
+            4 => Ok(ModbusRaw::Words(self.read_input_registers(address, quantity).await?)),
+            other => Err(anyhow::anyhow!("Function code {other} is not a read function (use 1 to 4)")),
         }
     }
-}
 
-fn map_modbus_err<T, E1: std::fmt::Display, E2: std::fmt::Display>(
-    result: Result<Result<T, E1>, E2>,
-) -> crate::Result<T> {
-    match result {
-        Ok(Ok(v)) => Ok(v),
-        Ok(Err(e)) => Err(anyhow::anyhow!("Modbus protocol error: {}", e)),
-        Err(e) => Err(anyhow::anyhow!("Modbus transport error: {}", e)),
-    }
-}
+    /// Write by function code number (5, 6, 15 or 16) the way the contrib write nodes do.
+    /// Returns the acknowledgement as an object: `{address, state}` (FC5), `{address, value}` (FC6)
+    /// or `{address, length}` (FC15 and FC16).
+    pub(crate) async fn write_raw(
+        &mut self,
+        unit: Option<u8>,
+        fc: u8,
+        address: u16,
+        value: &Variant,
+    ) -> crate::Result<Variant> {
+        fn truthy(value: &Variant) -> bool {
+            match value {
+                Variant::Bool(b) => *b,
+                Variant::Number(n) => n.as_f64().is_some_and(|f| f != 0.0),
+                Variant::String(s) => matches!(s.trim().to_ascii_lowercase().as_str(), "true" | "1"),
+                _ => false,
+            }
+        }
+        fn word(value: &Variant) -> crate::Result<u16> {
+            match value {
+                Variant::Number(n) => n
+                    .as_f64()
+                    .map(|f| f as i64 as u16)
+                    .ok_or_else(|| anyhow::anyhow!("Value {n} cannot be written to a register")),
+                Variant::String(s) => s
+                    .trim()
+                    .parse::<f64>()
+                    .map(|f| f as i64 as u16)
+                    .map_err(|_| anyhow::anyhow!("Value '{s}' is not a number")),
+                Variant::Bool(b) => Ok(*b as u16),
+                other => Err(anyhow::anyhow!("Value {other:?} cannot be written to a register")),
+            }
+        }
+        fn items(value: &Variant) -> Vec<Variant> {
+            match value {
+                Variant::Array(items) => items.clone(),
+                single => vec![single.clone()],
+            }
+        }
 
-fn map_modbus_err_unit<E1: std::fmt::Display, E2: std::fmt::Display>(
-    result: Result<Result<(), E1>, E2>,
-) -> crate::Result<()> {
-    match result {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(anyhow::anyhow!("Modbus protocol error: {}", e)),
-        Err(e) => Err(anyhow::anyhow!("Modbus transport error: {}", e)),
+        self.select_unit(unit);
+        let ack = |key: &str, value: Variant| Variant::from([("address", Variant::from(address as i64)), (key, value)]);
+        match fc {
+            5 => {
+                let state = truthy(value);
+                self.write_single_coil(address, state).await?;
+                Ok(ack("state", Variant::Bool(state)))
+            }
+            6 => {
+                let first = items(value).into_iter().next().ok_or_else(|| anyhow::anyhow!("No value to write"))?;
+                let word = word(&first)?;
+                self.write_single_register(address, word).await?;
+                Ok(ack("value", Variant::from(word as i64)))
+            }
+            15 => {
+                let coils: Vec<bool> = items(value).iter().map(truthy).collect();
+                if coils.is_empty() {
+                    return Err(anyhow::anyhow!("No values to write"));
+                }
+                self.write_multiple_coils(address, &coils).await?;
+                Ok(ack("length", Variant::from(coils.len() as i64)))
+            }
+            16 => {
+                let words = items(value).iter().map(word).collect::<crate::Result<Vec<u16>>>()?;
+                if words.is_empty() {
+                    return Err(anyhow::anyhow!("No values to write"));
+                }
+                self.write_multiple_registers(address, &words).await?;
+                Ok(ack("length", Variant::from(words.len() as i64)))
+            }
+            other => Err(anyhow::anyhow!("Function code {other} is not a write function (use 5, 6, 15 or 16)")),
+        }
     }
 }
 
@@ -540,8 +579,14 @@ impl ModbusConfigNode {
         config: &RedGlobalNodeConfig,
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn GlobalNodeBehavior>> {
-        let modbus_config = ModbusConfig::deserialize(&config.rest)?;
-        let connection = ModbusConnection { context: None, config: modbus_config.clone() };
+        // `modbus-client` is the config node of node-red-contrib-modbus.
+        let rest = if config.type_name == "modbus-client" {
+            super::modbus_contrib::translate_client(&config.rest)?
+        } else {
+            config.rest.clone()
+        };
+        let modbus_config = ModbusConfig::deserialize(&rest)?;
+        let connection = ModbusConnection { context: None, unit: modbus_config.unit_id, config: modbus_config.clone() };
         let queue =
             ModbusRequestQueue::new(modbus_config.parallel_unit_ids.unwrap_or(false), modbus_config.command_delay);
         let state = BaseGlobalNodeState {
@@ -574,17 +619,11 @@ pub(crate) async fn resolve_modbus_config(
     flow: Option<&crate::runtime::flow::Flow>,
     config_node_id: &str,
 ) -> crate::Result<Arc<dyn GlobalNodeBehavior>> {
-    use std::str::FromStr;
-
     let engine = flow.and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
 
-    let eid_opt = ElementId::from_str(config_node_id).ok();
-    let global = eid_opt
-        .and_then(|eid| engine.find_global_node_by_id(&eid))
-        .or_else(|| engine.find_global_node_by_name(config_node_id).ok().flatten())
-        .ok_or_else(|| anyhow::anyhow!("Config node '{}' not found", config_node_id))?;
-
-    Ok(global)
+    engine
+        .find_global_node_by_ref(config_node_id)
+        .ok_or_else(|| anyhow::anyhow!("Config node '{config_node_id}' not found, or it failed to load"))
 }
 
 /// Downcast a global node to ModbusConfigNode, returning a descriptive error on mismatch.

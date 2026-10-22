@@ -342,7 +342,7 @@ pub fn parse_red_id_str(id_str: &str) -> Option<ElementId> {
         return Some(element_id);
     }
 
-    log::warn!("Failed to parse ID '{id_str}' as hex, converting to hash");
+    log::debug!("ID '{id_str}' is not hex, mapping it to a hashed ElementId");
 
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -802,5 +802,110 @@ where
         Value::Number(n) => n.as_u64().map(|u| u as usize).ok_or_else(|| Error::custom("Invalid number")),
         Value::String(s) => s.parse::<usize>().map_err(|_| Error::custom("Invalid number string")),
         _ => Err(Error::custom("Expected number or string")),
+    }
+}
+
+/// Node-RED editors save most numeric and boolean properties as strings (`"1883"`, `"false"`).
+/// The `lenient_*` helpers accept the string form as well as the native JSON type.
+/// An empty string, `null` or a missing property gives `None`.
+pub fn lenient_opt_u64<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    match Option::<JsonValue>::deserialize(deserializer)? {
+        None | Some(JsonValue::Null) => Ok(None),
+        Some(JsonValue::Number(n)) => n
+            .as_u64()
+            .or_else(|| n.as_f64().filter(|f| *f >= 0.0 && f.fract() == 0.0).map(|f| f as u64))
+            .map(Some)
+            .ok_or_else(|| Error::custom(format!("expected a non-negative integer, got {n}"))),
+        Some(JsonValue::String(s)) => {
+            let s = s.trim();
+            if s.is_empty() {
+                Ok(None)
+            } else {
+                s.parse::<u64>().map(Some).map_err(|_| Error::custom(format!("expected an integer, got '{s}'")))
+            }
+        }
+        Some(other) => Err(Error::custom(format!("expected an integer or numeric string, got {other}"))),
+    }
+}
+
+pub fn lenient_opt_u16<'de, D>(deserializer: D) -> Result<Option<u16>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    lenient_opt_u64(deserializer)?
+        .map(|v| u16::try_from(v).map_err(|_| Error::custom(format!("{v} does not fit into 16 bits"))))
+        .transpose()
+}
+
+pub fn lenient_opt_u8<'de, D>(deserializer: D) -> Result<Option<u8>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    lenient_opt_u64(deserializer)?
+        .map(|v| u8::try_from(v).map_err(|_| Error::custom(format!("{v} does not fit into 8 bits"))))
+        .transpose()
+}
+
+pub fn lenient_opt_u32<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    lenient_opt_u64(deserializer)?
+        .map(|v| u32::try_from(v).map_err(|_| Error::custom(format!("{v} does not fit into 32 bits"))))
+        .transpose()
+}
+
+/// Like `lenient_opt_bool`, with `false` for a missing or empty value.
+pub fn lenient_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(lenient_opt_bool(deserializer)?.unwrap_or(false))
+}
+
+pub fn lenient_opt_bool<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    match Option::<JsonValue>::deserialize(deserializer)? {
+        None | Some(JsonValue::Null) => Ok(None),
+        Some(JsonValue::Bool(b)) => Ok(Some(b)),
+        Some(JsonValue::Number(n)) => Ok(Some(n.as_f64().is_some_and(|f| f != 0.0))),
+        Some(JsonValue::String(s)) => match s.trim().to_ascii_lowercase().as_str() {
+            "" => Ok(None),
+            "true" | "1" | "yes" | "on" => Ok(Some(true)),
+            "false" | "0" | "no" | "off" => Ok(Some(false)),
+            other => Err(Error::custom(format!("expected a boolean, got '{other}'"))),
+        },
+        Some(other) => Err(Error::custom(format!("expected a boolean or boolean string, got {other}"))),
+    }
+}
+
+/// Accepts a string, or a number which is turned into its decimal text. Empty strings become `None`.
+pub fn lenient_opt_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::de::Error;
+
+    match Option::<JsonValue>::deserialize(deserializer)? {
+        None | Some(JsonValue::Null) => Ok(None),
+        Some(JsonValue::String(s)) => Ok(if s.is_empty() { None } else { Some(s) }),
+        Some(JsonValue::Number(n)) => Ok(Some(n.to_string())),
+        Some(JsonValue::Bool(b)) => Ok(Some(b.to_string())),
+        Some(other) => Err(Error::custom(format!("expected a string, got {other}"))),
     }
 }

@@ -65,6 +65,12 @@ impl TestHarness {
         Self::from_flow_json(json)
     }
 
+    /// The engine under test, for looking up loaded nodes.
+    #[allow(dead_code)]
+    pub fn engine(&self) -> &Engine {
+        &self.engine
+    }
+
     /// Run the engine, expecting `expected_count` messages to arrive at
     /// the `test-once` sink nodes. Messages are automatically injected
     /// via the inject nodes (if any have `once: true`).

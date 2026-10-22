@@ -31,7 +31,6 @@
 //! - Supports JSON stringification for objects/arrays
 //! - Handles various data types (strings, numbers, buffers, etc.)
 
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -44,18 +43,37 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
-use super::mqtt_broker::MqttBrokerNode;
-use super::mqtt_broker_embedded::MqttBrokerEmbeddedNode;
+use super::mqtt_broker::{build_mqtt_options, resolve_broker_settings};
+use crate::runtime::model::json::deser::{lenient_bool, lenient_opt_u32};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(try_from = "serde_json::Value")]
 enum MqttQoS {
-    #[serde(rename = "0")]
     #[default]
     AtMost = 0,
-    #[serde(rename = "1")]
     AtLeast = 1,
-    #[serde(rename = "2")]
     Exactly = 2,
+}
+
+/// Node-RED saves the QoS as a string (`"1"`), and as an empty string when it is not set.
+impl TryFrom<serde_json::Value> for MqttQoS {
+    type Error = String;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        let level = match &value {
+            serde_json::Value::Null => Some(0),
+            serde_json::Value::Number(n) => n.as_u64(),
+            serde_json::Value::String(s) if s.trim().is_empty() => Some(0),
+            serde_json::Value::String(s) => s.trim().parse::<u64>().ok(),
+            _ => None,
+        };
+        match level {
+            Some(0) => Ok(MqttQoS::AtMost),
+            Some(1) => Ok(MqttQoS::AtLeast),
+            Some(2) => Ok(MqttQoS::Exactly),
+            _ => Err(format!("invalid QoS {value}")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -72,8 +90,8 @@ struct MqttOutNodeConfig {
     #[serde(default)]
     qos: MqttQoS,
 
-    /// Default retain flag
-    #[serde(default)]
+    /// Default retain flag (Node-RED saves it as `""`, `"true"` or `"false"`)
+    #[serde(default, deserialize_with = "lenient_bool")]
     retain: bool,
 
     /// Response topic for MQTT v5
@@ -89,7 +107,7 @@ struct MqttOutNodeConfig {
     content_type: String,
 
     /// Message expiry interval for MQTT v5
-    #[serde(rename = "expiry", default)]
+    #[serde(rename = "expiry", default, deserialize_with = "lenient_opt_u32")]
     message_expiry_interval: Option<u32>,
 
     /// User properties for MQTT v5 (JSON string)
@@ -100,15 +118,24 @@ struct MqttOutNodeConfig {
 #[derive(Default)]
 struct MqttConnection {
     client: Option<rumqttc::AsyncClient>,
-    event_loop: Option<Box<rumqttc::EventLoop>>,
+    /// Stops the task that drives the connection (`rumqttc` only sends and receives while it is polled).
+    cancel: Option<CancellationToken>,
     connected: bool,
+}
+
+impl MqttConnection {
+    fn stop_event_loop(&mut self) {
+        if let Some(token) = self.cancel.take() {
+            token.cancel();
+        }
+    }
 }
 
 impl std::fmt::Debug for MqttConnection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MqttConnection")
             .field("client", &self.client.is_some())
-            .field("event_loop", &self.event_loop.is_some())
+            .field("event_loop", &self.cancel.is_some())
             .field("connected", &self.connected)
             .finish()
     }
@@ -137,30 +164,9 @@ impl MqttOutNode {
         Ok(Box::new(node))
     }
 
-    /// Resolve the broker config reference to a (host, port) pair.
-    async fn resolve_broker_addr(&self) -> crate::Result<(String, u16)> {
+    async fn broker_settings(&self) -> crate::Result<MqttBrokerSettings> {
         let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
-
-        let eid_opt = ElementId::from_str(&self.config.broker).ok();
-        let global = eid_opt
-            .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| engine.find_global_node_by_name(&self.config.broker).ok().flatten())
-            .ok_or_else(|| anyhow::anyhow!("Broker config '{}' not found", self.config.broker))?;
-
-        if let Some(broker) = global.as_any().downcast_ref::<MqttBrokerNode>() {
-            return Ok(broker.broker_addr());
-        }
-
-        if let Some(embedded) = global.as_any().downcast_ref::<MqttBrokerEmbeddedNode>() {
-            let addr_guard = embedded.bound_addr.read().await;
-            if let Some(addr) = *addr_guard {
-                let addr: std::net::SocketAddr = addr;
-                return Ok((addr.ip().to_string(), addr.port()));
-            }
-            return Ok(embedded.configured_addr());
-        }
-
-        Err(anyhow::anyhow!("Broker config '{}' is not a mqtt-broker or mqtt-broker-embedded node", self.config.broker))
+        resolve_broker_settings(&engine, &self.config.broker).await
     }
 
     async fn ensure_connection(&self) -> crate::Result<()> {
@@ -170,12 +176,9 @@ impl MqttOutNode {
             return Ok(());
         }
 
-        let (host, port) = self.resolve_broker_addr().await?;
-
-        let client_id = format!("rust_red_{}", &uuid::Uuid::new_v4().to_string()[..8]);
-        let mut mqttoptions = rumqttc::MqttOptions::new(client_id, &host, port);
-        mqttoptions.set_keep_alive(Duration::from_secs(60));
-        mqttoptions.set_clean_session(true);
+        let settings = self.broker_settings().await?;
+        let (host, port) = (settings.host.clone(), settings.port);
+        let mqttoptions = build_mqtt_options(&settings, "rust_red_out", self.id());
 
         let (client, mut eventloop) = rumqttc::AsyncClient::new(mqttoptions, 10);
 
@@ -208,8 +211,28 @@ impl MqttOutNode {
         {
             Ok(Ok(())) => {
                 connection.client = Some(client);
-                connection.event_loop = Some(Box::new(eventloop));
                 connection.connected = true;
+
+                // Keep driving the connection: without polling, nothing is ever published and the
+                // client reconnects after a broker restart only while it is polled.
+                let cancel = CancellationToken::new();
+                connection.cancel = Some(cancel.clone());
+                tokio::spawn(async move {
+                    loop {
+                        tokio::select! {
+                            _ = cancel.cancelled() => break,
+                            result = eventloop.poll() => {
+                                if let Err(error) = result {
+                                    log::warn!("MQTT out connection error, retrying: {error}");
+                                    tokio::select! {
+                                        _ = cancel.cancelled() => break,
+                                        _ = tokio::time::sleep(Duration::from_secs(1)) => {}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
                 Ok(())
             }
             Ok(Err(e)) => {
@@ -232,11 +255,11 @@ impl MqttOutNode {
             .as_ref()
             .ok_or_else(|| crate::RustRedError::invalid_operation("MQTT client not available"))?;
 
-        // Get topic from message or config (message overrides config)
-        let topic = if let Some(topic_from_msg) = msg.get("topic").and_then(|v| v.as_str()) {
-            if !topic_from_msg.is_empty() { topic_from_msg.to_string() } else { self.config.topic.clone() }
-        } else {
+        // Like Node-RED: a topic set on the node wins, msg.topic is used only when the node has none.
+        let topic = if !self.config.topic.is_empty() {
             self.config.topic.clone()
+        } else {
+            msg.get("topic").and_then(|v| v.as_str()).unwrap_or_default().to_string()
         };
 
         if topic.is_empty() {
@@ -395,7 +418,7 @@ impl MqttOutNode {
                                     let _ = client.disconnect().await;
                                 }
                                 connection.connected = false;
-                                connection.event_loop = None;
+                                connection.stop_event_loop();
                                 drop(connection);
 
                                 self.ensure_connection().await?;
@@ -416,7 +439,7 @@ impl MqttOutNode {
                         log::info!("MQTT disconnected");
                     }
                     connection.connected = false;
-                    connection.event_loop = None;
+                    connection.stop_event_loop();
                 }
                 _ => {
                     return Err(crate::RustRedError::invalid_operation(&format!(
@@ -476,7 +499,7 @@ impl FlowNodeBehavior for MqttOutNode {
             let _ = client.disconnect().await;
         }
         connection.connected = false;
-        connection.event_loop = None;
+        connection.stop_event_loop();
 
         log::debug!("MqttOutNode process() task has been terminated.");
     }

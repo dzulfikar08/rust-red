@@ -75,6 +75,9 @@ reqwest = { workspace = true, optional = true }
 # Database drivers
 tokio-postgres = { workspace = true, optional = true }
 deadpool-postgres = { workspace = true, optional = true }
+tokio-postgres-rustls = { version = "0.13", optional = true }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+rustls-native-certs = { version = "0.8", optional = true }
 deadpool = { version = "0.12", optional = true }
 tiberius = { version = "0.12", optional = true, features = ["chrono"] }
 rusqlite = { workspace = true, optional = true }
@@ -123,7 +126,7 @@ nodes_xml = ["quick-xml", "serde-xml-rs"]
 nodes_yaml = ["serde_yaml_ng"]
 nodes_html = ["dep:scraper"]
 otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp", "dep:once_cell"]
-nodes_postgres = ["dep:tokio-postgres", "dep:deadpool-postgres"]
+nodes_postgres = ["dep:tokio-postgres", "dep:deadpool-postgres", "dep:tokio-postgres-rustls", "dep:rustls", "dep:rustls-native-certs", "dep:futures-util"]
 nodes_timescaledb = ["dep:tokio-postgres", "dep:deadpool-postgres"]
 nodes_mssql = ["dep:tiberius", "dep:deadpool", "tokio-util/compat"]
 nodes_modbus = ["dep:tokio-modbus"]

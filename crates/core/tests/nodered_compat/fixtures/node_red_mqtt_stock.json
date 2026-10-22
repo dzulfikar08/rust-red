@@ -1,0 +1,80 @@
+[
+    {
+        "id": "7b1f0e5a2c9d4e63",
+        "type": "tab",
+        "label": "MQTT bridge",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "3e8d2a71f9c04b56",
+        "type": "mqtt in",
+        "z": "7b1f0e5a2c9d4e63",
+        "name": "",
+        "topic": "plant/line1/#",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "a4c91d6e7b2f8035",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 150,
+        "y": 100,
+        "wires": [
+            [
+                "c05e7a39d1b84f62"
+            ]
+        ]
+    },
+    {
+        "id": "c05e7a39d1b84f62",
+        "type": "mqtt out",
+        "z": "7b1f0e5a2c9d4e63",
+        "name": "",
+        "topic": "plant/echo",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "a4c91d6e7b2f8035",
+        "x": 400,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "a4c91d6e7b2f8035",
+        "type": "mqtt-broker",
+        "name": "Local mosquitto",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    }
+]

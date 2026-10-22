@@ -42,6 +42,8 @@ mod test_template;
 mod test_trigger;
 mod test_watch;
 
+#[cfg(all(feature = "nodes_modbus", feature = "nodes_postgres"))]
+mod test_contrib_compat;
 mod test_flow_import;
 
 mod test_csv;

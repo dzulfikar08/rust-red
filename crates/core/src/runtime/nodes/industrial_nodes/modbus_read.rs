@@ -1,3 +1,14 @@
+//! Modbus read node.
+//!
+//! Serves `modbus read`, and the `modbus-read` and `modbus-getter` nodes of
+//! `node-red-contrib-modbus` (see `modbus_contrib`).
+//!
+//! A `modbus-read` node polls at its rate and sends two messages per read: output 1 with the
+//! values in `msg.payload` and the raw response in `msg.responseBuffer`, output 2 with the raw
+//! response in `msg.payload`. A `modbus-getter` node does the same when a message arrives instead
+//! of polling. A `modbus read` node keeps its own shape: `msg.payload` holds the values and
+//! `msg.modbus` the request, on its single output.
+
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -10,7 +21,10 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
-use super::modbus_config::{ModbusConfigNode, ModbusDataType, downcast_modbus_config, resolve_modbus_config};
+use super::modbus_config::{
+    ModbusConfigNode, ModbusDataType, ModbusRaw, downcast_modbus_config, resolve_modbus_config,
+};
+use super::modbus_contrib::{self as contrib, ContribOptions};
 
 #[derive(Deserialize, Debug, Clone)]
 struct ModbusReadConfig {
@@ -33,6 +47,8 @@ struct ModbusReadConfig {
     poll_rate: Option<u64>,
     #[serde(default, rename = "pollRateUnit")]
     poll_rate_unit: Option<String>,
+    #[serde(flatten)]
+    options: ContribOptions,
 }
 
 impl ModbusReadConfig {
@@ -73,7 +89,12 @@ impl ModbusReadNode {
         config: &RedFlowNodeConfig,
         _options: Option<&config::Config>,
     ) -> crate::Result<Box<dyn FlowNodeBehavior>> {
-        let read_config = ModbusReadConfig::deserialize(&config.rest)?;
+        let rest = if contrib::is_contrib(&config.rest) {
+            contrib::translate_read(&config.rest, config.type_name != "modbus-getter")?
+        } else {
+            config.rest.clone()
+        };
+        let read_config = ModbusReadConfig::deserialize(&rest)?;
         Ok(Box::new(ModbusReadNode { base: base_node, config: read_config }))
     }
 
@@ -96,33 +117,149 @@ impl ModbusReadNode {
         }
     }
 
-    async fn perform_read(&self, config_node: &ModbusConfigNode) -> crate::Result<Variant> {
-        let mut conn = config_node.connection.lock().await;
-        let address = self.config.address;
-        let reg_count = self.effective_register_count()?;
-        match self.config.function_code.as_str() {
-            "readCoils" => {
-                // FC1
-                let values: Vec<bool> = conn.read_coils(address, self.config.quantity).await?;
-                Ok(Variant::from(values.iter().map(|&b| Variant::from(b)).collect::<Vec<_>>()))
+    async fn perform_read(&self, config_node: &ModbusConfigNode) -> crate::Result<(Variant, ModbusRaw)> {
+        let count = self.effective_register_count()?;
+        let fc = contrib::function_code(&self.config.function_code);
+        let raw = {
+            let mut conn = config_node.connection.lock().await;
+            conn.read_raw(self.config.options.unit_id, fc, self.config.address, count).await?
+        };
+        let values = match &raw {
+            ModbusRaw::Bits(_) => raw.to_variant(),
+            ModbusRaw::Words(words) => Variant::from(self.config.data_type.convert_batch(words)?),
+        };
+        Ok((values, raw))
+    }
+
+    fn request_info(&self) -> Variant {
+        Variant::from(serde_json::json!({
+            "functionCode": self.config.function_code,
+            "address": self.config.address,
+            "quantity": self.config.quantity,
+        }))
+    }
+
+    fn status_text(&self) -> String {
+        format!("{} @ {}", self.config.address, self.config.function_code)
+    }
+
+    async fn status(&self, fill: StatusFill, shape: StatusShape, text: String, cancel: CancellationToken) {
+        self.report_status(StatusObject { fill: Some(fill), shape: Some(shape), text: Some(text) }, cancel).await;
+    }
+
+    /// With `emptyMsgOnFail`, the contrib nodes send an empty payload and the error on both outputs.
+    async fn send_failure(&self, base: Msg, error: &anyhow::Error, cancel: CancellationToken) {
+        if !self.config.options.empty_msg_on_fail {
+            return;
+        }
+        let (first, second) = contrib::failure_outputs(base, error);
+        if let Err(e) = contrib::send_pair(self, first, second, cancel).await {
+            log::warn!("[modbus-read:{}] Cannot send the failure message: {e}", self.name());
+        }
+    }
+
+    /// One poll of a `modbus-read` node, or of a `modbus read` node with a poll rate.
+    async fn poll_once(&self, config_node: &ModbusConfigNode, cancel: CancellationToken) {
+        match self.perform_read(config_node).await {
+            Ok((values, raw)) => {
+                let sent = if self.config.options.contrib {
+                    let topic = self.config.options.topic.clone().unwrap_or_else(|| "polling".to_string());
+                    let request = contrib::request_object(
+                        self.config.options.unit_id,
+                        contrib::function_code(&self.config.function_code),
+                        self.config.address,
+                        self.config.quantity,
+                        None,
+                    );
+                    // The polling message of the contrib node, kept in `msg.input`.
+                    let input = Variant::from([
+                        ("topic", Variant::String(topic.clone())),
+                        ("from", Variant::String(self.name().to_string())),
+                        ("payload", request),
+                    ]);
+                    let (mut first, mut second) = contrib::read_outputs(Msg::default(), &topic, &raw, Variant::Null);
+                    for msg in [&mut first, &mut second] {
+                        msg.remove("modbusRequest");
+                        msg.set("input".to_string(), input.clone());
+                        msg.set("sendingNodeId".to_string(), Variant::String(self.id().to_string()));
+                    }
+                    contrib::send_pair(self, first, second, cancel.child_token()).await
+                } else {
+                    let mut msg = Msg::default();
+                    msg.set("payload".to_string(), values);
+                    msg.set(
+                        "topic".to_string(),
+                        Variant::String(self.config.options.topic.clone().unwrap_or_else(|| "modbus".to_string())),
+                    );
+                    msg.set("modbus".to_string(), self.request_info());
+                    self.fan_out_one(Envelope { port: 0, msg: MsgHandle::new(msg) }, cancel.child_token()).await
+                };
+                if let Err(e) = sent {
+                    log::warn!("[modbus-read:{}] Cannot send the result: {e}", self.name());
+                }
+                self.status(StatusFill::Green, StatusShape::Dot, self.status_text(), cancel.child_token()).await;
             }
-            "readDiscreteInputs" => {
-                // FC2
-                let values: Vec<bool> = conn.read_discrete_inputs(address, self.config.quantity).await?;
-                Ok(Variant::from(values.iter().map(|&b| Variant::from(b)).collect::<Vec<_>>()))
+            Err(e) => {
+                log::warn!("[modbus-read:{}] Read error: {e}", self.name());
+                self.send_failure(Msg::default(), &e, cancel.child_token()).await;
+                self.status(StatusFill::Red, StatusShape::Ring, e.to_string(), cancel.child_token()).await;
             }
-            "readInputRegisters" => {
-                // FC4
-                let words: Vec<u16> = conn.read_input_registers(address, reg_count).await?;
-                let values = self.config.data_type.convert_batch(&words)?;
-                Ok(Variant::from(values))
+        }
+    }
+
+    /// One read triggered by an incoming message.
+    async fn read_for_message(&self, config_node: &ModbusConfigNode, msg: MsgHandle, cancel: CancellationToken) {
+        let result = self.perform_read(config_node).await;
+
+        if self.config.options.contrib {
+            let input = msg.read().await.clone();
+            match result {
+                Ok((_, raw)) => {
+                    let topic = input
+                        .get("topic")
+                        .and_then(|t| t.as_str())
+                        .map(str::to_string)
+                        .unwrap_or_else(|| self.id().to_string());
+                    let base = if self.config.options.keep_msg_properties { input } else { Msg::default() };
+                    let request = contrib::request_object(
+                        self.config.options.unit_id,
+                        contrib::function_code(&self.config.function_code),
+                        self.config.address,
+                        self.config.quantity,
+                        None,
+                    );
+                    let (first, second) = contrib::read_outputs(base, &topic, &raw, request);
+                    if let Err(e) = contrib::send_pair(self, first, second, cancel.child_token()).await {
+                        log::warn!("[modbus-read:{}] Cannot send the result: {e}", self.name());
+                    }
+                    self.status(StatusFill::Green, StatusShape::Dot, self.status_text(), cancel.child_token()).await;
+                }
+                Err(e) => {
+                    log::warn!("[modbus-read:{}] Read error: {e}", self.name());
+                    self.send_failure(input, &e, cancel.child_token()).await;
+                    self.status(StatusFill::Red, StatusShape::Ring, e.to_string(), cancel.child_token()).await;
+                }
             }
-            _ => {
-                // FC3 – readHoldingRegisters (default)
-                let words: Vec<u16> = conn.read_holding_registers(address, reg_count).await?;
-                let values = self.config.data_type.convert_batch(&words)?;
-                Ok(Variant::from(values))
+            return;
+        }
+
+        match result {
+            Ok((values, _)) => {
+                {
+                    let mut guard = msg.write().await;
+                    guard.set("payload".to_string(), values);
+                    guard.set("modbus".to_string(), self.request_info());
+                }
+                self.status(StatusFill::Green, StatusShape::Dot, self.status_text(), cancel.child_token()).await;
             }
+            Err(e) => {
+                log::warn!("[modbus-read:{}] Read error: {e}", self.name());
+                msg.write().await.set("error".to_string(), Variant::String(e.to_string()));
+                self.status(StatusFill::Red, StatusShape::Ring, e.to_string(), cancel.child_token()).await;
+            }
+        }
+        if let Err(e) = self.fan_out_one(Envelope { port: 0, msg }, cancel.child_token()).await {
+            log::warn!("[modbus-read:{}] Cannot send the result: {e}", self.name());
         }
     }
 }
@@ -138,68 +275,39 @@ impl FlowNodeBehavior for ModbusReadNode {
             Ok(n) => n,
             Err(e) => {
                 log::error!("[modbus-read:{}] {}", self.name(), e);
-                self.report_status(
-                    StatusObject {
-                        fill: Some(StatusFill::Red),
-                        shape: Some(StatusShape::Ring),
-                        text: Some(e.to_string()),
-                    },
-                    stop_token.clone(),
-                )
-                .await;
+                self.status(StatusFill::Red, StatusShape::Ring, e.to_string(), stop_token.clone()).await;
                 stop_token.cancelled().await;
                 return;
             }
         };
 
         // If polling configured, spawn a poll loop
-        let poll_handle = if let Some(interval_ms) = self.config.effective_poll_interval_ms() {
+        let poll_handle = if let Some(interval_ms) = self.config.effective_poll_interval_ms().filter(|ms| *ms > 0) {
             let this = self.clone();
             let cfg = config_node.clone();
             let cancel = stop_token.child_token();
             Some(tokio::spawn(async move {
-                let mut interval = tokio::time::interval(Duration::from_millis(interval_ms));
+                let period = Duration::from_millis(interval_ms);
+                // A contrib node waits one period before its first read, and `delayOnStart` waits longer.
+                let first_tick = if this.config.options.contrib {
+                    let delay = if this.config.options.delay_on_start {
+                        Duration::from_secs(this.config.options.start_delay_time.unwrap_or(10))
+                    } else {
+                        Duration::ZERO
+                    };
+                    tokio::time::Instant::now() + delay + period
+                } else {
+                    tokio::time::Instant::now()
+                };
+                let mut interval = tokio::time::interval_at(first_tick, period);
+                interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
                 loop {
                     tokio::select! {
                         _ = cancel.cancelled() => break,
                         _ = interval.tick() => {
-                            let cfg_inner = match downcast_modbus_config(&cfg) {
-                                Ok(c) => c,
-                                Err(e) => {
-                                    log::error!("[modbus-read:{}] {}", this.name(), e);
-                                    continue;
-                                }
-                            };
-                            match this.perform_read(cfg_inner).await {
-                                Ok(payload) => {
-                                    let msg_body = Variant::from([
-                                        ("payload", payload),
-                                        ("topic", Variant::String("modbus".into())),
-                                        ("modbus", Variant::from(serde_json::json!({
-                                            "functionCode": this.config.function_code,
-                                            "address": this.config.address,
-                                            "quantity": this.config.quantity,
-                                        }))),
-                                    ]);
-                                    let envelope = Envelope {
-                                        port: 0,
-                                        msg: MsgHandle::with_body(msg_body),
-                                    };
-                                    let _ = this.fan_out_one(envelope, cancel.child_token()).await;
-                                    let _ = this.report_status(StatusObject {
-                                        fill: Some(StatusFill::Green),
-                                        shape: Some(StatusShape::Dot),
-                                        text: Some(format!("{} @ {}", this.config.address, this.config.function_code)),
-                                    }, cancel.child_token()).await;
-                                }
-                                Err(e) => {
-                                    log::warn!("[modbus-read:{}] Read error: {}", this.name(), e);
-                                    let _ = this.report_status(StatusObject {
-                                        fill: Some(StatusFill::Red),
-                                        shape: Some(StatusShape::Ring),
-                                        text: Some(format!("{}", e)),
-                                    }, cancel.child_token()).await;
-                                }
+                            match downcast_modbus_config(&cfg) {
+                                Ok(cfg_inner) => this.poll_once(cfg_inner, cancel.child_token()).await,
+                                Err(e) => log::error!("[modbus-read:{}] {}", this.name(), e),
                             }
                         }
                     }
@@ -217,51 +325,11 @@ impl FlowNodeBehavior for ModbusReadNode {
             with_uow(this.as_ref(), cancel.child_token(), |node, msg| {
                 let cfg = cfg.clone();
                 async move {
-                    let cfg_inner = match downcast_modbus_config(&cfg) {
-                        Ok(c) => c,
+                    match downcast_modbus_config(&cfg) {
+                        Ok(cfg_inner) => node.read_for_message(cfg_inner, msg, cancel.child_token()).await,
                         Err(e) => {
-                            let mut guard = msg.write().await;
-                            guard.set("error".to_string(), Variant::String(e.to_string()));
-                            return Ok(());
-                        }
-                    };
-                    match node.perform_read(cfg_inner).await {
-                        Ok(payload) => {
-                            let mut guard = msg.write().await;
-                            guard.set("payload".to_string(), payload);
-                            guard.set(
-                                "modbus".to_string(),
-                                Variant::from(serde_json::json!({
-                                    "functionCode": node.config.function_code,
-                                    "address": node.config.address,
-                                    "quantity": node.config.quantity,
-                                })),
-                            );
-                            drop(guard);
-                            node.report_status(
-                                StatusObject {
-                                    fill: Some(StatusFill::Green),
-                                    shape: Some(StatusShape::Dot),
-                                    text: Some(format!("{} @ {}", node.config.address, node.config.function_code)),
-                                },
-                                cancel.child_token(),
-                            )
-                            .await;
-                        }
-                        Err(e) => {
-                            log::warn!("[modbus-read:{}] Read error: {}", node.name(), e);
-                            let mut guard = msg.write().await;
-                            guard.set("error".to_string(), Variant::String(e.to_string()));
-                            drop(guard);
-                            node.report_status(
-                                StatusObject {
-                                    fill: Some(StatusFill::Red),
-                                    shape: Some(StatusShape::Ring),
-                                    text: Some(format!("{}", e)),
-                                },
-                                cancel.child_token(),
-                            )
-                            .await;
+                            log::error!("[modbus-read:{}] {}", node.name(), e);
+                            msg.write().await.set("error".to_string(), Variant::String(e.to_string()));
                         }
                     }
                     Ok(())

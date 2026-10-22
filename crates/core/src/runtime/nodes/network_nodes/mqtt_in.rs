@@ -37,7 +37,6 @@
 //! - Buffer/string conversion based on content
 
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -50,18 +49,37 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
-use super::mqtt_broker::MqttBrokerNode;
-use super::mqtt_broker_embedded::MqttBrokerEmbeddedNode;
+use super::mqtt_broker::{build_mqtt_options, resolve_broker_settings};
+use crate::runtime::model::json::deser::{lenient_opt_bool, lenient_opt_u8, lenient_opt_u32};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
+#[serde(try_from = "serde_json::Value")]
 enum MqttQoS {
-    #[serde(rename = "0")]
     #[default]
     AtMost = 0,
-    #[serde(rename = "1")]
     AtLeast = 1,
-    #[serde(rename = "2")]
     Exactly = 2,
+}
+
+/// Node-RED saves the QoS as a string (`"2"`), and as an empty string when it is not set.
+impl TryFrom<serde_json::Value> for MqttQoS {
+    type Error = String;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        let level = match &value {
+            serde_json::Value::Null => Some(0),
+            serde_json::Value::Number(n) => n.as_u64(),
+            serde_json::Value::String(s) if s.trim().is_empty() => Some(0),
+            serde_json::Value::String(s) => s.trim().parse::<u64>().ok(),
+            _ => None,
+        };
+        match level {
+            Some(0) => Ok(MqttQoS::AtMost),
+            Some(1) => Ok(MqttQoS::AtLeast),
+            Some(2) => Ok(MqttQoS::Exactly),
+            _ => Err(format!("invalid QoS {value}")),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Default)]
@@ -104,19 +122,19 @@ struct MqttInNodeConfig {
     inputs: u8,
 
     /// MQTT v5 subscription identifier
-    #[serde(rename = "subscriptionIdentifier", default)]
+    #[serde(rename = "subscriptionIdentifier", default, deserialize_with = "lenient_opt_u32")]
     subscription_identifier: Option<u32>,
 
     /// MQTT v5 no local flag
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient_opt_bool")]
     nl: Option<bool>,
 
     /// MQTT v5 retain as published flag
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient_opt_bool")]
     rap: Option<bool>,
 
     /// MQTT v5 retain handling
-    #[serde(default)]
+    #[serde(default, deserialize_with = "lenient_opt_u8")]
     rh: Option<u8>,
 }
 
@@ -177,33 +195,9 @@ impl MqttInNode {
         Ok(Box::new(node))
     }
 
-    /// Resolve the broker config reference to a (host, port) pair.
-    async fn resolve_broker_addr(&self) -> crate::Result<(String, u16)> {
+    async fn broker_settings(&self) -> crate::Result<MqttBrokerSettings> {
         let engine = self.flow().and_then(|f| f.engine()).ok_or_else(|| anyhow::anyhow!("No engine available"))?;
-
-        let eid_opt = ElementId::from_str(&self.config.broker).ok();
-        let global = eid_opt
-            .and_then(|eid| engine.find_global_node_by_id(&eid))
-            .or_else(|| engine.find_global_node_by_name(&self.config.broker).ok().flatten())
-            .ok_or_else(|| anyhow::anyhow!("Broker config '{}' not found", self.config.broker))?;
-
-        // Try as MqttBrokerNode (external broker config)
-        if let Some(broker) = global.as_any().downcast_ref::<MqttBrokerNode>() {
-            return Ok(broker.broker_addr());
-        }
-
-        // Try as MqttBrokerEmbeddedNode (in-process broker)
-        if let Some(embedded) = global.as_any().downcast_ref::<MqttBrokerEmbeddedNode>() {
-            let addr_guard = embedded.bound_addr.read().await;
-            if let Some(addr) = *addr_guard {
-                let addr: std::net::SocketAddr = addr;
-                return Ok((addr.ip().to_string(), addr.port()));
-            }
-            // Broker hasn't bound yet — fall back to config values
-            return Ok(embedded.configured_addr());
-        }
-
-        Err(anyhow::anyhow!("Broker config '{}' is not a mqtt-broker or mqtt-broker-embedded node", self.config.broker))
+        resolve_broker_settings(&engine, &self.config.broker).await
     }
 
     async fn ensure_connection(&self) -> crate::Result<rumqttc::AsyncClient> {
@@ -213,12 +207,9 @@ impl MqttInNode {
             return Ok(connection.client.clone().unwrap());
         }
 
-        let (host, port) = self.resolve_broker_addr().await?;
-
-        let client_id = format!("rust_red_in_{}", &uuid::Uuid::new_v4().to_string()[..8]);
-        let mut mqttoptions = rumqttc::MqttOptions::new(client_id, &host, port);
-        mqttoptions.set_keep_alive(Duration::from_secs(60));
-        mqttoptions.set_clean_session(true);
+        let settings = self.broker_settings().await?;
+        let (host, port) = (settings.host.clone(), settings.port);
+        let mqttoptions = build_mqtt_options(&settings, "rust_red_in", self.id());
 
         let (client, mut eventloop) = rumqttc::AsyncClient::new(mqttoptions, 100);
 
@@ -619,8 +610,19 @@ impl FlowNodeBehavior for MqttInNode {
         let mut event_loop_task: Option<tokio::task::JoinHandle<()>> = None;
 
         while !stop_token.is_cancelled() {
-            // Ensure we have a connection
-            if let Err(e) = self.ensure_connection().await {
+            // The event loop task ends when the broker drops the connection: start over with a fresh one.
+            if event_loop_task.as_ref().is_some_and(|task| task.is_finished()) {
+                event_loop_task = None;
+                let mut connection = self.connection.lock().await;
+                connection.connected = false;
+                connection.client = None;
+                drop(connection);
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
+
+            // Ensure we have a connection, unless the broker config asks for manual connects
+            let auto_connect = self.broker_settings().await.map(|settings| settings.auto_connect).unwrap_or(true);
+            if auto_connect && let Err(e) = self.ensure_connection().await {
                 log::error!("Failed to establish MQTT In connection: {e}");
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 continue;

@@ -130,6 +130,49 @@ pub struct BaseGlobalNodeState {
     pub disabled: bool,
 }
 
+/// Connection settings of an MQTT broker config node, as used by `mqtt in` and `mqtt out`.
+///
+/// The shape follows the settings struct of the upstream EdgeLinkd project.
+#[derive(Debug, Clone)]
+pub struct MqttBrokerSettings {
+    pub host: String,
+    pub port: u16,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub tls: bool,
+    pub keepalive: u16,
+    pub clean: bool,
+    pub client_id: Option<String>,
+    pub auto_connect: bool,
+    pub protocol_version: u8,
+    pub will_topic: Option<String>,
+    pub will_payload: Option<String>,
+    pub will_qos: u8,
+    pub will_retain: bool,
+}
+
+impl MqttBrokerSettings {
+    /// Plain, unauthenticated settings for a broker reachable at `host:port`.
+    pub fn plain(host: impl Into<String>, port: u16) -> Self {
+        Self {
+            host: host.into(),
+            port,
+            username: None,
+            password: None,
+            tls: false,
+            keepalive: 60,
+            clean: true,
+            client_id: None,
+            auto_connect: true,
+            protocol_version: 4,
+            will_topic: None,
+            will_payload: None,
+            will_qos: 0,
+            will_retain: false,
+        }
+    }
+}
+
 pub trait ScopedNodeBehavior {
     fn get_scope(&self) -> &FlowNodeScope;
 }
@@ -137,6 +180,11 @@ pub trait ScopedNodeBehavior {
 #[async_trait]
 pub trait GlobalNodeBehavior: Send + Sync + FlowsElement {
     fn get_base(&self) -> &BaseGlobalNodeState;
+
+    /// Connection settings, for MQTT broker config nodes only.
+    fn mqtt_settings(&self) -> Option<MqttBrokerSettings> {
+        None
+    }
 }
 
 #[async_trait]

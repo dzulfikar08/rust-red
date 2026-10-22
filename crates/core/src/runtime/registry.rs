@@ -6,6 +6,27 @@ use crate::runtime::nodes::*;
 
 inventory::collect!(MetaNode);
 
+/// Node types written by other Node-RED packages that are served by one of our own nodes.
+///
+/// The left side is the `type` found in an exported flow, the right side is the type
+/// we register. The node factories look at the original `type` to pick the field mapping.
+const TYPE_ALIASES: &[(&str, &str)] = &[
+    // node-red-contrib-modbus
+    ("modbus-client", "modbus-config"),
+    ("modbus-read", "modbus read"),
+    ("modbus-getter", "modbus read"),
+    ("modbus-write", "modbus write"),
+    ("modbus-flex-write", "modbus-flex-writer"),
+    // node-red-contrib-postgresql
+    ("postgreSQLConfig", "postgres-config"),
+    ("postgresql", "postgres-query"),
+];
+
+/// Resolve an exported node `type` to the type we register, if it is an alias.
+pub fn resolve_type_alias(type_name: &str) -> &str {
+    TYPE_ALIASES.iter().find(|(alias, _)| *alias == type_name).map(|(_, target)| *target).unwrap_or(type_name)
+}
+
 pub trait Registry: 'static + Send + Sync {
     fn all(&self) -> &HashMap<&'static str, &'static MetaNode>;
     fn get(&self, type_name: &str) -> Option<&'static MetaNode>;
@@ -80,7 +101,7 @@ impl Registry for RegistryImpl {
     }
 
     fn get(&self, type_name: &str) -> Option<&'static MetaNode> {
-        self.meta_nodes.get(type_name).copied()
+        self.meta_nodes.get(type_name).or_else(|| self.meta_nodes.get(resolve_type_alias(type_name))).copied()
     }
 }
 

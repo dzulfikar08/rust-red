@@ -7,6 +7,8 @@ pub mod bacnet_write;
 #[cfg(feature = "nodes_modbus")]
 pub mod modbus_config;
 #[cfg(feature = "nodes_modbus")]
+pub mod modbus_contrib;
+#[cfg(feature = "nodes_modbus")]
 pub mod modbus_flex_getter;
 #[cfg(feature = "nodes_modbus")]
 pub mod modbus_flex_writer;
