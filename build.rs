@@ -200,6 +200,17 @@ fn copy_dir_contents_incremental(src: &Path, dst: &Path) -> std::io::Result<()> 
     Ok(())
 }
 
+/// Runs `npm <args>` in `dir`; false when npm cannot be started or exits with an error.
+fn run_npm(npm_cmd: &str, args: &[&str], dir: &Path) -> bool {
+    match std::process::Command::new(npm_cmd).args(args).current_dir(dir).status() {
+        Ok(status) => status.success(),
+        Err(e) => {
+            println!("cargo:warning=Failed to run `npm {}`: {e}", args.join(" "));
+            false
+        }
+    }
+}
+
 fn build_node_red(node_red_root: &Path) {
     use std::process::Command;
 
@@ -213,28 +224,29 @@ fn build_node_red(node_red_root: &Path) {
         return;
     }
 
-    // Install dependencies
+    // Install dependencies. Node-RED's lockfile pins one git dependency (`jsdoc-nr-template`, a dev
+    // dependency), which npm 11.10+ refuses by default (`EALLOWGIT`). Older npm versions ignore the
+    // option, so a plain install is tried first and the retry only runs when it fails.
     println!("cargo:warning=Installing Node-RED dependencies...");
-    let install_result = Command::new(npm_cmd).arg("install").current_dir(node_red_root).status();
-
-    if let Err(e) = install_result {
-        panic!("Failed to install Node-RED dependencies: {e}");
-    }
-
-    if !install_result.unwrap().success() {
-        panic!("npm ci failed for Node-RED");
+    let installed = run_npm(npm_cmd, &["install"], node_red_root)
+        || run_npm(npm_cmd, &["install", "--allow-git=all"], node_red_root);
+    if !installed {
+        println!(
+            "cargo:warning=`npm install` failed in 3rd-party/node-red, so the Node-RED editor files are NOT built. \
+             rust-red still builds, but it serves no editor (run it with --headless). \
+             Fix the npm error above (try a current Node.js LTS) and build again to get the editor."
+        );
+        return;
     }
 
     // Build Node-RED
     println!("cargo:warning=Building Node-RED...");
-    let build_result = Command::new(npm_cmd).arg("run").arg("build").current_dir(node_red_root).status();
-
-    if let Err(e) = build_result {
-        panic!("Failed to build Node-RED: {e}");
-    }
-
-    if !build_result.unwrap().success() {
-        panic!("npm run build failed for Node-RED");
+    if !run_npm(npm_cmd, &["run", "build"], node_red_root) {
+        println!(
+            "cargo:warning=`npm run build` failed in 3rd-party/node-red, so the Node-RED editor files are NOT built. \
+             rust-red still builds, but it serves no editor (run it with --headless)."
+        );
+        return;
     }
 
     println!("cargo:warning=Node-RED build complete!");

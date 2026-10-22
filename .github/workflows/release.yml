@@ -63,6 +63,11 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
+      # build.rs only warns when the editor build fails, so make a release without editor impossible.
+      - name: Check the Node-RED editor files were built
+        shell: bash
+        run: test -f target/ui_static/red/red.min.js || { echo "Node-RED editor files are missing"; exit 1; }
+
       - name: Package
         shell: bash
         run: |
