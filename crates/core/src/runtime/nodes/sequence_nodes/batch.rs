@@ -25,11 +25,11 @@ pub struct BatchNodeConfig {
     pub overlap: usize, // Overlap between batches (count mode)
     #[serde(default)]
     pub interval: f64, // Interval in seconds (interval mode)
-    #[serde(default)]
+    #[serde(rename = "allowEmptySequence", alias = "allow_empty_sequence", default)]
     pub allow_empty_sequence: bool, // Whether to send empty sequences (interval mode)
     #[serde(default)]
     pub topics: Vec<TopicConfig>, // Topics to batch (concat mode)
-    #[serde(default)]
+    #[serde(rename = "honourParts", alias = "honour_parts", default)]
     pub honour_parts: bool, // Whether to honor msg.parts info
 }
 
@@ -86,11 +86,12 @@ pub struct BatchNode {
     // Pending messages for concat mode
     concat_pending: Arc<Mutex<HashMap<String, TopicGroups>>>,
     pending_count: Arc<Mutex<usize>>,
+    max_kept_msgs: usize,
 }
 
 impl BatchNode {
     pub fn build(
-        _flow: &Flow,
+        flow: &Flow,
         base_node: BaseFlowNodeState,
         config: &RedFlowNodeConfig,
         _options: Option<&config::Config>,
@@ -104,6 +105,7 @@ impl BatchNode {
             interval_task: Mutex::new(None),
             concat_pending: Arc::new(Mutex::new(HashMap::new())),
             pending_count: Arc::new(Mutex::new(0)),
+            max_kept_msgs: flow.settings().node_message_buffer_max_length,
         }))
     }
 
@@ -188,6 +190,21 @@ impl BatchNode {
 
         pending.push(msg_handle);
 
+        if self.max_kept_msgs > 0 && pending.len() > self.max_kept_msgs {
+            let mut dropped: Vec<MsgHandle> = pending.drain(..).collect();
+            drop(pending);
+            // Node-RED calls done("batch.too-many") for the message that caused the
+            // overflow. That is an error completion (catch), while the messages that
+            // were already buffered are completed normally.
+            if let Some(last) = dropped.pop() {
+                for buffered in dropped {
+                    self.notify_uow_completed(buffered, CancellationToken::new()).await;
+                }
+                self.report_error("batch.too-many".to_owned(), last, CancellationToken::new()).await;
+            }
+            return Ok(vec![]);
+        }
+
         if pending.len() >= self.config.count || eof {
             let batch_size = if eof { pending.len() } else { self.config.count };
             let overlap = self.config.overlap.min(batch_size.saturating_sub(1));
@@ -213,63 +230,69 @@ impl BatchNode {
         Ok(vec![])
     }
 
+    /// Send what the interval timer accumulated, or the empty sequence upstream emits when
+    /// the node is configured with `allowEmptySequence`.
+    async fn flush_interval(self: &Arc<Self>, cancel: CancellationToken) {
+        let pending: Vec<MsgHandle> = {
+            let mut pending = self.interval_pending.lock().await;
+            pending.drain(..).collect()
+        };
+
+        if !pending.is_empty() {
+            match self.send_batch(pending, false).await {
+                Ok(msgs) => {
+                    for msg in msgs {
+                        let _ = self.fan_out_one(Envelope { port: 0, msg: msg.clone() }, cancel.child_token()).await;
+                        self.notify_uow_completed(msg, cancel.child_token()).await;
+                    }
+                }
+                Err(e) => log::error!("Failed to send an interval batch: {e}"),
+            }
+        } else if self.config.allow_empty_sequence {
+            let mut parts = BTreeMap::new();
+            parts.insert("id".to_string(), Variant::String(Msg::generate_id().to_string()));
+            parts.insert("index".to_string(), Variant::Number(serde_json::Number::from(0)));
+            parts.insert("count".to_string(), Variant::Number(serde_json::Number::from(1)));
+            let msg = MsgHandle::with_payload(Variant::Null);
+            msg.write().await.set("parts".to_string(), Variant::Object(parts));
+            let _ = self.fan_out_one(Envelope { port: 0, msg }, cancel.child_token()).await;
+        }
+    }
+
     /// Start the interval timer for interval mode
-    async fn start_interval_timer(&self) -> JoinHandle<()> {
+    async fn start_interval_timer(self: &Arc<Self>, cancel: CancellationToken) -> JoinHandle<()> {
         let duration = Duration::from_secs_f64(self.config.interval);
-        let allow_empty = self.config.allow_empty_sequence;
-        let pending = self.interval_pending.clone();
+        let this = Arc::clone(self);
+        let token = cancel.child_token();
 
         tokio::spawn(async move {
             let mut interval = interval(duration);
+            // `interval` fires immediately; Node-RED's `setInterval` waits a full period first.
+            interval.tick().await;
 
             loop {
-                interval.tick().await;
-
-                let pending_msgs = pending.lock().await;
-                if !pending_msgs.is_empty() {
-                    // Messages will be sent by the main process loop
-                    continue;
-                } else if allow_empty {
-                    // Create empty sequence (not implemented)
-                    continue;
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    _ = interval.tick() => this.flush_interval(token.clone()).await,
                 }
             }
         })
     }
 
-    /// Interval mode: batch by time interval
+    /// Interval mode: every message joins the sequence the timer will flush.
     async fn process_interval_mode(&self, msg_handle: MsgHandle) -> Result<Vec<MsgHandle>, RustRedError> {
-        // Handle reset
-        {
-            let msg = msg_handle.read().await;
-            if msg.contains("reset") {
-                let mut pending = self.interval_pending.lock().await;
-                pending.clear();
-
-                // Restart timer
-                let mut task = self.interval_task.lock().await;
-                if let Some(handle) = task.take() {
-                    handle.abort();
-                }
-                if self.config.interval > 0.0 {
-                    *task = Some(self.start_interval_timer().await);
-                }
-
-                return Ok(vec![]);
-            }
-        }
-
         let mut pending = self.interval_pending.lock().await;
         pending.push(msg_handle);
-
-        // In a full implementation, this would be triggered by the timer
-        const MAX_BATCH_SIZE: usize = 100;
-        if pending.len() >= MAX_BATCH_SIZE {
-            let batch = pending.drain(..).collect();
+        if self.max_kept_msgs > 0 && pending.len() > self.max_kept_msgs {
+            let mut dropped: Vec<MsgHandle> = pending.drain(..).collect();
             drop(pending);
-            return self.send_batch(batch, false).await;
+            if let Some(last) = dropped.pop() {
+                for buffered in dropped {
+                    self.notify_uow_completed(buffered, CancellationToken::new()).await;
+                }
+                self.report_error("batch.too-many".to_owned(), last, CancellationToken::new()).await;
+            }
         }
-
         Ok(vec![])
     }
 
@@ -331,10 +354,12 @@ impl BatchNode {
         group.messages.push(msg_handle.clone());
         *pending_count += 1;
 
-        // Update count if available
+        // Update count if available: upstream keeps the first `parts.count` it sees for a
+        // group, which is what makes a group complete when the matching messages arrive.
         {
             let msg = msg_handle.read().await;
-            if let Some(Variant::Object(parts)) = msg.get("parts")
+            if group.count.is_none()
+                && let Some(Variant::Object(parts)) = msg.get("parts")
                 && let Some(Variant::Number(count)) = parts.get("count")
             {
                 group.count = Some(count.as_u64().unwrap_or(0) as usize);
@@ -357,13 +382,23 @@ impl BatchNode {
             // Collect messages from all topics
             let mut all_messages = Vec::new();
 
+            // Upstream collects from every configured topic *before* removing anything, so a
+            // topic that is listed twice contributes its messages to the sequence twice.
+            for topic_config in &self.config.topics {
+                if let Some(topic_groups) = pending.get(&topic_config.topic)
+                    && let Some(first_group_id) = topic_groups.group_ids.first()
+                    && let Some(group) = topic_groups.groups.get(first_group_id)
+                {
+                    all_messages.extend(group.messages.iter().cloned());
+                }
+            }
+
             for topic_config in &self.config.topics {
                 if let Some(topic_groups) = pending.get_mut(&topic_config.topic)
                     && let Some(first_group_id) = topic_groups.group_ids.first().cloned()
                 {
                     if let Some(group) = topic_groups.groups.remove(&first_group_id) {
                         *pending_count = pending_count.saturating_sub(group.messages.len());
-                        all_messages.extend(group.messages);
                     }
                     topic_groups.group_ids.remove(0);
                 }
@@ -376,10 +411,21 @@ impl BatchNode {
         }
 
         // Check for overflow
-        const MAX_PENDING: usize = 1000;
-        if *pending_count > MAX_PENDING {
+        if self.max_kept_msgs > 0 && *pending_count > self.max_kept_msgs {
+            let mut dropped: Vec<MsgHandle> = pending
+                .values()
+                .flat_map(|topic_groups| topic_groups.groups.values().flat_map(|group| group.messages.iter().cloned()))
+                .collect();
             pending.clear();
             *pending_count = 0;
+            drop(pending_count);
+            drop(pending);
+            if let Some(last) = dropped.pop() {
+                for buffered in dropped {
+                    self.notify_uow_completed(buffered, CancellationToken::new()).await;
+                }
+                self.report_error("batch.too-many".to_owned(), last, CancellationToken::new()).await;
+            }
         }
 
         Ok(vec![])
@@ -392,50 +438,69 @@ impl FlowNodeBehavior for BatchNode {
         &self.base
     }
     async fn run(self: Arc<Self>, stop_token: CancellationToken) {
+        // Node-RED starts the interval timer when the node is created, not when the first
+        // message arrives: the sequence is flushed on the timer, and with
+        // `allowEmptySequence` the very first flush can be an empty one.
+        let is_interval_mode = self.config.mode == "interval" && self.config.interval > 0.0;
+        if is_interval_mode {
+            let mut task = self.interval_task.lock().await;
+            *task = Some(self.start_interval_timer(stop_token.clone()).await);
+        }
+
         while !stop_token.is_cancelled() {
             let cancel = stop_token.clone();
-            with_uow(self.as_ref(), cancel.child_token(), |node, msg| async move {
-                let msg_guard = msg.read().await;
-                // Handle reset
-                if msg_guard.get("reset").is_some() {
-                    node.count_pending.lock().await.clear();
-                    node.interval_pending.lock().await.clear();
-                    node.concat_pending.lock().await.clear();
-                    *node.pending_count.lock().await = 0;
-                    // interval timer
-                    let mut task = node.interval_task.lock().await;
-                    if let Some(handle) = task.take() {
-                        handle.abort();
+            let msg = match self.recv_msg(cancel.clone()).await {
+                Ok(msg) => msg,
+                Err(_) => break,
+            };
+            if msg.read().await.get("reset").is_some() {
+                let mut pending = Vec::new();
+                pending.extend(self.count_pending.lock().await.drain(..));
+                pending.extend(self.interval_pending.lock().await.drain(..));
+                {
+                    let mut concat = self.concat_pending.lock().await;
+                    for topic_groups in concat.values() {
+                        for group in topic_groups.groups.values() {
+                            pending.extend(group.messages.iter().cloned());
+                        }
                     }
-                    if node.config.interval > 0.0 {
-                        *task = Some(node.start_interval_timer().await);
-                    }
-                    return Ok(());
+                    concat.clear();
                 }
-                // Handle all three modes
-                let mut out = vec![];
-                match node.config.mode.as_str() {
-                    "count" => {
-                        drop(msg_guard);
-                        out = node.process_count_mode(msg.clone()).await?;
-                    }
-                    "interval" => {
-                        drop(msg_guard);
-                        out = node.process_interval_mode(msg.clone()).await?;
-                    }
-                    "concat" => {
-                        drop(msg_guard);
-                        out = node.process_concat_mode(msg.clone()).await?;
-                    }
-                    _ => {}
+                *self.pending_count.lock().await = 0;
+                for buffered in pending {
+                    self.notify_uow_completed(buffered, cancel.child_token()).await;
                 }
-                for m in out {
-                    let env = Envelope { port: 0, msg: m };
-                    node.fan_out_one(env, cancel.child_token()).await?;
+                let mut task = self.interval_task.lock().await;
+                if let Some(handle) = task.take() {
+                    handle.abort();
                 }
-                Ok(())
-            })
-            .await;
+                if is_interval_mode {
+                    *task = Some(self.start_interval_timer(cancel.clone()).await);
+                }
+                self.notify_uow_completed(msg, cancel.child_token()).await;
+                continue;
+            }
+            let out = match self.config.mode.as_str() {
+                "count" => self.process_count_mode(msg.clone()).await,
+                "interval" => self.process_interval_mode(msg.clone()).await,
+                "concat" => self.process_concat_mode(msg.clone()).await,
+                _ => Ok(vec![]),
+            };
+            let out = match out {
+                Ok(out) => out,
+                Err(err) => {
+                    self.report_error(err.to_string(), msg, cancel.child_token()).await;
+                    continue;
+                }
+            };
+            for output in out {
+                if let Err(err) =
+                    self.fan_out_one(Envelope { port: 0, msg: output.clone() }, cancel.child_token()).await
+                {
+                    self.report_error(err.to_string(), output.clone(), cancel.child_token()).await;
+                }
+                self.notify_uow_completed(output, cancel.child_token()).await;
+            }
         }
         log::debug!("BatchNode process() task has been terminated.");
     }
