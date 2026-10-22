@@ -688,3 +688,121 @@ async fn mqtt_out_connect_disconnect_actions() {
     let _results =
         harness.inject_and_collect_timeout("2", json!({"action": "connect"}), 0, Duration::from_secs(3)).await;
 }
+
+// ---------------------------------------------------------------------------
+// MQTT v5: the broker config's `protocolVersion` decides which protocol the nodes speak
+// ---------------------------------------------------------------------------
+
+/// A TCP listener that records the protocol level of the first MQTT CONNECT it receives
+/// (4 = MQTT 3.1.1, 5 = MQTT v5) and then drops the connection.
+async fn capture_connect_protocol_level() -> (std::net::SocketAddr, tokio::task::JoinHandle<u8>) {
+    use tokio::io::AsyncReadExt;
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind capture listener");
+    let addr = listener.local_addr().unwrap();
+    let handle = tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.expect("accept");
+        // CONNECT: 0x10, remaining length (one byte for these short packets), 0x00 0x04 "MQTT", protocol level
+        let mut head = [0u8; 9];
+        socket.read_exact(&mut head).await.expect("read CONNECT header");
+        assert_eq!(head[0], 0x10, "first packet must be CONNECT");
+        assert_eq!(&head[2..8], b"\x00\x04MQTT");
+        head[8]
+    });
+    (addr, handle)
+}
+
+/// Run a flow with one `mqtt in` (`direction` "in") or one `mqtt out` ("out") against the capture listener
+/// and return the protocol level of its CONNECT. `broker_extra` is merged into the `mqtt-broker` node.
+async fn connect_protocol_level(direction: &str, broker_extra: serde_json::Value) -> u8 {
+    let (addr, level) = capture_connect_protocol_level().await;
+
+    // The stock Node-RED shape: `broker` and `port`, no `url`
+    let mut broker = json!({"id": "broker_1", "type": "mqtt-broker", "broker": addr.ip().to_string(), "port": addr.port().to_string()});
+    broker.as_object_mut().unwrap().extend(broker_extra.as_object().unwrap().clone());
+
+    let node = if direction == "in" {
+        json!({"id": "1", "type": "mqtt in", "z": "100", "broker": "broker_1", "topic": "v5/test", "qos": "0",
+               "datatype": "utf8", "inputs": 0, "wires": [["99"]]})
+    } else {
+        json!({"id": "1", "type": "mqtt out", "z": "100", "broker": "broker_1", "topic": "v5/test", "qos": "0",
+               "wires": []})
+    };
+    let flow = json!([{"id": "100", "type": "tab"}, broker, node, {"id": "99", "z": "100", "type": "test-once"}]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    // `mqtt in` connects as soon as the engine starts, `mqtt out` when the first message arrives
+    if direction == "in" {
+        let _ = harness.engine().run_once(1, Duration::from_secs(2)).await;
+    } else {
+        let _ = harness.inject_and_collect_timeout("1", json!({"payload": "x"}), 1, Duration::from_secs(2)).await;
+    }
+    tokio::time::timeout(Duration::from_secs(5), level).await.expect("no CONNECT received").expect("capture task")
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn mqtt_in_connects_with_mqtt_v5_when_protocol_version_is_5() {
+    assert_eq!(connect_protocol_level("in", json!({"protocolVersion": "5"})).await, 5);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn mqtt_out_connects_with_mqtt_v5_when_protocol_version_is_5() {
+    assert_eq!(connect_protocol_level("out", json!({"protocolVersion": 5})).await, 5);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn mqtt_in_and_out_default_to_mqtt_3_1_1() {
+    assert_eq!(connect_protocol_level("in", json!({})).await, 4);
+    assert_eq!(connect_protocol_level("out", json!({"protocolVersion": "4"})).await, 4);
+}
+
+/// Round trip over MQTT v5, including v5 publish properties, against a real MQTT 5 broker.
+///
+/// The embedded `rust-red-mqtt-broker` only speaks MQTT 3.1.1, so this needs an external broker such as
+/// Mosquitto 2. Start one and run the test:
+///
+/// ```text
+/// docker run -d --rm --name mqtt5 -p 18835:1883 eclipse-mosquitto:2 \
+///     sh -c 'printf "listener 1883\nallow_anonymous true\n" > /tmp/m.conf && mosquitto -c /tmp/m.conf'
+/// MQTT_V5_URL=mqtt://127.0.0.1:18835 cargo test -p rust-red-core --features default,internal-testing \
+///     --test nodered_compat mqtt_v5_roundtrip -- --ignored
+/// docker rm -f mqtt5
+/// ```
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[ignore = "requires an MQTT 5 broker, set MQTT_V5_URL (e.g. mqtt://127.0.0.1:18835)"]
+async fn mqtt_v5_roundtrip_with_properties() {
+    use rust_red_core::runtime::model::Variant;
+
+    let url = std::env::var("MQTT_V5_URL").expect("MQTT_V5_URL must point at an MQTT 5 broker");
+    // Retained, so the subscriber gets the message even if it subscribes after the publish
+    let topic = format!(
+        "rustred/v5/{}",
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+    );
+
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "broker_1", "type": "mqtt-broker", "url": url, "protocolVersion": 5},
+        {"id": "1", "type": "mqtt in", "z": "100", "broker": "broker_1", "topic": topic, "qos": "1",
+         "datatype": "utf8", "inputs": 0, "wires": [["99"]]},
+        {"id": "2", "type": "mqtt out", "z": "100", "broker": "broker_1", "topic": topic, "qos": "1",
+         "retain": "true", "contentType": "application/json", "respTopic": "reply/here", "correl": "c-1",
+         "expiry": "60", "userProps": "{\"k\":\"v\"}", "wires": []},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let results =
+        harness.inject_and_collect_timeout("2", json!({"payload": "hello"}), 1, Duration::from_secs(10)).await;
+    assert_eq!(results.len(), 1, "mqtt in did not receive the message published over MQTT v5");
+    let msg = &results[0];
+    assert_eq!(msg.get("payload").and_then(|v| v.as_str()), Some("hello"));
+    assert_eq!(msg.get("topic").and_then(|v| v.as_str()), Some(topic.as_str()));
+    assert_eq!(msg.get("contentType").and_then(|v| v.as_str()), Some("application/json"));
+    assert_eq!(msg.get("responseTopic").and_then(|v| v.as_str()), Some("reply/here"));
+    assert_eq!(msg.get("correlationData"), Some(&Variant::Bytes(b"c-1".to_vec())));
+    match msg.get("userProperties") {
+        Some(Variant::Object(props)) => assert_eq!(props.get("k"), Some(&Variant::String("v".into()))),
+        other => panic!("userProperties missing: {other:?}"),
+    }
+}

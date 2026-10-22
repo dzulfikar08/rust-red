@@ -24,7 +24,7 @@ use std::sync::Arc;
 use crate::runtime::model::json::deser::{lenient_opt_bool, lenient_opt_string, lenient_opt_u8, lenient_opt_u16};
 use crate::runtime::model::*;
 use crate::runtime::nodes::*;
-use rumqttc::{AsyncClient, EventLoop, LastWill, MqttOptions, QoS, Transport};
+use rumqttc::{AsyncClient, EventLoop, LastWill, MqttOptions, QoS, Transport, v5};
 use rust_red_macro::*;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -210,14 +210,9 @@ fn qos_from_u8(qos: u8) -> QoS {
 /// connection each time another node connects with the same id. Without a configured id,
 /// a random `{id_prefix}_{random}` id is used.
 ///
-/// MQTT v5 (`protocolVersion` 5) is accepted in the config, but the connection is made
-/// with MQTT 3.1.1, which every v5 broker also speaks.
+/// With `protocolVersion` 5 the nodes use [`build_mqtt_v5_options`] instead, which follows the same rules.
 pub(super) fn build_mqtt_options(settings: &MqttBrokerSettings, id_prefix: &str, node_id: ElementId) -> MqttOptions {
-    let client_id = match &settings.client_id {
-        Some(configured) => format!("{configured}-{id_prefix}-{node_id}"),
-        None => format!("{id_prefix}_{}", &uuid::Uuid::new_v4().to_string()[..8]),
-    };
-    let mut opts = MqttOptions::new(client_id, settings.host.clone(), settings.port);
+    let mut opts = MqttOptions::new(mqtt_client_id(settings, id_prefix, node_id), settings.host.clone(), settings.port);
     opts.set_keep_alive(Duration::from_secs(settings.keepalive as u64));
     opts.set_clean_session(settings.clean);
 
@@ -238,6 +233,56 @@ pub(super) fn build_mqtt_options(settings: &MqttBrokerSettings, id_prefix: &str,
             qos: qos_from_u8(settings.will_qos),
             retain: settings.will_retain,
         });
+    }
+
+    opts
+}
+
+fn mqtt_client_id(settings: &MqttBrokerSettings, id_prefix: &str, node_id: ElementId) -> String {
+    match &settings.client_id {
+        Some(configured) => format!("{configured}-{id_prefix}-{node_id}"),
+        None => format!("{id_prefix}_{}", &uuid::Uuid::new_v4().to_string()[..8]),
+    }
+}
+
+pub(super) fn qos_to_v5(qos: u8) -> v5::mqttbytes::QoS {
+    match qos {
+        1 => v5::mqttbytes::QoS::AtLeastOnce,
+        2 => v5::mqttbytes::QoS::ExactlyOnce,
+        _ => v5::mqttbytes::QoS::AtMostOnce,
+    }
+}
+
+/// Build MQTT v5 `rumqttc` options from broker settings, with the same client id, credentials,
+/// TLS and last will rules as [`build_mqtt_options`]. `clean` maps to the v5 clean start flag.
+pub(super) fn build_mqtt_v5_options(
+    settings: &MqttBrokerSettings,
+    id_prefix: &str,
+    node_id: ElementId,
+) -> v5::MqttOptions {
+    let mut opts =
+        v5::MqttOptions::new(mqtt_client_id(settings, id_prefix, node_id), settings.host.clone(), settings.port);
+    opts.set_keep_alive(Duration::from_secs(settings.keepalive as u64));
+    opts.set_clean_start(settings.clean);
+
+    if let Some(username) = &settings.username {
+        opts.set_credentials(username, settings.password.as_deref().unwrap_or(""));
+    }
+
+    if settings.tls {
+        opts.set_transport(Transport::tls_with_default_config());
+    }
+
+    if let Some(will_topic) = &settings.will_topic
+        && !will_topic.is_empty()
+    {
+        opts.set_last_will(v5::mqttbytes::v5::LastWill::new(
+            will_topic.clone(),
+            settings.will_payload.clone().unwrap_or_default().into_bytes(),
+            qos_to_v5(settings.will_qos),
+            settings.will_retain,
+            None,
+        ));
     }
 
     opts
@@ -469,5 +514,55 @@ mod tests {
     #[test]
     fn garbage_port_is_an_error_not_a_panic() {
         assert!(MqttBrokerConfig::deserialize(&serde_json::json!({"broker": "h", "port": "abc"})).is_err());
+    }
+
+    #[test]
+    fn protocol_version_5_and_will_fields_reach_the_settings() {
+        let settings = config(serde_json::json!({
+            "broker": "h", "port": "1883", "protocolVersion": "5", "autoConnect": "false",
+            "willTopic": "status/offline", "willPayload": "gone", "willQos": "1", "willRetain": "true"
+        }))
+        .settings();
+        assert_eq!(settings.protocol_version, 5);
+        assert!(!settings.auto_connect);
+        assert_eq!(settings.will_topic.as_deref(), Some("status/offline"));
+        assert_eq!(settings.will_payload.as_deref(), Some("gone"));
+        assert_eq!(settings.will_qos, 1);
+        assert!(settings.will_retain);
+
+        // Without a protocolVersion the nodes keep using MQTT 3.1.1
+        assert_eq!(config(serde_json::json!({"broker": "h"})).settings().protocol_version, 4);
+    }
+
+    #[test]
+    fn v5_options_follow_the_settings() {
+        let settings = config(serde_json::json!({
+            "broker": "mq.example.com", "port": 1884, "clientid": "plc", "keepalive": 20, "cleansession": false,
+            "protocolVersion": 5, "credentials": {"user": "alice", "password": "pw"},
+            "willTopic": "w", "willPayload": "bye", "willQos": 2, "willRetain": true
+        }))
+        .settings();
+        let id = ElementId::new();
+        let opts = build_mqtt_v5_options(&settings, "rust_red_in", id);
+        assert_eq!(opts.broker_address(), ("mq.example.com".to_string(), 1884));
+        assert_eq!(opts.client_id(), format!("plc-rust_red_in-{id}"));
+        assert_eq!(opts.keep_alive(), Duration::from_secs(20));
+        assert!(!opts.clean_start());
+        assert_eq!(opts.credentials(), Some(("alice".to_string(), "pw".to_string())));
+        let will = opts.last_will().expect("will must be set");
+        assert_eq!(&will.topic[..], b"w");
+        assert_eq!(&will.message[..], b"bye");
+        assert_eq!(will.qos, v5::mqttbytes::QoS::ExactlyOnce);
+        assert!(will.retain);
+    }
+
+    #[test]
+    fn v5_options_without_client_id_or_credentials() {
+        let settings = config(serde_json::json!({"broker": "h", "protocolVersion": 5})).settings();
+        let opts = build_mqtt_v5_options(&settings, "rust_red_out", ElementId::new());
+        assert!(opts.client_id().starts_with("rust_red_out_"));
+        assert!(opts.credentials().is_none());
+        assert!(opts.last_will().is_none());
+        assert!(opts.clean_start());
     }
 }

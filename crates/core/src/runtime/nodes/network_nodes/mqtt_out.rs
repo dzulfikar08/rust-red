@@ -16,7 +16,8 @@
 //! - `topic`: Default topic (can be overridden by msg.topic)
 //! - `qos`: Default QoS level (0, 1, or 2)
 //! - `retain`: Default retain flag
-//! - MQTT v5 properties (future enhancement)
+//! - MQTT v5 properties (`respTopic`, `correl`, `contentType`, `expiry`, `userProps`), sent when the broker config
+//!   uses `protocolVersion` 5. The matching `msg` properties override them.
 //!
 //! Message properties:
 //! - `msg.topic`: Topic to publish to (overrides config)
@@ -43,7 +44,7 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
-use super::mqtt_broker::{build_mqtt_options, resolve_broker_settings};
+use super::mqtt_broker::{build_mqtt_options, build_mqtt_v5_options, qos_to_v5, resolve_broker_settings};
 use crate::runtime::model::json::deser::{lenient_bool, lenient_opt_u32};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Default)]
@@ -115,9 +116,132 @@ struct MqttOutNodeConfig {
     user_properties: String,
 }
 
+impl MqttOutNodeConfig {
+    /// MQTT v5 publish properties: the node's settings, overridden by the matching `msg` properties
+    /// (`msg.responseTopic`, `msg.correlationData`, `msg.contentType`, `msg.messageExpiryInterval`,
+    /// `msg.userProperties`), as in Node-RED.
+    fn v5_properties(&self, msg: &Msg) -> rumqttc::v5::mqttbytes::v5::PublishProperties {
+        fn msg_string(msg: &Msg, key: &str) -> Option<String> {
+            msg.get(key).and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(str::to_string)
+        }
+        fn non_empty(value: &str) -> Option<String> {
+            (!value.is_empty()).then(|| value.to_string())
+        }
+
+        let correlation_data = match msg.get("correlationData") {
+            Some(Variant::Bytes(bytes)) if !bytes.is_empty() => Some(bytes.clone()),
+            Some(Variant::String(s)) if !s.is_empty() => Some(s.clone().into_bytes()),
+            _ => non_empty(&self.correlation_data).map(String::into_bytes),
+        };
+
+        let message_expiry_interval = msg
+            .get("messageExpiryInterval")
+            .and_then(|v| v.as_number())
+            .and_then(|n| n.as_u64())
+            .and_then(|n| u32::try_from(n).ok())
+            .or(self.message_expiry_interval);
+
+        let user_properties = match msg.get("userProperties") {
+            Some(Variant::Object(map)) => map
+                .iter()
+                .map(|(key, value)| {
+                    let value = match value {
+                        Variant::String(s) => s.clone(),
+                        other => serde_json::to_string(other).unwrap_or_default(),
+                    };
+                    (key.clone(), value)
+                })
+                .collect(),
+            _ => self.config_user_properties(),
+        };
+
+        rumqttc::v5::mqttbytes::v5::PublishProperties {
+            payload_format_indicator: None,
+            message_expiry_interval,
+            topic_alias: None,
+            response_topic: msg_string(msg, "responseTopic").or_else(|| non_empty(&self.response_topic)),
+            correlation_data: correlation_data.map(Into::into),
+            user_properties,
+            subscription_identifiers: Vec::new(),
+            content_type: msg_string(msg, "contentType").or_else(|| non_empty(&self.content_type)),
+        }
+    }
+
+    /// The node's `userProps`, a JSON object saved as a string
+    fn config_user_properties(&self) -> Vec<(String, String)> {
+        if self.user_properties.trim().is_empty() {
+            return Vec::new();
+        }
+        match serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&self.user_properties) {
+            Ok(map) => map
+                .into_iter()
+                .map(|(key, value)| {
+                    let value = match value {
+                        serde_json::Value::String(s) => s,
+                        other => other.to_string(),
+                    };
+                    (key, value)
+                })
+                .collect(),
+            Err(error) => {
+                log::warn!("MQTT out: ignoring userProps, which is not a JSON object: {error}");
+                Vec::new()
+            }
+        }
+    }
+}
+
+/// Client of the connection, MQTT 3.1.1 or MQTT v5 depending on the broker's `protocolVersion`.
+enum MqttClient {
+    V4(rumqttc::AsyncClient),
+    V5(rumqttc::v5::AsyncClient),
+}
+
+impl MqttClient {
+    async fn disconnect(&self) -> Result<(), String> {
+        match self {
+            Self::V4(client) => client.disconnect().await.map_err(|e| e.to_string()),
+            Self::V5(client) => client.disconnect().await.map_err(|e| e.to_string()),
+        }
+    }
+}
+
+enum MqttEventLoop {
+    V4(Box<rumqttc::EventLoop>),
+    V5(Box<rumqttc::v5::EventLoop>),
+}
+
+enum MqttEvent {
+    ConnAck { accepted: bool, detail: String },
+    Other,
+}
+
+impl MqttEventLoop {
+    async fn poll_event(&mut self) -> Result<MqttEvent, String> {
+        match self {
+            Self::V4(event_loop) => match event_loop.poll().await.map_err(|e| e.to_string())? {
+                rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(connack)) => Ok(MqttEvent::ConnAck {
+                    accepted: connack.code == rumqttc::ConnectReturnCode::Success,
+                    detail: format!("{:?}", connack.code),
+                }),
+                _ => Ok(MqttEvent::Other),
+            },
+            Self::V5(event_loop) => match event_loop.poll().await.map_err(|e| e.to_string())? {
+                rumqttc::v5::Event::Incoming(rumqttc::v5::mqttbytes::v5::Packet::ConnAck(connack)) => {
+                    Ok(MqttEvent::ConnAck {
+                        accepted: connack.code == rumqttc::v5::mqttbytes::v5::ConnectReturnCode::Success,
+                        detail: format!("{:?}", connack.code),
+                    })
+                }
+                _ => Ok(MqttEvent::Other),
+            },
+        }
+    }
+}
+
 #[derive(Default)]
 struct MqttConnection {
-    client: Option<rumqttc::AsyncClient>,
+    client: Option<MqttClient>,
     /// Stops the task that drives the connection (`rumqttc` only sends and receives while it is polled).
     cancel: Option<CancellationToken>,
     connected: bool,
@@ -178,28 +302,34 @@ impl MqttOutNode {
 
         let settings = self.broker_settings().await?;
         let (host, port) = (settings.host.clone(), settings.port);
-        let mqttoptions = build_mqtt_options(&settings, "rust_red_out", self.id());
-
-        let (client, mut eventloop) = rumqttc::AsyncClient::new(mqttoptions, 10);
+        let (client, mut eventloop) = if settings.protocol_version == 5 {
+            let options = build_mqtt_v5_options(&settings, "rust_red_out", self.id());
+            let (client, eventloop) = rumqttc::v5::AsyncClient::new(options, 10);
+            (MqttClient::V5(client), MqttEventLoop::V5(Box::new(eventloop)))
+        } else {
+            let options = build_mqtt_options(&settings, "rust_red_out", self.id());
+            let (client, eventloop) = rumqttc::AsyncClient::new(options, 10);
+            (MqttClient::V4(client), MqttEventLoop::V4(Box::new(eventloop)))
+        };
 
         // Try to connect with timeout - similar to Node-RED's connection logic
         match timeout(Duration::from_secs(10), async {
             loop {
-                match eventloop.poll().await {
-                    Ok(rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(connack))) => {
-                        if connack.code == rumqttc::ConnectReturnCode::Success {
-                            log::info!("MQTT connected successfully to {}:{}", host, port);
-                            return Ok(());
-                        } else {
-                            log::error!("MQTT connection failed with code: {:?}", connack.code);
-                            return Err(format!("Connection refused: {:?}", connack.code));
-                        }
+                match eventloop.poll_event().await {
+                    Ok(MqttEvent::ConnAck { accepted: true, .. }) => {
+                        log::info!(
+                            "MQTT connected successfully to {}:{} (MQTT v{})",
+                            host,
+                            port,
+                            if settings.protocol_version == 5 { "5" } else { "3.1.1" }
+                        );
+                        return Ok(());
                     }
-                    Ok(rumqttc::Event::Outgoing(_)) => {
-                        log::debug!("MQTT outgoing packet sent");
-                        continue;
+                    Ok(MqttEvent::ConnAck { detail, .. }) => {
+                        log::error!("MQTT connection failed with code: {detail}");
+                        return Err(format!("Connection refused: {detail}"));
                     }
-                    Ok(_) => continue,
+                    Ok(MqttEvent::Other) => continue,
                     Err(e) => {
                         log::warn!("MQTT connection error: {e:?}");
                         return Err(format!("Connection error: {e}"));
@@ -221,7 +351,7 @@ impl MqttOutNode {
                     loop {
                         tokio::select! {
                             _ = cancel.cancelled() => break,
-                            result = eventloop.poll() => {
+                            result = eventloop.poll_event() => {
                                 if let Err(error) = result {
                                     log::warn!("MQTT out connection error, retrying: {error}");
                                     tokio::select! {
@@ -301,14 +431,20 @@ impl MqttOutNode {
         // Convert payload to bytes following Node-RED conversion rules
         let payload_bytes = self.convert_payload_to_bytes(payload)?;
 
-        // Build MQTT v5 properties if needed (for future MQTT v5 support)
-        // For now, we use rumqttc which primarily supports MQTT v3.1.1
-
         // Publish the message
-        client
-            .publish(topic, qos, retain, payload_bytes)
-            .await
-            .map_err(|e| crate::RustRedError::invalid_operation(&format!("MQTT publish failed: {e}")))?;
+        match client {
+            MqttClient::V4(client) => {
+                client.publish(topic, qos, retain, payload_bytes).await.map_err(|e| e.to_string())
+            }
+            MqttClient::V5(client) => {
+                let properties = self.config.v5_properties(msg);
+                client
+                    .publish_with_properties(topic, qos_to_v5(qos as u8), retain, payload_bytes, properties)
+                    .await
+                    .map_err(|e| e.to_string())
+            }
+        }
+        .map_err(|e| crate::RustRedError::invalid_operation(&format!("MQTT publish failed: {e}")))?;
 
         Ok(())
     }
@@ -502,5 +638,68 @@ impl FlowNodeBehavior for MqttOutNode {
         connection.stop_event_loop();
 
         log::debug!("MqttOutNode process() task has been terminated.");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MqttOutNodeConfig;
+    use crate::runtime::model::{Msg, Variant};
+    use serde::Deserialize;
+
+    fn config(json: serde_json::Value) -> MqttOutNodeConfig {
+        MqttOutNodeConfig::deserialize(&json).expect("config must load")
+    }
+
+    #[test]
+    fn v5_properties_come_from_the_node_config() {
+        let cfg = config(serde_json::json!({
+            "broker": "b", "respTopic": "reply/to", "correl": "abc", "contentType": "application/json",
+            "expiry": "60", "userProps": "{\"k\":\"v\",\"n\":1}"
+        }));
+        let props = cfg.v5_properties(&Msg::default());
+        assert_eq!(props.response_topic.as_deref(), Some("reply/to"));
+        assert_eq!(props.correlation_data.as_deref(), Some(&b"abc"[..]));
+        assert_eq!(props.content_type.as_deref(), Some("application/json"));
+        assert_eq!(props.message_expiry_interval, Some(60));
+        let mut user = props.user_properties;
+        user.sort();
+        assert_eq!(user, vec![("k".to_string(), "v".to_string()), ("n".to_string(), "1".to_string())]);
+    }
+
+    #[test]
+    fn v5_properties_are_overridden_by_msg() {
+        let cfg = config(serde_json::json!({"broker": "b", "contentType": "text/plain", "expiry": 60}));
+        let mut msg = Msg::default();
+        msg.set("contentType".to_string(), Variant::String("image/png".into()));
+        msg.set("messageExpiryInterval".to_string(), Variant::Number(serde_json::Number::from(5)));
+        msg.set("responseTopic".to_string(), Variant::String("r".into()));
+        msg.set("correlationData".to_string(), Variant::Bytes(vec![1, 2]));
+        msg.set(
+            "userProperties".to_string(),
+            Variant::Object([("a".to_string(), Variant::String("b".into()))].into_iter().collect()),
+        );
+        let props = cfg.v5_properties(&msg);
+        assert_eq!(props.content_type.as_deref(), Some("image/png"));
+        assert_eq!(props.message_expiry_interval, Some(5));
+        assert_eq!(props.response_topic.as_deref(), Some("r"));
+        assert_eq!(props.correlation_data.as_deref(), Some(&[1u8, 2][..]));
+        assert_eq!(props.user_properties, vec![("a".to_string(), "b".to_string())]);
+    }
+
+    #[test]
+    fn v5_properties_are_empty_without_settings() {
+        let props = config(serde_json::json!({"broker": "b"})).v5_properties(&Msg::default());
+        assert!(props.response_topic.is_none());
+        assert!(props.correlation_data.is_none());
+        assert!(props.content_type.is_none());
+        assert!(props.message_expiry_interval.is_none());
+        assert!(props.user_properties.is_empty());
+    }
+
+    #[test]
+    fn invalid_user_props_are_ignored() {
+        let cfg = config(serde_json::json!({"broker": "b", "userProps": "not json"}));
+        assert!(cfg.v5_properties(&Msg::default()).user_properties.is_empty());
     }
 }
