@@ -258,3 +258,118 @@ async fn delay_variable_zero() {
     assert_msg_str(&msgs[0], "payload", "zero-delay");
     assert!(elapsed < Duration::from_millis(200), "Zero delay should be fast, but took {:?}", elapsed);
 }
+
+/// Delay: the `complete` node fires when the delayed message is sent, not when it is received
+/// (upstream raises `done()` after the delayed send).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn delay_completes_after_delayed_send() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "delay", "z": "100", "name": "",
+         "pauseType": "delay", "timeout": "600", "timeoutUnits": "milliseconds",
+         "rate": "1", "nbRateUnits": "1", "rateUnits": "second",
+         "randomFirst": "1", "randomLast": "5", "randomUnits": "seconds",
+         "drop": false, "allowrate": false, "outputs": 1,
+         "wires": [[]]},
+        {"id": "2", "z": "100", "type": "complete", "scope": ["1"], "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let start = std::time::Instant::now();
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "x"}), 1, Duration::from_secs(3)).await;
+    let elapsed = start.elapsed();
+
+    assert_eq!(msgs.len(), 1, "the complete node must fire once");
+    assert!(elapsed >= Duration::from_millis(500), "done() must wait for the delayed send, took {elapsed:?}");
+}
+
+/// Delay: `reset` drops the pending message and completes it right away.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn delay_reset_completes_pending_message() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "delay", "z": "100", "name": "",
+         "pauseType": "delay", "timeout": "10", "timeoutUnits": "seconds",
+         "rate": "1", "nbRateUnits": "1", "rateUnits": "second",
+         "randomFirst": "1", "randomLast": "5", "randomUnits": "seconds",
+         "drop": false, "allowrate": false, "outputs": 1,
+         "wires": [[]]},
+        {"id": "2", "z": "100", "type": "complete", "scope": ["1"], "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness
+        .run_with_inject(
+            2,
+            vec![("1".to_string(), json!({"payload": "pending"})), ("1".to_string(), json!({"reset": true}))],
+        )
+        .await;
+
+    // Both the dropped message and the reset message complete, long before the 10s timer.
+    assert_eq!(msgs.len(), 2);
+}
+
+/// Queue mode releases one message per rate interval; the interval is the rate interval, not
+/// the node timeout.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn delay_queue_mode_uses_rate_interval() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "delay", "z": "100", "name": "",
+         "pauseType": "queue", "timeout": "30", "timeoutUnits": "seconds",
+         "rate": "10", "nbRateUnits": "1", "rateUnits": "second",
+         "randomFirst": "1", "randomLast": "5", "randomUnits": "seconds",
+         "drop": false, "allowrate": false, "outputs": 1,
+         "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let start = std::time::Instant::now();
+    let msgs = harness
+        .run_with_inject(
+            3,
+            vec![
+                ("1".to_string(), json!({"payload": 1, "topic": "a"})),
+                ("1".to_string(), json!({"payload": 2, "topic": "b"})),
+                ("1".to_string(), json!({"payload": 3, "topic": "c"})),
+            ],
+        )
+        .await;
+
+    assert_eq!(msgs.len(), 3);
+    assert!(start.elapsed() < Duration::from_secs(5), "queue mode must not wait for the node timeout");
+}
+
+/// Timed mode releases the whole buffer on every rate interval.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn delay_timed_mode_releases_buffer_on_rate_interval() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "delay", "z": "100", "name": "",
+         "pauseType": "timed", "timeout": "30", "timeoutUnits": "seconds",
+         "rate": "5", "nbRateUnits": "1", "rateUnits": "second",
+         "randomFirst": "1", "randomLast": "5", "randomUnits": "seconds",
+         "drop": false, "allowrate": false, "outputs": 1,
+         "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let start = std::time::Instant::now();
+    let msgs = harness
+        .run_with_inject(
+            3,
+            vec![
+                ("1".to_string(), json!({"payload": 1, "topic": "a"})),
+                ("1".to_string(), json!({"payload": 2, "topic": "b"})),
+                ("1".to_string(), json!({"payload": 3, "topic": "c"})),
+            ],
+        )
+        .await;
+
+    assert_eq!(msgs.len(), 3);
+    assert!(start.elapsed() < Duration::from_secs(5), "timed mode must not wait for the node timeout");
+}

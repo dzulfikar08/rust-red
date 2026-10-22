@@ -34,7 +34,7 @@ pub struct FlowSettings {
 
     /// How many messages a node may keep buffered while it works on message sequences; `0` means no
     /// limit. This is Node-RED's `nodeMessageBufferMaxLength` settings.js property, which upstream
-    /// applies to the nodes operating on sequences (sort, batch, join).
+    /// applies to the nodes operating on sequences (switch, delay, split, sort, batch).
     #[serde(default)]
     pub node_message_buffer_max_length: usize,
 }
@@ -547,13 +547,13 @@ impl Flow {
         self.inner.engine.upgrade()
     }
 
-    pub fn get_envs(&self) -> &RedEnvs {
-        &self.inner.envs
-    }
-
     /// The runtime settings (`runtime.flow`) this flow was built with.
     pub fn settings(&self) -> &FlowSettings {
         &self.inner._args
+    }
+
+    pub fn get_envs(&self) -> &RedEnvs {
+        &self.inner.envs
     }
 
     pub fn get_env(&self, key: &str) -> Option<Variant> {
