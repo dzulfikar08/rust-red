@@ -538,6 +538,11 @@ The heavy check mark (:heavy_check_mark:) indicates the node has passed the Node
 
 ## Changelog
 
+### 0.3.1
+
+- `inject` loads when `onceDelay`, `repeat` or `once` are saved as strings, as the Node-RED editor does after a value was edited. Before, `"onceDelay": "1"` stopped the whole flow from starting.
+- `cargo build --release` after `git clone --recursive` works with current npm versions. npm 11.10 and later refuse the one git dependency in the Node-RED lockfile, so the build now retries with `--allow-git=all`. If npm still fails, the build prints a clear warning and produces a binary without the editor (use `--headless`), instead of panicking. The release workflow fails if the editor files are missing.
+
 ### 0.3.0
 
 #### Ported from EdgeLinkd
