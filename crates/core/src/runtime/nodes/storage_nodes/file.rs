@@ -86,6 +86,12 @@ enum FileEncoding {
     Base64,
     #[serde(rename = "binary")]
     Binary,
+    #[serde(rename = "hex")]
+    Hex,
+    #[serde(rename = "ucs2", alias = "utf16le", alias = "utf-16le")]
+    Ucs2,
+    #[serde(rename = "utf-16be")]
+    Utf16Be,
     #[serde(rename = "setbymsg")]
     SetByMsg,
 }
@@ -206,6 +212,9 @@ impl FileNode {
                 general_purpose::STANDARD.decode(data).unwrap_or_else(|_| data.as_bytes().to_vec())
             }
             FileEncoding::Binary => data.as_bytes().to_vec(),
+            FileEncoding::Hex => hex::decode(data).unwrap_or_else(|_| data.as_bytes().to_vec()),
+            FileEncoding::Ucs2 => data.encode_utf16().flat_map(u16::to_le_bytes).collect(),
+            FileEncoding::Utf16Be => data.encode_utf16().flat_map(u16::to_be_bytes).collect(),
             FileEncoding::SetByMsg => data.as_bytes().to_vec(), // 如果消息没有指定编码，默认使用 UTF-8
         }
     }
@@ -237,6 +246,9 @@ impl FileNode {
                     "utf8" => FileEncoding::Utf8,
                     "base64" => FileEncoding::Base64,
                     "binary" => FileEncoding::Binary,
+                    "hex" => FileEncoding::Hex,
+                    "ucs2" | "utf16le" | "utf-16le" => FileEncoding::Ucs2,
+                    "utf-16be" => FileEncoding::Utf16Be,
                     _ => FileEncoding::None,
                 }
             } else {
@@ -254,6 +266,15 @@ impl FileNode {
                 general_purpose::STANDARD.decode(&data_bytes).unwrap_or(data_bytes.clone())
             }
             FileEncoding::Binary => data_bytes.clone(),
+            FileEncoding::Hex => {
+                hex::decode(String::from_utf8_lossy(&data_bytes).as_bytes()).unwrap_or(data_bytes.clone())
+            }
+            FileEncoding::Ucs2 => {
+                String::from_utf8_lossy(&data_bytes).encode_utf16().flat_map(u16::to_le_bytes).collect()
+            }
+            FileEncoding::Utf16Be => {
+                String::from_utf8_lossy(&data_bytes).encode_utf16().flat_map(u16::to_be_bytes).collect()
+            }
             FileEncoding::SetByMsg => data_bytes.clone(),
         };
 

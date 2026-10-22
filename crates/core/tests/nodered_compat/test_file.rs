@@ -463,3 +463,47 @@ async fn file_write_read_roundtrip() {
     assert!(!read_msgs.is_empty());
     assert_msg_str(&read_msgs[0], "payload", "roundtrip data");
 }
+
+// ---------------------------------------------------------------------------
+// Extra encodings (hex, ucs2, utf-16be)
+// ---------------------------------------------------------------------------
+
+async fn write_with_encoding(encoding: &str, payload: &str) -> Vec<u8> {
+    let tmp = TempDir::new().expect("create temp dir");
+    let file_path = tmp.path().join("enc.bin");
+    let mut flow = build_file_write_flow(&file_path.to_string_lossy(), "true", false);
+    flow[1]["encoding"] = json!(encoding);
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": payload}), 1, Duration::from_secs(2)).await;
+    assert!(!msgs.is_empty(), "File node should forward the message");
+    tokio::fs::read(&file_path).await.expect("read file")
+}
+
+async fn read_with_encoding(encoding: &str, bytes: &[u8]) -> String {
+    let tmp = TempDir::new().expect("create temp dir");
+    let file_path = tmp.path().join("enc.bin");
+    tokio::fs::write(&file_path, bytes).await.expect("write test file");
+    let mut flow = build_file_read_flow(&file_path.to_string_lossy(), "utf8");
+    flow[1]["encoding"] = json!(encoding);
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "t"}), 1, Duration::from_secs(2)).await;
+    assert!(!msgs.is_empty(), "File-in node should output a message");
+    msgs[0]["payload"].as_str().expect("string payload").to_string()
+}
+
+/// File write: hex, ucs2 and utf-16be encodings.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn file_write_extra_encodings() {
+    assert_eq!(write_with_encoding("hex", "4869").await, b"Hi");
+    assert_eq!(write_with_encoding("ucs2", "Hi").await, vec![0x48, 0x00, 0x69, 0x00]);
+    assert_eq!(write_with_encoding("utf16le", "Hi").await, vec![0x48, 0x00, 0x69, 0x00]);
+    assert_eq!(write_with_encoding("utf-16be", "Hi").await, vec![0x00, 0x48, 0x00, 0x69]);
+}
+
+/// File read: hex, ucs2 and utf-16be encodings.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn file_read_extra_encodings() {
+    assert_eq!(read_with_encoding("hex", b"Hi").await, "4869");
+    assert_eq!(read_with_encoding("ucs2", &[0x48, 0x00, 0x69, 0x00]).await, "Hi");
+    assert_eq!(read_with_encoding("utf-16be", &[0x00, 0x48, 0x00, 0x69]).await, "Hi");
+}
