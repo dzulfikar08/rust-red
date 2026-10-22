@@ -48,7 +48,7 @@ Modbus TCP to PostgreSQL comparison (10 holding registers polled every 500 ms, a
 | RustRED (full build) | 20.4 MB (max 20.5 MB) | 0.20% |
 | Node-RED (Node v26.11.1, node-red-contrib-modbus, node-red-contrib-postgresql) | 126 MB (max 149 MB) | 0.71% |
 
-That is roughly 6x less memory in this one test. The RustRED flow used RustRED's own node types, the Node-RED flow used the contrib nodes. Simulator: pymodbus 3.6.9; database: `postgres:16-alpine` in Docker.
+That is roughly 6x less memory in this one test. The RustRED flow used RustRED's own node types, the Node-RED flow used the contrib nodes. Since 0.2.1 the contrib flow runs on RustRED unchanged, see below. Simulator: pymodbus 3.6.9; database: `postgres:16-alpine` in Docker.
 
 ### Node-RED flow compatibility
 
@@ -66,7 +66,7 @@ How the three packages differ from Node-RED:
 - **Credentials.** The user and password are read from a `credentials` object on the config node, from plain `user` and `password` properties, or from environment variables when the field type is `env` (PostgreSQL). The encrypted `flows_cred.json` is not read, so a flow exported without credentials needs them added by one of these ways.
 - **A broken config node** is logged as an error and disabled. Nodes that use it report that it is missing. The rest of the flows keep running.
 - **Node ids** do not have to be hex. Ids such as `p1` are accepted on both flow nodes and config nodes.
-- **MQTT.** Every `mqtt in` and `mqtt out` node opens its own connection, where Node-RED shares one. A configured client id gets a suffix per node for that reason. `protocolVersion` 5 is accepted, but the connection uses MQTT 3.1.1. Birth and close messages are not sent.
+- **MQTT.** Every `mqtt in` and `mqtt out` node opens its own connection, where Node-RED shares one. A configured client id gets a suffix per node for that reason. As in Node-RED, a topic set on `mqtt out` wins over `msg.topic`. `protocolVersion` 5 is accepted, but the connection uses MQTT 3.1.1. Birth and close messages are not sent.
 - **Modbus.** `msg.payload` holds the values (an array of numbers, or booleans for coils) and `msg.responseBuffer` holds `{data, buffer}`. Only TCP and RTU serial transports exist, not UDP or ASCII. `msg.modbusRequest` and `msg.input` hold numbers where Node-RED holds the strings from the editor. The nodes `modbus-flex-connector`, `modbus-flex-sequencer`, `modbus-flex-fc`, `modbus-response`, `modbus-queue-info`, `modbus-io-config` and the I/O file options are not available.
 - **PostgreSQL.** `numeric` columns come back as text, like node-postgres, and `bigint` beyond 2^53 as text. Timestamps come back as ISO 8601 text, not as Date objects. A query with several statements runs, but returns every column as text. `ssl` is supported (`true`, or `{"rejectUnauthorized": false}`).
 - Context storage to the local file system, and part of `RED.util`, are not implemented (see roadmap below).
