@@ -219,3 +219,79 @@ async fn split_empty_array() {
 
     assert!(msgs.is_empty(), "Empty array should produce no messages");
 }
+
+fn manual_join_flow(build: &str, joiner: &str, count: &str) -> serde_json::Value {
+    json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "join", "z": "100", "name": "",
+         "mode": "custom", "build": build,
+         "property": "payload", "propertyType": "msg",
+         "joiner": joiner, "joinerType": "str", "accumulate": false,
+         "timeout": "", "count": count,
+         "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ])
+}
+
+/// Join: the editor's `joiner` property is the separator of a manual string join.
+// Mirrors: Node-RED 17-split_spec.js "should join strings with a joiner" (upstream 27bc07e)
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn join_manual_string_uses_joiner() {
+    let harness = TestHarness::from_flow_json(manual_join_flow("string", "-", "3"));
+    let msgs = harness
+        .run_with_inject(
+            1,
+            vec![
+                ("1".to_string(), json!({"payload": "a"})),
+                ("1".to_string(), json!({"payload": "b"})),
+                ("1".to_string(), json!({"payload": "c"})),
+            ],
+        )
+        .await;
+
+    assert_eq!(msgs.len(), 1);
+    assert_eq!(msgs[0].get("payload").unwrap().as_str().unwrap(), "a-b-c");
+}
+
+/// Join: manual mode takes the count from the node and joins in arrival order even when the
+/// messages carry `msg.parts`.
+// Mirrors: Node-RED 17-split_spec.js "should join in manual mode ignoring msg.parts" (upstream 27bc07e)
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn join_manual_ignores_parts_count_and_index() {
+    let harness = TestHarness::from_flow_json(manual_join_flow("array", "", "2"));
+    let msgs = harness
+        .run_with_inject(
+            1,
+            vec![
+                ("1".to_string(), json!({"payload": "x", "parts": {"id": "g", "index": 5, "count": 9}})),
+                ("1".to_string(), json!({"payload": "y", "parts": {"id": "g", "index": 1, "count": 9}})),
+            ],
+        )
+        .await;
+
+    assert_eq!(msgs.len(), 1);
+    let arr = msgs[0].get("payload").unwrap().as_array().unwrap();
+    assert_eq!(arr, &vec![Variant::from("x"), Variant::from("y")]);
+}
+
+/// Join: `msg.complete` flushes the group before its count is reached, and the bare marker is not
+/// added to the payload.
+// Mirrors: Node-RED 17-split_spec.js "should flush on msg.complete" (upstream 27bc07e)
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn join_complete_flushes_group_early() {
+    let harness = TestHarness::from_flow_json(manual_join_flow("array", "", "5"));
+    let msgs = harness
+        .run_with_inject(
+            1,
+            vec![
+                ("1".to_string(), json!({"payload": 1})),
+                ("1".to_string(), json!({"payload": 2})),
+                ("1".to_string(), json!({"complete": true})),
+            ],
+        )
+        .await;
+
+    assert_eq!(msgs.len(), 1);
+    let arr = msgs[0].get("payload").unwrap().as_array().unwrap();
+    assert_eq!(arr.len(), 2);
+}
