@@ -24,10 +24,14 @@ pub struct SortNodeConfig {
     pub as_num: bool, // Whether to treat values as numbers
     #[serde(default = "default_target")]
     pub target: String, // Target property path
-    #[serde(default = "default_target_type")]
+    #[serde(default = "default_target_type", rename = "targetType", alias = "target_type")]
     pub target_type: String, // "msg" or "seq" (sequence)
-    #[serde(default)]
-    pub key: String, // Key for sorting (for array/object)
+    /// Sort key for the array at `target` (`targetType: "msg"`), as sent by the editor.
+    #[serde(default, rename = "msgKey", alias = "key")]
+    pub key: String,
+    /// Sort key for a message group (`targetType: "seq"`), as sent by the editor.
+    #[serde(default = "default_seq_key", rename = "seqKey")]
+    pub seq_key: String,
 }
 
 fn default_order() -> String {
@@ -39,6 +43,9 @@ fn default_target() -> String {
 fn default_target_type() -> String {
     "msg".to_string()
 }
+fn default_seq_key() -> String {
+    "payload".to_string()
+}
 
 impl Default for SortNodeConfig {
     fn default() -> Self {
@@ -48,6 +55,7 @@ impl Default for SortNodeConfig {
             target: "payload".to_string(),
             target_type: "msg".to_string(),
             key: "payload".to_string(),
+            seq_key: "payload".to_string(),
         }
     }
 }
@@ -126,7 +134,7 @@ impl SortNode {
     // Sort grouped messages
     async fn sort_group(&self, group: &mut PendingGroup) -> Vec<Msg> {
         let mut pairs: Vec<(Variant, Msg)> = Vec::new();
-        let key = if self.config.key.is_empty() { None } else { Some(self.config.key.as_str()) };
+        let key = if self.config.seq_key.is_empty() { None } else { Some(self.config.seq_key.as_str()) };
         for h in &group.msgs {
             let msg = h.read().await.clone();
             let v = if let Some(k) = key {

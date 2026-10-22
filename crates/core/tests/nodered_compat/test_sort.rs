@@ -187,3 +187,62 @@ async fn sort_reset_clears_pending() {
 
     assert!(msgs.is_empty(), "Reset should produce no output");
 }
+
+/// Sort: a message group is sorted by the editor's `seqKey`, not always by `payload`.
+// Mirrors: Node-RED 18-sort_spec.js "should sort message group by seqKey"
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn sort_sequence_uses_seq_key() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "sort", "z": "100", "name": "",
+         "order": "ascending", "as_num": true,
+         "target": "payload", "targetType": "seq", "seqKey": "data", "seqKeyType": "msg",
+         "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness
+        .run_with_inject(
+            3,
+            vec![
+                ("1".to_string(), json!({"payload": "a", "data": 30, "parts": {"id": "g1", "index": 0, "count": 3}})),
+                ("1".to_string(), json!({"payload": "b", "data": 10, "parts": {"id": "g1", "index": 1, "count": 3}})),
+                ("1".to_string(), json!({"payload": "c", "data": 20, "parts": {"id": "g1", "index": 2, "count": 3}})),
+            ],
+        )
+        .await;
+
+    let payloads: Vec<&str> = msgs.iter().map(|m| m.get("payload").unwrap().as_str().unwrap()).collect();
+    assert_eq!(payloads, vec!["b", "c", "a"]);
+}
+
+/// Sort: completing a group must not panic or deadlock the node, and a second group still sorts.
+// Regression for upstream a165109 (group completion path)
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn sort_two_groups_in_a_row() {
+    let flow = json!([
+        {"id": "100", "type": "tab"},
+        {"id": "1", "type": "sort", "z": "100", "name": "",
+         "order": "ascending", "as_num": true,
+         "target": "payload", "targetType": "seq", "seqKey": "payload", "seqKeyType": "msg",
+         "wires": [["99"]]},
+        {"id": "99", "z": "100", "type": "test-once"}
+    ]);
+
+    let harness = TestHarness::from_flow_json(flow);
+    let msgs = harness
+        .run_with_inject(
+            4,
+            vec![
+                ("1".to_string(), json!({"payload": 2, "parts": {"id": "g1", "index": 0, "count": 2}})),
+                ("1".to_string(), json!({"payload": 1, "parts": {"id": "g1", "index": 1, "count": 2}})),
+                ("1".to_string(), json!({"payload": 4, "parts": {"id": "g2", "index": 0, "count": 2}})),
+                ("1".to_string(), json!({"payload": 3, "parts": {"id": "g2", "index": 1, "count": 2}})),
+            ],
+        )
+        .await;
+
+    let values: Vec<i64> = msgs.iter().map(|m| m.get("payload").unwrap().as_i64().unwrap()).collect();
+    assert_eq!(values, vec![1, 2, 3, 4]);
+}
