@@ -59,6 +59,7 @@ serde-xml-rs = { workspace = true, optional = true }
 # Crates in this project
 rust-red-macro = { path = "../macro" }
 dashmap.workspace = true
+futures.workspace = true
 jsonata-core.workspace = true
 itertools.workspace = true
 smallvec.workspace = true
@@ -104,7 +105,6 @@ libc.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 log4rs.workspace = true
 ctor.workspace = true
-futures.workspace = true
 tempfile = "3"
 rust-red-mqtt-broker = { path = "../mqtt-broker" }
 rumqttc = "0.24"

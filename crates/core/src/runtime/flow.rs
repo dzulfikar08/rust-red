@@ -549,7 +549,7 @@ impl Flow {
 
     /// The runtime settings (`runtime.flow`) this flow was built with.
     pub fn settings(&self) -> &FlowSettings {
-        &self.inner._args
+        &self.inner.args
     }
 
     pub fn get_envs(&self) -> &RedEnvs {
