@@ -3995,6 +3995,7 @@ dependencies = [
  "inventory",
  "itertools 0.14.0",
  "jsonata-rs",
+ "libc",
  "log 0.4.29",
  "log4rs",
  "mustache",

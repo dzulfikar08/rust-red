@@ -95,6 +95,11 @@ once_cell = { workspace = true, optional = true }
 # HTML parsing
 scraper = { workspace = true, optional = true }
 
+# The exec node delivers a real SIGTERM/SIGINT on Unix. Windows has no equivalent (Node.js
+# terminates the process there whatever signal is named), so this is Unix-only.
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
 [dev-dependencies]
 # Enable test-utilities in dev mode only. This is mostly for tests.
 tokio = { workspace = true, features = ["test-util"] }

@@ -26,6 +26,7 @@ mod test_catch;
 mod test_change;
 mod test_comment;
 mod test_debug;
+mod test_exec;
 mod test_delay;
 mod test_file;
 mod test_function;
