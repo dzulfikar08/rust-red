@@ -208,9 +208,7 @@ async fn batch_interval_flushes_on_timer() {
     ]);
 
     let harness = TestHarness::from_flow_json(flow);
-    let msgs = harness
-        .inject_and_collect_timeout("1", json!({"payload": "x"}), 1, Duration::from_secs(3))
-        .await;
+    let msgs = harness.inject_and_collect_timeout("1", json!({"payload": "x"}), 1, Duration::from_secs(3)).await;
     assert_eq!(msgs.len(), 1);
     assert_eq!(msgs[0].get("payload").unwrap().as_str().unwrap(), "x");
     assert_msg_has(&msgs[0], "parts");
@@ -250,7 +248,10 @@ async fn batch_overflow_reports_too_many() {
         {"id": "99", "z": "100", "type": "test-once"}
     ]);
 
-    let harness = TestHarness::from_flow_json_with_config(flow, TestHarness::config_with_int_overrides(&[("runtime.flow.node_message_buffer_max_length", 2)]));
+    let harness = TestHarness::from_flow_json_with_config(
+        flow,
+        TestHarness::config_with_int_overrides(&[("runtime.flow.node_message_buffer_max_length", 2)]),
+    );
     let injections: Vec<(String, serde_json::Value)> =
         (0..3).map(|i| ("1".to_string(), json!({"payload": i}))).collect();
     let msgs = harness.run_with_inject(1, injections).await;

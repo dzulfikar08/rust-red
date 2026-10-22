@@ -121,11 +121,7 @@ impl BatchNode {
     /// stay in the buffer for the next sequence (count mode with `overlap`), the copy that is sent
     /// has to be a clone, or the next batch would rewrite the `parts` of a message that was
     /// already emitted.
-    async fn send_batch(
-        &self,
-        messages: Vec<MsgHandle>,
-        clone_messages: bool,
-    ) -> Result<Vec<MsgHandle>, RustRedError> {
+    async fn send_batch(&self, messages: Vec<MsgHandle>, clone_messages: bool) -> Result<Vec<MsgHandle>, RustRedError> {
         if messages.is_empty() {
             return Ok(vec![]);
         }
