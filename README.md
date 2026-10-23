@@ -556,9 +556,15 @@ The heavy check mark (:heavy_check_mark:) indicates the node has passed the Node
 - **Parser nodes**: CSV, JSON, XML, YAML, HTML
 - **Storage nodes**: File, File In, Watch
 - **Database nodes**: PostgreSQL, TimescaleDB, MSSQL, SQLite, InfluxDB
-- **Industrial nodes**: Modbus (Read/Write/Flex/Server), OPC-UA (Read/Write), BACnet (Read)
+- **Industrial nodes**: Modbus (Read/Write/Flex/Server), OPC-UA (Read/Write), BACnet (Read/Write/COV)
 
 ## Changelog
+
+### 0.3.4
+
+- **`bacnet write` writes to the device.** It sends WriteProperty with the configured priority (`priority` 1-16, `msg.priority` overrides). The value type follows the object (Real for analog, Enumerated for binary, Unsigned for multi-state present values; `valueType` forces one). A `null` payload, `relinquish: true` or `msg.relinquish = true` writes NULL at the priority, which releases that slot. After the acknowledgement `msg.payload` is `true` and `msg.bacnet` holds what was written. Errors raise a node error instead of a message.
+- **`bacnet read` subscribes to COV.** With `subscribeCov` it sends SubscribeCOV, renews the subscription at half its lifetime, and emits a message for every notification (confirmed ones are acknowledged), with the properties in `msg.bacnet.values`. `covLifetime` and `covIncrement` work as documented.
+- Tests answer ReadProperty, WriteProperty and SubscribeCOV from the in-process device, including renewals and the increment filter.
 
 ### 0.3.3
 

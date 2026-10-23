@@ -1,4 +1,5 @@
-//! Minimal BACnet/IP client: confirmed ReadProperty (ASHRAE 135 clause 15.5) over UDP.
+//! Minimal BACnet/IP client over UDP: confirmed ReadProperty (ASHRAE 135 clause 15.5), WriteProperty (15.9) and
+//! SubscribeCOV (13.14) with the COV notifications (13.7, 13.8) that follow.
 //!
 //! The client sends one request per call from a fresh ephemeral UDP socket, connected to the
 //! target so only that device's replies are seen. Segmented ComplexAcks (clause 5.4) are
@@ -166,13 +167,194 @@ fn push_context_unsigned(out: &mut Vec<u8>, number: u32, value: u32) {
     out.extend_from_slice(&bytes[skip..]);
 }
 
-/// Complete BVLC frame carrying a confirmed ReadProperty request.
-pub(crate) fn encode_read_property(invoke_id: u8, object_type: u32, instance: u32, property: u32) -> Vec<u8> {
-    let mut apdu = vec![0x02, 0x70 | MAX_APDU_CODE, invoke_id, SERVICE_READ_PROPERTY];
-    push_tag(&mut apdu, 0, true, 4);
-    apdu.extend_from_slice(&((object_type << 22) | (instance & 0x3F_FFFF)).to_be_bytes());
-    push_context_unsigned(&mut apdu, 1, property);
+const SERVICE_WRITE_PROPERTY: u8 = 0x0F;
+const SERVICE_SUBSCRIBE_COV: u8 = 0x05;
+
+fn push_object_id(out: &mut Vec<u8>, tag: u32, object_type: u32, instance: u32) {
+    push_tag(out, tag, true, 4);
+    out.extend_from_slice(&((object_type << 22) | (instance & 0x3F_FFFF)).to_be_bytes());
+}
+
+/// Complete BVLC frame carrying a confirmed request with `body` as its service data.
+fn encode_confirmed(invoke_id: u8, service: u8, body: &[u8]) -> Vec<u8> {
+    let mut apdu = vec![0x02, 0x70 | MAX_APDU_CODE, invoke_id, service];
+    apdu.extend_from_slice(body);
     frame(&apdu, true)
+}
+
+fn read_property_body(object_type: u32, instance: u32, property: u32) -> Vec<u8> {
+    let mut body = Vec::new();
+    push_object_id(&mut body, 0, object_type, instance);
+    push_context_unsigned(&mut body, 1, property);
+    body
+}
+
+/// Complete BVLC frame carrying a confirmed ReadProperty request.
+#[cfg(test)]
+pub(crate) fn encode_read_property(invoke_id: u8, object_type: u32, instance: u32, property: u32) -> Vec<u8> {
+    encode_confirmed(invoke_id, SERVICE_READ_PROPERTY, &read_property_body(object_type, instance, property))
+}
+
+/// A value to write, as one application-tagged BACnet primitive.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum WriteValue {
+    Null,
+    Boolean(bool),
+    Unsigned(u64),
+    Signed(i64),
+    Real(f32),
+    Double(f64),
+    Enumerated(u32),
+    String(String),
+}
+
+fn push_application(out: &mut Vec<u8>, value: &WriteValue) {
+    fn minimal(bytes: &[u8], keep: usize) -> &[u8] {
+        let skip = bytes.iter().take(bytes.len() - keep).take_while(|b| **b == 0).count();
+        &bytes[skip..]
+    }
+    match value {
+        WriteValue::Null => out.push(0x00),
+        WriteValue::Boolean(b) => out.push(0x10 | *b as u8),
+        WriteValue::Unsigned(v) => {
+            let bytes = v.to_be_bytes();
+            let content = minimal(&bytes, 1);
+            push_tag(out, 2, false, content.len());
+            out.extend_from_slice(content);
+        }
+        WriteValue::Signed(v) => {
+            let bytes = v.to_be_bytes();
+            let mut start = 0;
+            while start < 7
+                && ((bytes[start] == 0x00 && bytes[start + 1] & 0x80 == 0)
+                    || (bytes[start] == 0xFF && bytes[start + 1] & 0x80 != 0))
+            {
+                start += 1;
+            }
+            push_tag(out, 3, false, 8 - start);
+            out.extend_from_slice(&bytes[start..]);
+        }
+        WriteValue::Real(v) => {
+            push_tag(out, 4, false, 4);
+            out.extend_from_slice(&v.to_be_bytes());
+        }
+        WriteValue::Double(v) => {
+            push_tag(out, 5, false, 8);
+            out.extend_from_slice(&v.to_be_bytes());
+        }
+        WriteValue::Enumerated(v) => {
+            let bytes = v.to_be_bytes();
+            let content = minimal(&bytes, 1);
+            push_tag(out, 9, false, content.len());
+            out.extend_from_slice(content);
+        }
+        WriteValue::String(s) => {
+            push_tag(out, 7, false, s.len() + 1);
+            out.push(0x00);
+            out.extend_from_slice(s.as_bytes());
+        }
+    }
+}
+
+fn write_property_body(
+    object_type: u32,
+    instance: u32,
+    property: u32,
+    value: &WriteValue,
+    priority: Option<u8>,
+) -> Vec<u8> {
+    let mut body = read_property_body(object_type, instance, property);
+    body.push(0x3E);
+    push_application(&mut body, value);
+    body.push(0x3F);
+    if let Some(p) = priority {
+        push_context_unsigned(&mut body, 4, p as u32);
+    }
+    body
+}
+
+fn json_number(v: &Value) -> Option<f64> {
+    match v {
+        Value::Number(n) => n.as_f64(),
+        Value::Bool(b) => Some(*b as u8 as f64),
+        Value::String(s) => s.trim().parse().ok(),
+        _ => None,
+    }
+}
+
+/// Choose the BACnet type of `value` for a property. `hint` is `auto` or one of `real`, `double`, `unsigned`,
+/// `signed`, `enumerated`, `boolean`, `string`, `null`. With `auto`, Present_Value follows the object type (clause 12:
+/// analog objects take Real, binary objects Enumerated 0 or 1, multi-state objects Unsigned) and other properties
+/// follow the JSON type. JSON `null` is always BACnet Null, which relinquishes a commandable priority slot.
+pub(crate) fn write_value(object_type: u32, property: u32, value: &Value, hint: &str) -> Result<WriteValue, String> {
+    if value.is_null() {
+        return Ok(WriteValue::Null);
+    }
+    let bad = |what: &str| format!("cannot write {value} as {what}");
+    let kind = match normalize(hint).as_str() {
+        "" | "auto" => {
+            if property == 85 {
+                match object_type {
+                    0..=2 => "real",
+                    3..=5 => "enumerated",
+                    13 | 14 | 19 => "unsigned",
+                    _ => "generic",
+                }
+            } else {
+                "generic"
+            }
+        }
+        "real" | "float" => "real",
+        "double" => "double",
+        "unsigned" | "uint" => "unsigned",
+        "signed" | "int" => "signed",
+        "enumerated" | "enum" => "enumerated",
+        "boolean" | "bool" => "boolean",
+        "string" | "characterstring" => "string",
+        "null" => return Ok(WriteValue::Null),
+        other => return Err(format!("unknown BACnet value type '{other}'")),
+    };
+    match kind {
+        "real" => json_number(value).map(|n| WriteValue::Real(n as f32)).ok_or_else(|| bad("Real")),
+        "double" => json_number(value).map(WriteValue::Double).ok_or_else(|| bad("Double")),
+        "unsigned" => match json_number(value) {
+            Some(n) if n >= 0.0 && n.fract() == 0.0 => Ok(WriteValue::Unsigned(n as u64)),
+            _ => Err(bad("Unsigned")),
+        },
+        "signed" => match json_number(value) {
+            Some(n) if n.fract() == 0.0 => Ok(WriteValue::Signed(n as i64)),
+            _ => Err(bad("Signed")),
+        },
+        "enumerated" => {
+            if let Value::String(s) = value {
+                match normalize(s).as_str() {
+                    "active" | "on" | "true" => return Ok(WriteValue::Enumerated(1)),
+                    "inactive" | "off" | "false" => return Ok(WriteValue::Enumerated(0)),
+                    _ => {}
+                }
+            }
+            match json_number(value) {
+                Some(n) if n >= 0.0 && n.fract() == 0.0 => Ok(WriteValue::Enumerated(n as u32)),
+                _ => Err(bad("Enumerated")),
+            }
+        }
+        "boolean" => match value {
+            Value::Bool(b) => Ok(WriteValue::Boolean(*b)),
+            other => json_number(other).map(|n| WriteValue::Boolean(n != 0.0)).ok_or_else(|| bad("Boolean")),
+        },
+        "string" => Ok(WriteValue::String(match value {
+            Value::String(s) => s.clone(),
+            other => other.to_string(),
+        })),
+        _ => match value {
+            Value::Bool(b) => Ok(WriteValue::Boolean(*b)),
+            Value::String(s) => Ok(WriteValue::String(s.clone())),
+            Value::Number(n) if n.is_u64() => Ok(WriteValue::Unsigned(n.as_u64().unwrap())),
+            Value::Number(n) if n.is_i64() => Ok(WriteValue::Signed(n.as_i64().unwrap())),
+            Value::Number(n) => Ok(WriteValue::Real(n.as_f64().unwrap_or(0.0) as f32)),
+            other => Err(format!("cannot write {other} to a BACnet property")),
+        },
+    }
 }
 
 fn frame(apdu: &[u8], expecting_reply: bool) -> Vec<u8> {
@@ -525,6 +707,61 @@ fn read_context_unsigned(data: &[u8], pos: &mut usize, number: u32) -> Option<u3
     Some(unsigned(content) as u32)
 }
 
+async fn open_socket(target: SocketAddr) -> Result<UdpSocket, String> {
+    let bind: SocketAddr = if target.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" }.parse().unwrap();
+    UdpSocket::bind(bind).await.map_err(|e| format!("BACnet socket: {e}"))
+}
+
+/// Send one confirmed request and wait for its answer, resending after a timeout. Returns the service data of a
+/// ComplexAck (segments reassembled) or an empty vector for a SimpleAck. Other traffic from the device is skipped.
+async fn confirmed_request(
+    socket: &UdpSocket,
+    target: SocketAddr,
+    service: u8,
+    body: &[u8],
+    apdu_timeout: Duration,
+    retries: u32,
+) -> Result<Vec<u8>, String> {
+    let invoke_id = NEXT_INVOKE_ID.fetch_add(1, Ordering::Relaxed);
+    let request = encode_confirmed(invoke_id, service, body);
+    let mut buf = vec![0u8; MAX_FRAME];
+    for _ in 0..=retries {
+        socket.send_to(&request, target).await.map_err(|e| format!("BACnet send to {target}: {e}"))?;
+        let mut state = Reassembly::default();
+        let deadline = Instant::now() + apdu_timeout;
+        loop {
+            let (n, from) = match tokio::time::timeout_at(deadline, socket.recv_from(&mut buf)).await {
+                Ok(Ok(got)) => got,
+                Ok(Err(e)) => return Err(format!("BACnet receive from {target}: {e}")),
+                Err(_) => break,
+            };
+            if from.ip() != target.ip() {
+                continue;
+            }
+            let Some(apdu) = apdu_of_frame(&buf[..n]) else { continue };
+            match handle_apdu(apdu, invoke_id, &mut state) {
+                Reply::Ignore => {}
+                Reply::Error(e) => return Err(e),
+                Reply::SegmentAck(ack) => {
+                    socket
+                        .send_to(&frame(&ack, false), from)
+                        .await
+                        .map_err(|e| format!("BACnet send to {target}: {e}"))?;
+                }
+                Reply::Data(data) => {
+                    if apdu[0] & 0x08 != 0 {
+                        // Acknowledge the final segment (window size copied from the segment).
+                        let ack = [0x40, invoke_id, apdu[2], apdu[3]];
+                        let _ = socket.send_to(&frame(&ack, false), from).await;
+                    }
+                    return Ok(data);
+                }
+            }
+        }
+    }
+    Err(format!("BACnet timeout waiting for {target} ({} ms, {retries} retries)", apdu_timeout.as_millis()))
+}
+
 /// Read one property of one object from the BACnet/IP device at `target`.
 pub(crate) async fn read_property(
     target: SocketAddr,
@@ -534,41 +771,184 @@ pub(crate) async fn read_property(
     apdu_timeout: Duration,
     retries: u32,
 ) -> Result<Value, String> {
-    let bind: SocketAddr = if target.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" }.parse().unwrap();
-    let socket = UdpSocket::bind(bind).await.map_err(|e| format!("BACnet socket: {e}"))?;
-    socket.connect(target).await.map_err(|e| format!("BACnet connect {target}: {e}"))?;
-    let invoke_id = NEXT_INVOKE_ID.fetch_add(1, Ordering::Relaxed);
-    let request = encode_read_property(invoke_id, object_type, instance, property);
-    let mut buf = vec![0u8; MAX_FRAME];
-    for _ in 0..=retries {
-        socket.send(&request).await.map_err(|e| format!("BACnet send to {target}: {e}"))?;
-        let mut state = Reassembly::default();
-        let deadline = Instant::now() + apdu_timeout;
+    let socket = open_socket(target).await?;
+    let body = read_property_body(object_type, instance, property);
+    let data = confirmed_request(&socket, target, SERVICE_READ_PROPERTY, &body, apdu_timeout, retries).await?;
+    decode_read_property_ack(&data, object_type, instance, property)
+}
+
+/// Write one property (WriteProperty). `priority` 1-16 selects the slot of a commandable property; writing
+/// [`WriteValue::Null`] at a priority relinquishes that slot.
+pub(crate) async fn write_property(
+    target: SocketAddr,
+    object_type: u32,
+    instance: u32,
+    property: u32,
+    value: &WriteValue,
+    priority: Option<u8>,
+    apdu_timeout: Duration,
+    retries: u32,
+) -> Result<(), String> {
+    let socket = open_socket(target).await?;
+    let body = write_property_body(object_type, instance, property, value, priority);
+    confirmed_request(&socket, target, SERVICE_WRITE_PROPERTY, &body, apdu_timeout, retries).await.map(|_| ())
+}
+
+/// One COV notification: the properties the device reported for the monitored object.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct CovEvent {
+    pub process_id: u32,
+    pub object_type: u32,
+    pub instance: u32,
+    pub time_remaining: u32,
+    pub values: Vec<(u32, Value)>,
+}
+
+fn subscribe_cov_body(process_id: u32, object_type: u32, instance: u32, confirmed: bool, lifetime: u32) -> Vec<u8> {
+    let mut body = Vec::new();
+    push_context_unsigned(&mut body, 0, process_id);
+    push_object_id(&mut body, 1, object_type, instance);
+    push_tag(&mut body, 2, true, 1);
+    body.push(confirmed as u8);
+    push_context_unsigned(&mut body, 3, lifetime);
+    body
+}
+
+fn read_context_object(data: &[u8], pos: &mut usize, number: u32) -> Option<(u32, u32)> {
+    let (tag, header) = parse_tag(data.get(*pos..)?)?;
+    if !tag.context || tag.number != number || tag.len != 4 {
+        return None;
+    }
+    let raw = u32::from_be_bytes(data.get(*pos + header..*pos + header + 4)?.try_into().ok()?);
+    *pos += header + 4;
+    Some((raw >> 22, raw & 0x3F_FFFF))
+}
+
+fn expect_context(data: &[u8], pos: &mut usize, number: u32, opening: bool) -> Option<()> {
+    let (tag, header) = parse_tag(data.get(*pos..)?)?;
+    if !tag.context || tag.number != number || tag.opening != opening || tag.closing == opening {
+        return None;
+    }
+    *pos += header;
+    Some(())
+}
+
+/// Decode the service data of a Confirmed or Unconfirmed COV notification (clause 13.8 and 13.9).
+fn decode_cov_notification(data: &[u8]) -> Option<CovEvent> {
+    let mut pos = 0;
+    let process_id = read_context_unsigned(data, &mut pos, 0)?;
+    read_context_object(data, &mut pos, 1)?;
+    let (object_type, instance) = read_context_object(data, &mut pos, 2)?;
+    let time_remaining = read_context_unsigned(data, &mut pos, 3)?;
+    expect_context(data, &mut pos, 4, true)?;
+    let mut values = Vec::new();
+    while let Some(property) = read_context_unsigned(data, &mut pos, 0) {
+        let _ = read_context_unsigned(data, &mut pos, 1);
+        expect_context(data, &mut pos, 2, true)?;
+        let mut decoded = decode_sequence(data, &mut pos, false).ok()?;
+        expect_context(data, &mut pos, 2, false)?;
+        let _ = read_context_unsigned(data, &mut pos, 3);
+        values.push((property, if decoded.len() == 1 { decoded.remove(0) } else { Value::Array(decoded) }));
+    }
+    expect_context(data, &mut pos, 4, false)?;
+    Some(CovEvent { process_id, object_type, instance, time_remaining, values })
+}
+
+/// What a received frame means to a COV subscriber.
+#[derive(Debug, PartialEq)]
+enum CovFrame {
+    /// A notification; `ack` is the SimpleAck to send back when the device asked for confirmation.
+    Notification(CovEvent, Option<Vec<u8>>),
+    Other,
+}
+
+fn classify_cov_frame(apdu: &[u8]) -> CovFrame {
+    match apdu.first().map(|b| b >> 4) {
+        // UnconfirmedCOVNotification: type, service 2.
+        Some(1) if apdu.get(1) == Some(&2) => {
+            decode_cov_notification(&apdu[2..]).map(|e| CovFrame::Notification(e, None)).unwrap_or(CovFrame::Other)
+        }
+        // ConfirmedCOVNotification: type, max-apdu, invoke id, service 1.
+        Some(0) if apdu.len() > 4 && apdu[3] == 1 => decode_cov_notification(&apdu[4..])
+            .map(|e| CovFrame::Notification(e, Some(vec![0x20, apdu[2], 1])))
+            .unwrap_or(CovFrame::Other),
+        _ => CovFrame::Other,
+    }
+}
+
+/// A COV subscription held on one UDP socket: the device sends notifications to the socket the subscription came from.
+pub(crate) struct CovSubscription {
+    socket: UdpSocket,
+    target: SocketAddr,
+    process_id: u32,
+    object_type: u32,
+    instance: u32,
+    buf: Vec<u8>,
+}
+
+impl CovSubscription {
+    pub(crate) async fn open(
+        target: SocketAddr,
+        process_id: u32,
+        object_type: u32,
+        instance: u32,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            socket: open_socket(target).await?,
+            target,
+            process_id,
+            object_type,
+            instance,
+            buf: vec![0u8; MAX_FRAME],
+        })
+    }
+
+    /// Subscribe, or renew when already subscribed. A lifetime of 0 asks for an indefinite subscription.
+    pub(crate) async fn subscribe(&self, lifetime: u32, apdu_timeout: Duration, retries: u32) -> Result<(), String> {
+        let body = subscribe_cov_body(self.process_id, self.object_type, self.instance, false, lifetime);
+        confirmed_request(&self.socket, self.target, SERVICE_SUBSCRIBE_COV, &body, apdu_timeout, retries)
+            .await
+            .map(|_| ())
+    }
+
+    /// Cancel the subscription (SubscribeCOV without confirmation flag and lifetime).
+    pub(crate) async fn cancel(&self, apdu_timeout: Duration) {
+        let mut body = Vec::new();
+        push_context_unsigned(&mut body, 0, self.process_id);
+        push_object_id(&mut body, 1, self.object_type, self.instance);
+        let _ = confirmed_request(&self.socket, self.target, SERVICE_SUBSCRIBE_COV, &body, apdu_timeout, 0).await;
+    }
+
+    /// Wait for the next notification of this subscription until `deadline`; `None` when the deadline passes.
+    pub(crate) async fn next(&mut self, deadline: Instant) -> Result<Option<CovEvent>, String> {
         loop {
-            let n = match tokio::time::timeout_at(deadline, socket.recv(&mut buf)).await {
-                Ok(Ok(n)) => n,
-                Ok(Err(e)) => return Err(format!("BACnet receive from {target}: {e}")),
-                Err(_) => break,
+            let (n, from) = match tokio::time::timeout_at(deadline, self.socket.recv_from(&mut self.buf)).await {
+                Ok(Ok(got)) => got,
+                Ok(Err(e)) => return Err(format!("BACnet receive from {}: {e}", self.target)),
+                Err(_) => return Ok(None),
             };
-            let Some(apdu) = apdu_of_frame(&buf[..n]) else { continue };
-            match handle_apdu(apdu, invoke_id, &mut state) {
-                Reply::Ignore => {}
-                Reply::Error(e) => return Err(e),
-                Reply::SegmentAck(ack) => {
-                    socket.send(&frame(&ack, false)).await.map_err(|e| format!("BACnet send to {target}: {e}"))?;
+            if from.ip() != self.target.ip() {
+                continue;
+            }
+            let Some(apdu) = apdu_of_frame(&self.buf[..n]) else { continue };
+            if let CovFrame::Notification(event, ack) = classify_cov_frame(apdu) {
+                if let Some(ack) = ack {
+                    let _ = self.socket.send_to(&frame(&ack, false), from).await;
                 }
-                Reply::Data(data) => {
-                    if apdu[0] & 0x08 != 0 {
-                        // Acknowledge the final segment (window size copied from the segment).
-                        let ack = [0x40, invoke_id, apdu[2], apdu[3]];
-                        let _ = socket.send(&frame(&ack, false)).await;
-                    }
-                    return decode_read_property_ack(&data, object_type, instance, property);
+                if event.process_id == self.process_id
+                    && event.object_type == self.object_type
+                    && event.instance == self.instance
+                {
+                    return Ok(Some(event));
                 }
             }
         }
     }
-    Err(format!("BACnet timeout waiting for {target} ({} ms, {retries} retries)", apdu_timeout.as_millis()))
+}
+
+/// Property name for a property number, or the number as text.
+pub(crate) fn property_name(id: u32) -> String {
+    PROPERTIES.iter().find(|(_, i)| *i == id).map(|(n, _)| (*n).to_string()).unwrap_or_else(|| id.to_string())
 }
 
 #[cfg(test)]
@@ -654,5 +1034,104 @@ mod tests {
         assert_eq!(property_id("present_value"), Some(85));
         assert_eq!(property_id("77"), Some(77));
         assert_eq!(property_id("nope"), None);
+    }
+
+    #[test]
+    fn encodes_write_property() {
+        // analog-output 1, present-value, Real 180.0 at priority 8.
+        let body = write_property_body(1, 1, 85, &WriteValue::Real(180.0), Some(8));
+        assert_eq!(
+            body,
+            vec![0x0C, 0x00, 0x40, 0x00, 0x01, 0x19, 0x55, 0x3E, 0x44, 0x43, 0x34, 0x00, 0x00, 0x3F, 0x49, 0x08]
+        );
+        // Relinquish: Null at priority 16, no priority when none is given.
+        let body = write_property_body(1, 1, 85, &WriteValue::Null, Some(16));
+        assert_eq!(&body[7..], &[0x3E, 0x00, 0x3F, 0x49, 0x10]);
+        assert_eq!(&write_property_body(1, 1, 85, &WriteValue::Null, None)[7..], &[0x3E, 0x00, 0x3F]);
+    }
+
+    #[test]
+    fn encodes_application_values_that_decode_back() {
+        let values = [
+            WriteValue::Boolean(true),
+            WriteValue::Unsigned(0),
+            WriteValue::Unsigned(70000),
+            WriteValue::Signed(-1),
+            WriteValue::Signed(-300),
+            WriteValue::Signed(127),
+            WriteValue::Signed(128),
+            WriteValue::Double(2.5),
+            WriteValue::Enumerated(1),
+            WriteValue::String("Comfort".into()),
+            WriteValue::String("a longer string than four".into()),
+        ];
+        let want = [
+            json!(true),
+            json!(0),
+            json!(70000),
+            json!(-1),
+            json!(-300),
+            json!(127),
+            json!(128),
+            json!(2.5),
+            json!(1),
+            json!("Comfort"),
+            json!("a longer string than four"),
+        ];
+        for (value, want) in values.iter().zip(want) {
+            let mut bytes = Vec::new();
+            push_application(&mut bytes, value);
+            let mut pos = 0;
+            assert_eq!(decode_sequence(&bytes, &mut pos, true).unwrap(), vec![want], "{value:?}");
+        }
+    }
+
+    #[test]
+    fn chooses_the_value_type_from_the_object() {
+        let w = |ot, prop, v: Value, hint: &str| write_value(ot, prop, &v, hint);
+        assert_eq!(w(1, 85, json!(72.5), "auto"), Ok(WriteValue::Real(72.5)));
+        assert_eq!(w(4, 85, json!(true), ""), Ok(WriteValue::Enumerated(1)));
+        assert_eq!(w(4, 85, json!("inactive"), "auto"), Ok(WriteValue::Enumerated(0)));
+        assert_eq!(w(19, 85, json!(3), "auto"), Ok(WriteValue::Unsigned(3)));
+        assert_eq!(w(19, 85, json!(1.5), "auto"), Err("cannot write 1.5 as Unsigned".into()));
+        assert_eq!(w(1, 85, Value::Null, "auto"), Ok(WriteValue::Null));
+        assert_eq!(w(0, 28, json!("text"), "auto"), Ok(WriteValue::String("text".into())));
+        assert_eq!(w(2, 81, json!(true), "auto"), Ok(WriteValue::Boolean(true)));
+        assert_eq!(w(2, 85, json!(5), "double"), Ok(WriteValue::Double(5.0)));
+        assert!(w(2, 85, json!("x"), "real").is_err());
+        assert!(w(2, 85, json!(1), "nope").is_err());
+    }
+
+    #[test]
+    fn encodes_subscribe_cov() {
+        assert_eq!(
+            subscribe_cov_body(1, 0, 1, false, 60),
+            vec![0x09, 0x01, 0x1C, 0x00, 0x00, 0x00, 0x01, 0x29, 0x00, 0x39, 0x3C]
+        );
+    }
+
+    #[test]
+    fn decodes_cov_notifications() {
+        let data = [
+            0x09, 0x01, 0x1C, 0x02, 0x00, 0x00, 0x05, 0x2C, 0x00, 0x00, 0x00, 0x01, 0x39, 0x3C, 0x4E, 0x09, 0x55, 0x2E,
+            0x44, 0x42, 0x90, 0x00, 0x00, 0x2F, 0x09, 0x6F, 0x2E, 0x82, 0x04, 0x00, 0x2F, 0x4F,
+        ];
+        let want = CovEvent {
+            process_id: 1,
+            object_type: 0,
+            instance: 1,
+            time_remaining: 60,
+            values: vec![(85, json!(72.0)), (111, json!([false, false, false, false]))],
+        };
+        assert_eq!(decode_cov_notification(&data), Some(want.clone()));
+        let mut unconfirmed = vec![0x10, 0x02];
+        unconfirmed.extend_from_slice(&data);
+        assert_eq!(classify_cov_frame(&unconfirmed), CovFrame::Notification(want.clone(), None));
+        let mut confirmed = vec![0x00, 0x75, 9, 0x01];
+        confirmed.extend_from_slice(&data);
+        assert_eq!(classify_cov_frame(&confirmed), CovFrame::Notification(want, Some(vec![0x20, 9, 1])));
+        assert_eq!(classify_cov_frame(&[0x10, 0x00, 1, 2]), CovFrame::Other);
+        assert_eq!(property_name(85), "presentValue");
+        assert_eq!(property_name(9999), "9999");
     }
 }

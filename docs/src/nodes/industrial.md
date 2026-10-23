@@ -127,10 +127,18 @@ Reads properties of one object over BACnet/IP (ReadProperty, unicast to `targetH
 
 **Output**: `msg.payload` is the value of the property, or, when more than one property is requested, an object keyed by property name. Real, Double, Unsigned, Signed and Enumerated values are numbers (binary present values are 0 or 1), Boolean is a boolean, character strings are strings, bit strings such as `statusFlags` are arrays of booleans, and constructed values are arrays. `msg.bacnet` holds `objectType`, `objectInstance`, `property`, `properties`, `endpoint` and `deviceId`. A device Error, Reject or Abort, or no reply, raises a node error that a `catch` node receives; no message is sent on the output.
 
-COV subscriptions (`subscribeCov`) are not implemented; the node logs a warning and reads on messages only.
+**COV**: with `subscribeCov` the node also sends SubscribeCOV (unconfirmed notifications) for the object and emits a message for every notification that carries one of the requested properties, starting with the one the device sends right after subscribing. `covLifetime` is the lifetime in seconds (default: the config node's `covLifetime`, else 300); the subscription is renewed at half the lifetime and re-established after an error. `covIncrement` drops numeric changes smaller than the increment, except the first. Notification messages have `msg.bacnet.cov = true`, every property of the notification in `msg.bacnet.values` and the seconds left in `msg.bacnet.timeRemaining`. Input messages still trigger a read. Confirmed COV notifications are acknowledged.
 
 ### BACnet Write
 
 **Type**: `bacnet write`
 
-Does not send WriteProperty yet: it logs the request and passes `true` through.
+Writes `msg.payload` to one property with WriteProperty each time a message arrives.
+
+**Properties**:
+- `configNode`, `objectType`, `objectInstance`, `property` - as for `bacnet read` (`presentValue` is the default property, `analogOutput` the default object type)
+- `priority` - command priority 1 (highest) to 16 for a commandable property; empty or 0 sends none and the device uses its default (16). `msg.priority` overrides it.
+- `valueType` - BACnet type of the value: `auto` (default), `real`, `double`, `unsigned`, `signed`, `enumerated`, `boolean` or `string`. With `auto`, the present value of analog objects is written as Real, of binary objects as Enumerated (`true`, `false`, `1`, `0`, `"active"`, `"inactive"`) and of multi-state objects as Unsigned; other properties follow the type of the payload (boolean, integer, number, string).
+- `relinquish` - write NULL at the priority instead of the payload, which releases that priority slot. `msg.relinquish = true` does the same, and so does a `null` payload. A priority is required.
+
+**Output**: after the device acknowledges, `msg.payload` is `true` and `msg.bacnet` holds `objectType`, `objectInstance`, `property`, `endpoint`, `deviceId`, `priority`, `relinquished` and the `value` written. A wrong value, an unknown object or property, a device Error, Reject or Abort, or no reply raises a node error for a `catch` node; no message is sent on the output.
