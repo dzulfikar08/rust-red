@@ -1,4 +1,6 @@
 #[cfg(feature = "nodes_bacnet")]
+pub mod bacnet_client;
+#[cfg(feature = "nodes_bacnet")]
 pub mod bacnet_config;
 #[cfg(feature = "nodes_bacnet")]
 pub mod bacnet_read;

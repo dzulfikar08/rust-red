@@ -106,15 +106,31 @@ Runs a Modbus TCP slave server.
 **Type**: `bacnet-config`
 
 **Properties**:
-- `host` - BACnet device IP
-- `port` - UDP port (default: 47808)
+- `deviceId` - BACnet device instance number of the target
+- `targetHost` - IP address of the device (default `127.0.0.1`)
+- `targetPort` - UDP port of the device (default: 47808)
+- `apduTimeoutMs` - time to wait for a reply, per attempt (default: 3000)
+- `retries` - resends after a timeout (default: 3)
 
-### BACnet Read / Write
+### BACnet Read
 
-**Types**: `bacnet-read`, `bacnet-write`
+**Type**: `bacnet read`
+
+Reads properties of one object over BACnet/IP (ReadProperty, unicast to `targetHost:targetPort`) each time a message arrives. Use an `inject` node with a repeat to poll. Segmented replies, such as `objectList`, are reassembled.
 
 **Properties**:
-- `server` - BACnet config node ID
-- `object_type` - BACnet object type
-- `object_instance` - object instance number
-- `property` - property identifier
+- `configNode` - BACnet config node ID
+- `objectType` - `analogInput`, `analogOutput`, `analogValue`, `binaryInput`, `binaryOutput`, `binaryValue`, `multiStateInput`, `multiStateOutput`, `multiStateValue`, `device` and the other BACnet object types by name, or the type number
+- `objectInstance` - object instance number
+- `property` - property name (`presentValue`, the default, `objectName`, `units`, `statusFlags`, ...; `present-value` and `present_value` work too) or number. A comma separated list reads several properties.
+- `properties` - more property names to read in the same message
+
+**Output**: `msg.payload` is the value of the property, or, when more than one property is requested, an object keyed by property name. Real, Double, Unsigned, Signed and Enumerated values are numbers (binary present values are 0 or 1), Boolean is a boolean, character strings are strings, bit strings such as `statusFlags` are arrays of booleans, and constructed values are arrays. `msg.bacnet` holds `objectType`, `objectInstance`, `property`, `properties`, `endpoint` and `deviceId`. A device Error, Reject or Abort, or no reply, raises a node error that a `catch` node receives; no message is sent on the output.
+
+COV subscriptions (`subscribeCov`) are not implemented; the node logs a warning and reads on messages only.
+
+### BACnet Write
+
+**Type**: `bacnet write`
+
+Does not send WriteProperty yet: it logs the request and passes `true` through.

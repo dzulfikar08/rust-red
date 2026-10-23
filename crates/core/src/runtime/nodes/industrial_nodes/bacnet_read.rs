@@ -9,9 +9,11 @@ use crate::runtime::model::*;
 use crate::runtime::nodes::*;
 use rust_red_macro::*;
 
+use super::bacnet_client;
 use super::bacnet_config::BacnetConfigNode;
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct BacnetReadConfig {
     #[serde(default, alias = "configNode")]
     config_node: String,
@@ -22,6 +24,10 @@ struct BacnetReadConfig {
     object_instance: u32,
     #[serde(default = "default_property")]
     property: String,
+    /// More properties to read in the same message. When more than one property is requested in
+    /// total, `msg.payload` is an object keyed by property name.
+    #[serde(default)]
+    properties: Vec<String>,
     /// Whether to subscribe to COV (Change of Value) notifications.
     /// When true, the node will issue a SubscribeCOV request and emit
     /// messages when the property value changes.
@@ -71,9 +77,19 @@ impl BacnetReadNode {
         Ok(global)
     }
 
-    /// Resolve the effective COV lifetime: per-node override, else config default.
-    fn effective_cov_lifetime(&self, cfg_inner: &BacnetConfigNode) -> u32 {
-        if self.config.cov_lifetime > 0 { self.config.cov_lifetime } else { cfg_inner.cov_lifetime() }
+    /// Property names to read: `property` (may hold a comma separated list) plus `properties`, without duplicates.
+    fn requested_properties(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for name in self.config.property.split(',').chain(self.config.properties.iter().map(String::as_str)) {
+            let name = name.trim();
+            if !name.is_empty() && !out.iter().any(|n| n == name) {
+                out.push(name.to_string());
+            }
+        }
+        if out.is_empty() {
+            out.push(default_property());
+        }
+        out
     }
 }
 
@@ -102,60 +118,84 @@ impl FlowNodeBehavior for BacnetReadNode {
             }
         };
 
-        // If COV subscription is requested, log the intent
         if self.config.subscribe_cov {
-            let cfg_inner = config_node.as_any().downcast_ref::<BacnetConfigNode>().unwrap();
-            let lifetime = self.effective_cov_lifetime(cfg_inner);
-            log::info!(
-                "[bacnet-read:{}] COV subscription requested for {}:{} {} (lifetime={}s, increment={:?})",
-                self.name(),
-                self.config.object_type,
-                self.config.object_instance,
-                self.config.property,
-                lifetime,
-                self.config.cov_increment,
+            log::warn!(
+                "[bacnet-read:{}] COV subscriptions are not implemented; the node reads on every input message instead",
+                self.name()
             );
-            // TODO: When bacnet-rs client is fully wired, send SubscribeCOV request here.
         }
 
         while !stop_token.is_cancelled() {
             let cancel = stop_token.child_token();
             let this = self.clone();
             let cfg = config_node.clone();
+            let send_cancel = cancel.child_token();
             with_uow(this.as_ref(), cancel.child_token(), |node, msg| {
                 let cfg = cfg.clone();
                 async move {
                     let cfg_inner = cfg.as_any().downcast_ref::<BacnetConfigNode>().unwrap();
-                    let conn = cfg_inner.connection.lock().await;
+                    let (target, timeout, retries, device_id) = {
+                        let conn = cfg_inner.connection.lock().await;
+                        (conn.target_addr(), conn.apdu_timeout_ms(), conn.retries(), conn.device_id())
+                    };
 
-                    log::info!(
-                        "[bacnet-read:{}] Read {}:{} {} from {} (device_id={})",
+                    let object_type = bacnet_client::object_type_id(&node.config.object_type)
+                        .ok_or_else(|| anyhow::anyhow!("Unknown BACnet object type '{}'", node.config.object_type))?;
+                    let requested = node.requested_properties();
+                    let addr = tokio::net::lookup_host(target.as_str())
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Cannot resolve BACnet target {target}: {e}"))?
+                        .next()
+                        .ok_or_else(|| anyhow::anyhow!("Cannot resolve BACnet target {target}"))?;
+
+                    log::debug!(
+                        "[bacnet-read:{}] Read {}:{} {:?} from {} (device_id={})",
                         node.name(),
                         node.config.object_type,
                         node.config.object_instance,
-                        node.config.property,
-                        conn.target_addr(),
-                        conn.device_id()
+                        requested,
+                        target,
+                        device_id
                     );
-                    drop(conn);
 
-                    let mut cov_info = serde_json::json!({
+                    let mut values = serde_json::Map::new();
+                    for name in &requested {
+                        let property = bacnet_client::property_id(name)
+                            .ok_or_else(|| anyhow::anyhow!("Unknown BACnet property '{name}'"))?;
+                        let value = bacnet_client::read_property(
+                            addr,
+                            object_type,
+                            node.config.object_instance,
+                            property,
+                            std::time::Duration::from_millis(timeout as u64),
+                            retries,
+                        )
+                        .await
+                        .map_err(|e| {
+                            anyhow::anyhow!("{e} ({}:{} {name})", node.config.object_type, node.config.object_instance)
+                        })?;
+                        values.insert(name.clone(), value);
+                    }
+                    let payload = if requested.len() == 1 {
+                        values.remove(&requested[0]).unwrap_or(serde_json::Value::Null)
+                    } else {
+                        serde_json::Value::Object(values)
+                    };
+
+                    let info = serde_json::json!({
                         "objectType": node.config.object_type,
                         "objectInstance": node.config.object_instance,
                         "property": node.config.property,
-                        "endpoint": cfg_inner.interface(),
+                        "properties": requested,
+                        "endpoint": target,
+                        "deviceId": device_id,
                     });
-                    if node.config.subscribe_cov {
-                        cov_info["covSubscribed"] = serde_json::json!(true);
-                        cov_info["covLifetime"] = serde_json::json!(node.effective_cov_lifetime(cfg_inner));
-                        if let Some(inc) = node.config.cov_increment {
-                            cov_info["covIncrement"] = serde_json::json!(inc);
-                        }
-                    }
 
                     let mut guard = msg.write().await;
-                    guard.set("payload".to_string(), Variant::Null);
-                    guard.set("bacnet".to_string(), Variant::from(cov_info));
+                    guard.set("payload".to_string(), Variant::from(payload));
+                    guard.set("bacnet".to_string(), Variant::from(info));
+                    drop(guard);
+                    node.fan_out_one(Envelope { port: 0, msg: msg.clone() }, send_cancel).await?;
                     Ok(())
                 }
             })

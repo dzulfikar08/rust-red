@@ -32,7 +32,7 @@ mod network_nodes;
 
 mod db_nodes;
 
-#[cfg(feature = "nodes_modbus")]
+#[cfg(any(feature = "nodes_modbus", feature = "nodes_bacnet"))]
 mod industrial_nodes;
 
 pub mod wellknown_names {

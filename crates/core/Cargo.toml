@@ -87,7 +87,6 @@ rusqlite = { workspace = true, optional = true }
 tokio-modbus = { workspace = true, optional = true }
 tokio-serial = { workspace = true, optional = true }
 opcua = { version = "0.12", optional = true }
-bacnet-rs = { version = "0.2", optional = true }
 axum.workspace = true
 # OpenTelemetry (optional)
 opentelemetry = { workspace = true, optional = true }
@@ -138,7 +137,7 @@ nodes_mssql = ["dep:tiberius", "dep:deadpool", "tokio-util/compat"]
 nodes_modbus = ["dep:tokio-modbus"]
 nodes_modbus_serial = ["nodes_modbus", "dep:tokio-serial"]
 nodes_opcua = ["dep:opcua"]
-nodes_bacnet = ["dep:bacnet-rs"]
+nodes_bacnet = ["tokio/net"]
 nodes_influxdb = ["dep:reqwest", "urlencoding"]
 nodes_sqlite = ["dep:rusqlite"]
 ai = ["dep:reqwest", "dep:futures-util"]

@@ -556,9 +556,16 @@ The heavy check mark (:heavy_check_mark:) indicates the node has passed the Node
 - **Parser nodes**: CSV, JSON, XML, YAML, HTML
 - **Storage nodes**: File, File In, Watch
 - **Database nodes**: PostgreSQL, TimescaleDB, MSSQL, SQLite, InfluxDB
-- **Industrial nodes**: Modbus (Read/Write/Flex/Server), OPC-UA (Read/Write), BACnet (Read/Write)
+- **Industrial nodes**: Modbus (Read/Write/Flex/Server), OPC-UA (Read/Write), BACnet (Read)
 
 ## Changelog
+
+### 0.3.3
+
+- **`bacnet read` reads from the device.** In 0.3.2 the node only logged the request and sent nothing. It now sends a ReadProperty over BACnet/IP to `targetHost:targetPort` of the `bacnet-config` node for every input message and sends `msg.payload` with the value (numbers, booleans, strings, arrays; `presentValue` by default), with the object and property in `msg.bacnet`. `property` takes names such as `presentValue`, `objectName` and `units` (or property numbers, or a comma separated list), `properties` adds more, and several properties give an object keyed by property name. Device errors, rejects, aborts and timeouts raise a node error for a `catch` node. Segmented replies are reassembled.
+- The industrial node module is compiled when only `nodes_bacnet` is enabled (it needed `nodes_modbus` before). The unused `bacnet-rs` dependency is gone.
+- `subscribeCov` is still not implemented (the node logs a warning) and `bacnet write` still does not send WriteProperty.
+- Tests answer ReadProperty from an in-process BACnet/IP device. The flow Modbus Poll and BACnet Explorer export also ran against the BACnet Explorer simulator (`sim_headless` in `mt-bacnet`).
 
 ### 0.3.2
 
