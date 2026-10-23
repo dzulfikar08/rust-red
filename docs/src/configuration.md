@@ -14,6 +14,7 @@ Options:
   --headless             Run without web UI
   --bind <BIND>          Web server bind address [default: 127.0.0.1:1888]
   -u, --user-dir <DIR>   User data directory [default: ~/.rust-red]
+  --credential-secret <SECRET>  Secret for flows_cred.json [env: NODE_RED_CREDENTIAL_SECRET]
   -c, --config <PATH>    Path to config file [default: ~/.rust-red/config.toml]
   -h, --help             Show help
   -V, --version          Show version

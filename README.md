@@ -65,7 +65,7 @@ Flows exported from Node-RED run as they are for core nodes and for these three 
 
 How the three packages differ from Node-RED:
 
-- **Credentials.** The user and password are read from a `credentials` object on the config node, from plain `user` and `password` properties, or from environment variables when the field type is `env` (PostgreSQL). The encrypted `flows_cred.json` is not read, so a flow exported without credentials needs them added by one of these ways.
+- **Credentials.** The credentials file Node-RED writes next to the flows file (`flows_cred.json` for `flows.json`, `<name>_cred.json` for `<name>.json`) is read, encrypted or not, and the credentials are merged into each node before it is built. A deploy from the editor saves changed credentials back in the same format, so Node-RED can open the files too. See [Credentials](#credentials) for the secret. Credentials written inline in a `credentials` object of the flows file, plain `user` and `password` properties, and `env` field types (PostgreSQL) still work. One difference: Node-RED knows from the node definition which credential fields are passwords, RustRED has no definitions and treats the fields named `password`, `passphrase`, `token`, `secret`, `apikey`, `clientsecret` and `accesstoken` as passwords when the editor asks for a node's credentials.
 - **A broken config node** is logged as an error and disabled. Nodes that use it report that it is missing. The rest of the flows keep running.
 - **Node ids** do not have to be hex. Ids such as `p1` are accepted on both flow nodes and config nodes.
 - **MQTT.** Every `mqtt in` and `mqtt out` node opens its own connection, where Node-RED shares one. A configured client id gets a suffix per node for that reason. As in Node-RED, a topic set on `mqtt out` wins over `msg.topic`. `protocolVersion` 5 is supported: the node connects with MQTT 5 and carries response topic, correlation data, content type, message expiry and user properties both ways. The embedded `mqtt-broker` node is MQTT 3.1.1 only, so use an external broker (for example Mosquitto 2) for MQTT 5. Birth and close messages are not sent.
@@ -141,6 +141,7 @@ By default, your browser will open the Node-RED frontend at [http://127.0.0.1:18
 - `--headless`: Headless mode (no Web UI, suitable for production)
 - `--bind <BIND>`: Custom web server bind address (default: `127.0.0.1:1888`)
 - `-u, --user-dir <USER_DIR>`: Specify user directory (default: `~/.rust-red`)
+- `--credential-secret <SECRET>`: Secret for the credentials file (also `NODE_RED_CREDENTIAL_SECRET`), see [Credentials](#credentials)
 - See more options with `--help`
 
 **Examples:**
@@ -186,6 +187,27 @@ Rust-Red can be configured through command-line arguments and configuration file
 host = "0.0.0.0"
 port = 1888
 ```
+
+### Credentials
+
+Node-RED keeps passwords out of `flows.json`. They live in `flows_cred.json` next to it (`<name>_cred.json` for `<name>.json`), encrypted as `{"$": "<32 hex IV><base64 ciphertext>"}` with AES-256-CTR, the key being the SHA-256 of the credential secret. RustRED reads and writes that file in the same format, so a Node-RED flow runs with its credentials as it is, and a flow edited in RustRED can be copied back to Node-RED.
+
+The secret is resolved in Node-RED's order:
+
+1. `credential_secret` in `rust-red.toml`, `--credential-secret <SECRET>`, or the environment variable `NODE_RED_CREDENTIAL_SECRET` (the command line and the environment win over the file). This is Node-RED's `credentialSecret` setting.
+2. `_credentialSecret` in `.config.runtime.json` (or the legacy `.config.json`) of the user directory. Node-RED generates this key when `credentialSecret` is not set, so copying `flows.json`, `flows_cred.json` and `.config.runtime.json` together is enough. RustRED looks in `--user-dir`, then in the directory of the flows file, then in the RustRED home.
+3. `credential_secret = false` in `rust-red.toml` stores the credentials as plain JSON, as `credentialSecret: false` does in Node-RED. An encrypted file is still read when a `_credentialSecret` is available.
+
+```toml
+# rust-red.toml
+credential_secret = "a long random secret"   # or: credential_secret = false
+```
+
+When the secret is set and the file does not decrypt with it, `_credentialSecret` is tried next, which is how Node-RED moves a flow from its generated key to a chosen one. If nothing decrypts it, RustRED stops with `cannot decrypt the credentials file ...: the credential secret is wrong` and never prints the secret.
+
+What is merged: every key of a node's entry (`user`, `password`, `token`, ...) goes into that node's `credentials` object before the node is built, subflow instances included. A `credentials` object written inline in the flows file wins per key over the file, except for empty values, which are placeholders and never replace a stored credential.
+
+Deploying from the editor works like Node-RED: the `credentials` the editor sends are taken out of the nodes and merged into the stored ones (an untouched password, `__PWRD__`, keeps the stored value, an empty value deletes it), credentials of deleted nodes are dropped, the file is rewritten only when something changed, and `flows.json` never contains credentials. If the stored file cannot be decrypted, the deploy fails and leaves both files alone. When no secret exists anywhere, the first save generates a random one and writes it to `.config.runtime.json`, as Node-RED does. `GET /flows` no longer returns credentials, and `GET /credentials/<type>/<id>` returns `has_password: true` instead of the password. The files are written with mode 0600 on Unix.
 
 ---
 
@@ -537,6 +559,12 @@ The heavy check mark (:heavy_check_mark:) indicates the node has passed the Node
 - **Industrial nodes**: Modbus (Read/Write/Flex/Server), OPC-UA (Read/Write), BACnet (Read/Write)
 
 ## Changelog
+
+### 0.3.2
+
+- **Credentials.** `flows_cred.json` (`<flows name>_cred.json`) is read in Node-RED's format: AES-256-CTR with the SHA-256 of the credential secret, or plain JSON. The secret comes from `credential_secret`, `--credential-secret` or `NODE_RED_CREDENTIAL_SECRET`, else `_credentialSecret` from `.config.runtime.json` or `.config.json` in the user directory. The credentials are merged into each node before it is built, so the user and password of `mqtt-broker`, `postgreSQLConfig`, `http request` and other nodes work in a flow exported from Node-RED. Format and secret handling follow Node-RED's `@node-red/runtime` credentials module.
+- A deploy from the editor saves changed credentials to the same file in the same format and keeps them out of `flows.json`. `GET /flows` no longer returns credentials and `GET /credentials/<type>/<id>` hides passwords, as Node-RED does. A wrong secret stops the start, or the deploy, with a clear message.
+- Tests use files written by Node-RED 4.1.10 (generated key, user key, plain). The flow Node-RED exported runs against Mosquitto with a password and PostgreSQL 16 (`scripts/smoke/credentials.sh`, which changes only the container ports), and Node-RED 4.1.10 opens the files RustRED writes.
 
 ### 0.3.1
 

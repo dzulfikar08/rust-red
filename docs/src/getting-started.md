@@ -97,7 +97,8 @@ cargo test --features cluster --test cluster_integration
 ~/.rust-red/
   flows.json          # Your flow definitions
   config.toml         # Runtime configuration
-  credentials.json    # Encrypted credentials (if auth enabled)
+  flows_cred.json     # Node credentials in Node-RED's format, encrypted (see README, Credentials)
+  .config.runtime.json # Holds _credentialSecret when no credential_secret is configured
 ```
 
 ## Next Steps
