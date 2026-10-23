@@ -127,7 +127,7 @@
         <div class="whatis-text">
           <h2 class="section-title">What is RustRED?</h2>
           <p class="whatis-desc">RustRED is an open-source flow runtime written in Rust. It reads Node-RED flow JSON files and executes them on an async engine built on Tokio.</p>
-          <p class="whatis-desc">Flows exported from Node-RED import and run, without Node.js. That covers the core nodes, the stock MQTT nodes, <code>node-red-contrib-modbus</code> and <code>node-red-contrib-postgresql</code>. Credentials in <code>flows_cred.json</code> are not read, so a flow exported without them needs them added.</p>
+          <p class="whatis-desc">Flows exported from Node-RED import and run, without Node.js. That covers the core nodes, the stock MQTT nodes, <code>node-red-contrib-modbus</code> and <code>node-red-contrib-postgresql</code>. Broker and database passwords come along: <code>flows_cred.json</code> is read in Node-RED&rsquo;s own format, encrypted or plain, with the same credential secret.</p>
           <p class="whatis-desc">RustRED is a fork of <a href="https://github.com/oldrev/edgelinkd" rel="noopener noreferrer" target="_blank">EdgeLinkd</a> by Li Wei, licensed under Apache-2.0, and is not affiliated with the Node-RED project.</p>
           <div class="whatis-badges">
             <span class="whatis-badge">Apache-2.0</span>
@@ -369,7 +369,7 @@
           <div class="migrate-num">3</div>
           <div>
             <h3>Run and verify</h3>
-            <p>Open <code>http://127.0.0.1:1888</code> for the editor. Stock MQTT, node-red-contrib-modbus and node-red-contrib-postgresql nodes run as exported. Add the database and broker credentials to the config nodes, because <code>flows_cred.json</code> is not read. A config node that fails to load is logged and disabled, and the rest of the flow keeps running.</p>
+            <p>Open <code>http://127.0.0.1:1888</code> for the editor. Stock MQTT, node-red-contrib-modbus and node-red-contrib-postgresql nodes run as exported. Copy <code>flows.json</code>, <code>flows_cred.json</code> and <code>.config.runtime.json</code> together, or pass the secret with <code>--credential-secret</code>, and the broker and database passwords are picked up. A config node that fails to load is logged and disabled, and the rest of the flow keeps running.</p>
           </div>
         </div>
       </div>
