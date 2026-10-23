@@ -7,6 +7,7 @@
 //! - GET  /versioning/diff?from=A&to=B   -> diff two versions
 
 use crate::handlers::WebState;
+use crate::handlers::flows::{flows_with_credentials, save_flows_extracting_credentials};
 use crate::versioning::FlowVersionStore;
 use axum::{
     Extension,
@@ -86,7 +87,7 @@ pub async fn rollback_version(
 ) -> Result<Json<Value>, StatusCode> {
     let store = make_store(&state).await.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    let flows = store.load_version_flows(&version_id).await.map_err(|e| {
+    let mut flows = store.load_version_flows(&version_id).await.map_err(|e| {
         log::error!("Rollback failed for version {version_id}: {e}");
         StatusCode::NOT_FOUND
     })?;
@@ -104,15 +105,27 @@ pub async fn rollback_version(
     {
         let flows_path_guard = state.flows_file_path.read().await;
         if let Some(flows_path) = flows_path_guard.as_ref() {
-            let flows_json = serde_json::to_string_pretty(&flows).unwrap_or_default();
-            if let Err(e) = tokio::fs::write(flows_path, flows_json).await {
+            let current_flows = match tokio::fs::read_to_string(flows_path).await {
+                Ok(text) => serde_json::from_str::<Vec<Value>>(&text).unwrap_or_default(),
+                Err(_) => Vec::new(),
+            };
+            if let Err(e) =
+                save_flows_extracting_credentials(&state.credential_settings, &mut flows, &current_flows, flows_path)
+                    .await
+            {
                 log::error!("Failed to write flows during rollback: {e}");
                 return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
 
             let engine_guard = state.engine.read().await;
             if let Some(_engine) = engine_guard.as_ref() {
-                let flows_value = serde_json::Value::Array(flows.clone());
+                let flows_value = match flows_with_credentials(&state.credential_settings, flows.clone(), flows_path) {
+                    Ok(value) => value,
+                    Err(e) => {
+                        log::error!("Failed to load credentials during rollback: {e}");
+                        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                    }
+                };
                 match state.redeploy_flows(flows_value).await {
                     Ok(_) => {
                         log::info!("Rollback to version {version_id} deployed successfully");

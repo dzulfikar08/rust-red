@@ -1,0 +1,213 @@
+[
+    {
+        "id": "7a1e4c0b9d2f5836",
+        "type": "tab",
+        "label": "Credentials smoke",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "b3f09a6d1c7e4825",
+        "type": "inject",
+        "z": "7a1e4c0b9d2f5836",
+        "name": "publish once",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "3",
+        "topic": "smoke/in",
+        "payload": "42",
+        "payloadType": "num",
+        "x": 150,
+        "y": 80,
+        "wires": [
+            [
+                "e5d2c8a07b1f4963"
+            ]
+        ]
+    },
+    {
+        "id": "e5d2c8a07b1f4963",
+        "type": "mqtt out",
+        "z": "7a1e4c0b9d2f5836",
+        "name": "",
+        "topic": "smoke/in",
+        "qos": "1",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "4c8a1f6e3b7d0925",
+        "x": 390,
+        "y": 80,
+        "wires": []
+    },
+    {
+        "id": "9d6b3e1a5c0f7284",
+        "type": "mqtt in",
+        "z": "7a1e4c0b9d2f5836",
+        "name": "",
+        "topic": "smoke/in",
+        "qos": "1",
+        "datatype": "auto-detect",
+        "broker": "4c8a1f6e3b7d0925",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 140,
+        "y": 160,
+        "wires": [
+            [
+                "2f7c5a9e0b4d1638"
+            ]
+        ]
+    },
+    {
+        "id": "2f7c5a9e0b4d1638",
+        "type": "function",
+        "z": "7a1e4c0b9d2f5836",
+        "name": "build params",
+        "func": "msg.params = [msg.topic, String(msg.payload)];\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 160,
+        "wires": [
+            [
+                "6e0a8d3b7f1c4529"
+            ]
+        ]
+    },
+    {
+        "id": "6e0a8d3b7f1c4529",
+        "type": "postgresql",
+        "z": "7a1e4c0b9d2f5836",
+        "name": "log row",
+        "query": "INSERT INTO smoke_log (topic, payload) VALUES ($1, $2);",
+        "postgreSQLConfig": "a81d5f3c9e2b6047",
+        "split": false,
+        "rowsPerMsg": 1,
+        "outputs": 1,
+        "x": 560,
+        "y": 160,
+        "wires": [
+            [
+                "d4b7e2a91c5f0836"
+            ]
+        ]
+    },
+    {
+        "id": "d4b7e2a91c5f0836",
+        "type": "debug",
+        "z": "7a1e4c0b9d2f5836",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": true,
+        "tostatus": false,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 750,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "4c8a1f6e3b7d0925",
+        "type": "mqtt-broker",
+        "name": "Plant broker",
+        "broker": "127.0.0.1",
+        "port": "1883",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "a81d5f3c9e2b6047",
+        "type": "postgreSQLConfig",
+        "name": "plant db",
+        "host": "127.0.0.1",
+        "hostFieldType": "str",
+        "port": "5432",
+        "portFieldType": "num",
+        "database": "plant",
+        "databaseFieldType": "str",
+        "ssl": "false",
+        "sslFieldType": "bool",
+        "applicationName": "",
+        "applicationNameType": "str",
+        "max": "10",
+        "maxFieldType": "num",
+        "idle": "1000",
+        "idleFieldType": "num",
+        "connectionTimeout": "10000",
+        "connectionTimeoutFieldType": "num",
+        "userFieldType": "cred",
+        "user": "",
+        "passwordFieldType": "cred",
+        "password": "",
+        "userEnv": "",
+        "passwordEnv": ""
+    },
+    {
+        "id": "0b5e9c2d7a4f1836",
+        "type": "http request",
+        "z": "7a1e4c0b9d2f5836",
+        "name": "authed GET",
+        "method": "GET",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "http://127.0.0.1:9/",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "basic",
+        "senderr": false,
+        "headers": [],
+        "x": 400,
+        "y": 260,
+        "wires": [
+            []
+        ]
+    }
+]

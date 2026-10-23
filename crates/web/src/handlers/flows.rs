@@ -1,6 +1,9 @@
 use crate::handlers::WebState;
 use crate::models::*;
 use axum::{Extension, extract::Path, http::StatusCode, response::Json};
+use rust_red_core::runtime::credentials::{
+    CredentialError, CredentialSettings, CredentialStore, apply_credentials, editor_view, strip_credentials,
+};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::Path as StdPath;
@@ -40,6 +43,32 @@ async fn save_flows_to_file(
     Ok(())
 }
 
+/// Save flows the way Node-RED does: the `credentials` of each node go to the credentials file
+/// next to the flows file (see `rust_red_core::runtime::credentials`), the flows file never holds
+/// them. `current` is what the flows file contains now, so credentials written inline there by
+/// hand are moved over instead of lost. Fails without writing anything when the stored credentials
+/// cannot be read.
+pub(crate) async fn save_flows_extracting_credentials(
+    settings: &CredentialSettings,
+    flows: &mut [serde_json::Value],
+    current: &[serde_json::Value],
+    file_path: &StdPath,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    CredentialStore::for_flows_file(file_path, settings).extract_for_deploy(flows, current)?;
+    save_flows_to_file(flows, file_path).await
+}
+
+/// The flows as the engine runs them: stored credentials merged back into each node.
+pub(crate) fn flows_with_credentials(
+    settings: &CredentialSettings,
+    flows: Vec<serde_json::Value>,
+    file_path: &StdPath,
+) -> Result<serde_json::Value, CredentialError> {
+    let mut flows = serde_json::Value::Array(flows);
+    CredentialStore::for_flows_file(file_path, settings).merge_into_flows(&mut flows)?;
+    Ok(flows)
+}
+
 /// Trigger engine restart after flows change
 async fn restart_engine_if_available(state: &WebState) {
     let restart_callback_guard = state.restart_callback.read().await;
@@ -56,7 +85,7 @@ async fn restart_engine_if_available(state: &WebState) {
 /// Get all flows (Node-RED compatible)
 pub async fn get_flows(Extension(state): Extension<Arc<WebState>>) -> Result<Json<Value>, StatusCode> {
     let flows_path_guard = state.flows_file_path.read().await;
-    let flows = if let Some(flows_path) = flows_path_guard.as_ref() {
+    let mut flows = if let Some(flows_path) = flows_path_guard.as_ref() {
         match load_flows_from_file(flows_path).await {
             Ok(flows) => flows,
             Err(e) => {
@@ -68,6 +97,8 @@ pub async fn get_flows(Extension(state): Extension<Arc<WebState>>) -> Result<Jso
         log::warn!("No flows file path configured");
         vec![]
     };
+    // Node-RED never sends credentials with the flows, the editor fetches them per node.
+    strip_credentials(&mut flows);
 
     let response = serde_json::json!({
         "flows": flows,
@@ -92,7 +123,7 @@ pub async fn post_flows(
     log::debug!("Received raw POST payload ({} bytes)", payload.len());
 
     // Try to parse the payload
-    let parsed_payload: FlowsPayload = match serde_json::from_str(&payload) {
+    let mut parsed_payload: FlowsPayload = match serde_json::from_str(&payload) {
         Ok(p) => p,
         Err(e) => {
             log::error!("Failed to parse flows payload: {e}");
@@ -148,14 +179,34 @@ pub async fn post_flows(
     // Save flows to file if path is available
     let flows_path_guard = state.flows_file_path.read().await;
     if let Some(flows_path) = flows_path_guard.as_ref() {
-        match save_flows_to_file(&parsed_payload.flows, flows_path).await {
+        let current_flows = load_flows_from_file(flows_path).await.unwrap_or_default();
+        let saved = save_flows_extracting_credentials(
+            &state.credential_settings,
+            &mut parsed_payload.flows,
+            &current_flows,
+            flows_path,
+        )
+        .await;
+        match saved {
             Ok(_) => {
                 log::info!("Flows saved to file: {}", flows_path.display());
 
                 // Redeploy flows using event-driven approach
                 let engine_guard = state.engine.read().await;
                 if let Some(_engine) = engine_guard.as_ref() {
-                    let flows_json = serde_json::Value::Array(parsed_payload.flows);
+                    let flows_json =
+                        match flows_with_credentials(&state.credential_settings, parsed_payload.flows, flows_path) {
+                            Ok(flows) => flows,
+                            Err(e) => {
+                                log::error!("Failed to merge credentials into the deployed flows: {e}");
+                                state.comms.send_deploy_notification(false, Some("0")).await;
+                                state
+                                    .comms
+                                    .send_notification("error", &format!("Failed to load credentials: {e}"))
+                                    .await;
+                                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+                            }
+                        };
                     match state.redeploy_flows(flows_json).await {
                         Ok(_) => {
                             log::info!("Flows redeployed successfully!");
@@ -358,11 +409,14 @@ pub async fn post_flow(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
 
+    let current_flows = flows.clone();
     flows.push(payload.clone());
 
     // Save back to file
     if let Some(flows_path) = flows_path_guard.as_ref() {
-        if let Err(e) = save_flows_to_file(&flows, flows_path).await {
+        if let Err(e) =
+            save_flows_extracting_credentials(&state.credential_settings, &mut flows, &current_flows, flows_path).await
+        {
             log::error!("Failed to save flows to file: {e}");
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
@@ -394,6 +448,7 @@ pub async fn put_flow(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
 
+    let current_flows = flows.clone();
     // Find and update the specified flow
     let mut found = false;
     for flow in &mut flows {
@@ -412,7 +467,9 @@ pub async fn put_flow(
 
     // Save back to file
     if let Some(flows_path) = flows_path_guard.as_ref() {
-        if let Err(e) = save_flows_to_file(&flows, flows_path).await {
+        if let Err(e) =
+            save_flows_extracting_credentials(&state.credential_settings, &mut flows, &current_flows, flows_path).await
+        {
             log::error!("Failed to save flows to file: {e}");
             return Err(StatusCode::INTERNAL_SERVER_ERROR);
         }
@@ -443,6 +500,7 @@ pub async fn delete_flow(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     };
 
+    let current_flows = flows.clone();
     // Find and delete the specified flow
     let initial_len = flows.len();
     flows.retain(|flow| flow.get("id").and_then(|v| v.as_str()).is_none_or(|flow_id| flow_id != id));
@@ -450,7 +508,10 @@ pub async fn delete_flow(
     if flows.len() < initial_len {
         // Save back to file
         if let Some(flows_path) = flows_path_guard.as_ref() {
-            if let Err(e) = save_flows_to_file(&flows, flows_path).await {
+            if let Err(e) =
+                save_flows_extracting_credentials(&state.credential_settings, &mut flows, &current_flows, flows_path)
+                    .await
+            {
                 log::error!("Failed to save flows to file: {e}");
                 return Err(StatusCode::INTERNAL_SERVER_ERROR);
             }
@@ -508,34 +569,147 @@ fn validate_flow_config_nodes(flows: &[Value]) -> Result<(), Vec<Value>> {
 
 /// `GET /credentials/{type}/{id}`
 ///
-/// Node-RED's editor calls this when opening a config node edit dialog for types that
-/// declare `credentials` in their `registerType()`. Node-RED embeds credential values
-/// as a nested `credentials` property on each config node in the flows array. We extract
-/// and return them here, or `{}` if not found (e.g. new node).
+/// Node-RED's editor calls this when opening a node's edit dialog for types that declare
+/// `credentials` in their `registerType()`. The values come from the credentials file next to
+/// the flows file, with any `credentials` written inline in the flows file layered on top.
+/// Like Node-RED, password values are never returned, only `has_<name>: true`. `{}` when the
+/// node has none (a new node).
 pub async fn get_credentials(
     Extension(state): Extension<Arc<WebState>>,
     Path((_node_type, node_id)): Path<(String, String)>,
 ) -> Result<Json<Value>, StatusCode> {
     let flows_path_guard = state.flows_file_path.read().await;
-    let flows = match flows_path_guard.as_ref() {
-        Some(path) => match load_flows_from_file(path).await {
-            Ok(f) => f,
-            Err(e) => {
-                log::error!("Failed to load flows for credentials: {e}");
-                return Ok(Json(serde_json::json!({})));
-            }
-        },
-        None => return Ok(Json(serde_json::json!({}))),
+    let Some(path) = flows_path_guard.as_ref() else {
+        return Ok(Json(serde_json::json!({})));
+    };
+    let flows = match load_flows_from_file(path).await {
+        Ok(f) => f,
+        Err(e) => {
+            log::error!("Failed to load flows for credentials: {e}");
+            return Ok(Json(serde_json::json!({})));
+        }
+    };
+    let stored = match CredentialStore::for_flows_file(path, &state.credential_settings).load() {
+        Ok(stored) => stored,
+        Err(e) => {
+            log::error!("{e}");
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
     };
 
-    // Find the config node by ID and return its nested credentials object
-    for node in &flows {
-        if node.get("id").and_then(|v| v.as_str()) == Some(&node_id)
-            && let Some(creds) = node.get("credentials").cloned()
-        {
-            return Ok(Json(creds));
-        }
+    let inline = flows
+        .iter()
+        .find(|node| node.get("id").and_then(Value::as_str) == Some(node_id.as_str()))
+        .and_then(|node| node.get("credentials").cloned());
+    let mut probe = serde_json::json!([{ "id": node_id }]);
+    if let (Some(inline), Some(node)) = (inline, probe[0].as_object_mut()) {
+        node.insert("credentials".to_owned(), inline);
+    }
+    apply_credentials(&mut probe, &stored);
+    match probe[0].get("credentials") {
+        Some(Value::Object(creds)) => Ok(Json(editor_view(creds))),
+        _ => Ok(Json(serde_json::json!({}))),
+    }
+}
+
+#[cfg(test)]
+mod credential_tests {
+    use super::*;
+    use rust_red_core::runtime::credentials::{SecretSetting, SecretString};
+    use serde_json::json;
+
+    fn state_for(flows_path: &StdPath, secret: SecretSetting) -> Arc<WebState> {
+        let mut state = WebState::new();
+        let inner = Arc::get_mut(&mut state).expect("the state is not shared yet");
+        inner.credential_settings = CredentialSettings { secret, ..Default::default() };
+        *inner.flows_file_path.get_mut() = Some(flows_path.to_owned());
+        state
     }
 
-    Ok(Json(serde_json::json!({})))
+    async fn deploy(state: &Arc<WebState>, flows: Value) -> Value {
+        let body = json!({ "flows": flows, "rev": "1" }).to_string();
+        post_flows(Extension(state.clone()), body).await.expect("the deploy succeeds").0
+    }
+
+    fn broker(credentials: Value) -> Value {
+        json!([
+            {"id": "t1", "type": "tab", "label": "Flow 1"},
+            {"id": "b1", "type": "mqtt-broker", "broker": "127.0.0.1", "port": "1883", "credentials": credentials},
+        ])
+    }
+
+    #[tokio::test]
+    async fn editor_deploy_moves_credentials_into_the_encrypted_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        let flows_path = tmp.path().join("flows.json");
+        let secret = SecretSetting::Secret(SecretString::new("deploy secret"));
+        let state = state_for(&flows_path, secret.clone());
+
+        deploy(&state, broker(json!({"user": "plant", "password": "pw-1"}))).await;
+
+        let saved = std::fs::read_to_string(&flows_path).unwrap();
+        assert!(!saved.contains("credentials") && !saved.contains("pw-1"), "flows.json holds no credentials");
+        let cred_text = std::fs::read_to_string(tmp.path().join("flows_cred.json")).unwrap();
+        assert!(cred_text.contains("\"$\"") && !cred_text.contains("pw-1"), "the file is encrypted");
+        let store = CredentialStore::for_flows_file(&flows_path, &CredentialSettings { secret, ..Default::default() });
+        assert_eq!(store.load().unwrap()["b1"], json!({"user": "plant", "password": "pw-1"}));
+
+        // GET /flows leaves credentials out, GET /credentials hides the password.
+        let flows = get_flows(Extension(state.clone())).await.unwrap().0;
+        assert!(!flows.to_string().contains("pw-1"));
+        let view =
+            get_credentials(Extension(state.clone()), Path(("mqtt-broker".into(), "b1".into()))).await.unwrap().0;
+        assert_eq!(view, json!({"user": "plant", "has_password": true}));
+        let none =
+            get_credentials(Extension(state.clone()), Path(("mqtt-broker".into(), "nope".into()))).await.unwrap().0;
+        assert_eq!(none, json!({}));
+
+        // The editor changes the user and leaves the password alone, then rotates the password.
+        deploy(&state, broker(json!({"user": "plant2", "password": "__PWRD__"}))).await;
+        assert_eq!(store.load().unwrap()["b1"], json!({"user": "plant2", "password": "pw-1"}));
+        deploy(&state, broker(json!({"password": "pw-2"}))).await;
+        assert_eq!(store.load().unwrap()["b1"], json!({"user": "plant2", "password": "pw-2"}));
+
+        // A deploy without credentials keeps them, and deleting the node drops them.
+        deploy(&state, broker(json!(null))).await;
+        assert_eq!(store.load().unwrap()["b1"]["password"], "pw-2");
+        deploy(&state, json!([{"id": "t1", "type": "tab", "label": "Flow 1"}])).await;
+        assert!(store.load().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn inline_credentials_in_the_current_flows_file_are_migrated_on_deploy() {
+        let tmp = tempfile::tempdir().unwrap();
+        let flows_path = tmp.path().join("flows.json");
+        std::fs::write(&flows_path, broker(json!({"user": "old", "password": "inline-pw"})).to_string()).unwrap();
+        let state = state_for(&flows_path, SecretSetting::Disabled);
+
+        // The editor never saw the inline credentials, so it deploys the nodes without them.
+        deploy(&state, broker(json!(null))).await;
+
+        let saved = std::fs::read_to_string(&flows_path).unwrap();
+        assert!(!saved.contains("inline-pw"));
+        let cred: Value =
+            serde_json::from_str(&std::fs::read_to_string(tmp.path().join("flows_cred.json")).unwrap()).unwrap();
+        assert_eq!(cred["b1"], json!({"user": "old", "password": "inline-pw"}));
+    }
+
+    #[tokio::test]
+    async fn deploy_with_a_wrong_secret_fails_and_keeps_both_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let flows_path = tmp.path().join("flows.json");
+        let good = SecretSetting::Secret(SecretString::new("right"));
+        deploy(&state_for(&flows_path, good), broker(json!({"user": "plant", "password": "pw-1"}))).await;
+        let flows_before = std::fs::read_to_string(&flows_path).unwrap();
+        let cred_before = std::fs::read_to_string(tmp.path().join("flows_cred.json")).unwrap();
+
+        let wrong = state_for(&flows_path, SecretSetting::Secret(SecretString::new("wrong")));
+        let body = json!({ "flows": broker(json!({"password": "evil"})), "rev": "1" }).to_string();
+        let status = post_flows(Extension(wrong.clone()), body).await.expect_err("the deploy fails");
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(std::fs::read_to_string(&flows_path).unwrap(), flows_before);
+        assert_eq!(std::fs::read_to_string(tmp.path().join("flows_cred.json")).unwrap(), cred_before);
+        let status = get_credentials(Extension(wrong), Path(("mqtt-broker".into(), "b1".into()))).await.err();
+        assert_eq!(status, Some(StatusCode::INTERNAL_SERVER_ERROR));
+    }
 }

@@ -1,5 +1,12 @@
 wasm_plugin_dir = "/tmp/rust-red-plugins"
 
+# Secret that encrypts the credentials file next to the flows file (flows_cred.json), as Node-RED's
+# credentialSecret setting. The command line flag --credential-secret and the environment variable
+# NODE_RED_CREDENTIAL_SECRET win over this. Without any of them, `_credentialSecret` from
+# .config.runtime.json in the user directory is used. `false` stores credentials as plain JSON.
+# credential_secret = "a long random secret"
+# credential_secret = false
+
 [runtime]
 
 [runtime.engine]

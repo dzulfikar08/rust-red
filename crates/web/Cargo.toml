@@ -37,3 +37,6 @@ otel = ["dep:opentelemetry", "rust-red-core/otel"]
 auth = []
 ai = ["rust-red-core/ai"]
 cluster = ["dep:rust-red-cluster", "rust-red-cluster/cluster", "rust-red-core/cluster"]
+
+[dev-dependencies]
+tempfile = "3"

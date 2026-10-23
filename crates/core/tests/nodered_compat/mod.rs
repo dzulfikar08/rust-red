@@ -25,6 +25,7 @@ mod test_batch;
 mod test_catch;
 mod test_change;
 mod test_comment;
+mod test_credentials;
 mod test_debug;
 mod test_delay;
 mod test_exec;

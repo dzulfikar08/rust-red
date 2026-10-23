@@ -2,6 +2,7 @@ use std::io;
 
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Shell};
+use rust_red_core::runtime::credentials::SecretString;
 
 const LONG_ABOUT: &str = r#"
 Rust-Red Daemon Program
@@ -42,6 +43,13 @@ pub struct CliArgs {
     /// Use specified user directory
     #[arg(short = 'u', long, global = true)]
     pub user_dir: Option<String>,
+
+    /// Secret that encrypts the credentials file next to the flows file (`flows_cred.json`), as
+    /// Node-RED's `credentialSecret` setting. Without it, `_credentialSecret` from
+    /// `.config.runtime.json` in the user directory is used. To store credentials unencrypted set
+    /// `credential_secret = false` in the config file.
+    #[arg(long, global = true, env = "NODE_RED_CREDENTIAL_SECRET", hide_env_values = true, value_name = "SECRET")]
+    pub credential_secret: Option<SecretString>,
 
     /// Generate shell completions and print to stdout
     #[arg(long, value_name = "SHELL")]
@@ -133,6 +141,10 @@ impl CliArgs {
         // user_dir
         if let Some(ref user_dir) = self.user_dir {
             builder = builder.set_override("user_dir", user_dir.clone())?;
+        }
+        // credential_secret
+        if let Some(secret) = self.credential_secret.as_ref().filter(|s| !s.expose().is_empty()) {
+            builder = builder.set_override("credential_secret", secret.expose().to_owned())?;
         }
         // home
         if let Some(ref home) = self.home {

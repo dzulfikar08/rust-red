@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 use tower_http::services::ServeDir;
 
 use rust_red_core::runtime::audit::{AuditConfig, create_audit_logger};
+use rust_red_core::runtime::credentials::CredentialSettings;
 use rust_red_core::runtime::registry::RegistryHandle;
 
 use crate::api::create_all_routes;
@@ -49,6 +50,7 @@ impl WebServer {
             frontend_plugins: rust_red_core::web::frontend_plugin::FrontendPluginRegistry::default(),
             audit_logger,
             auth_config,
+            credential_settings: CredentialSettings::from_config(cfg),
             #[cfg(feature = "cluster")]
             cluster_manager: std::sync::RwLock::new(None),
         });

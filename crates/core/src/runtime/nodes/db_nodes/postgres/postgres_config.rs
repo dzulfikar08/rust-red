@@ -299,6 +299,20 @@ mod tests {
     }
 
     #[test]
+    fn credentials_from_a_node_red_credentials_file_reach_the_config() {
+        use crate::runtime::credentials::{CredentialSettings, CredentialStore, SecretSetting};
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/node_red_credentials/plaintext");
+        let flows_path = std::path::Path::new(dir).join("flows.json");
+        let mut flows: Value = serde_json::from_str(&std::fs::read_to_string(&flows_path).unwrap()).unwrap();
+        let settings = CredentialSettings { secret: SecretSetting::Disabled, ..Default::default() };
+        CredentialStore::for_flows_file(&flows_path, &settings).merge_into_flows(&mut flows).unwrap();
+        let node = flows.as_array().unwrap().iter().find(|n| n["id"] == "a81d5f3c9e2b6047").unwrap();
+        let cfg = PostgresConfig::from_json(node).unwrap();
+        assert_eq!((cfg.user.as_str(), cfg.password.as_str()), ("scada", "pg-secret-1"));
+        assert_eq!((cfg.host.as_str(), cfg.port, cfg.dbname.as_str()), ("127.0.0.1", 5432, "plant"));
+    }
+
+    #[test]
     fn legacy_plain_text_user_and_native_names_load() {
         let cfg = PostgresConfig::from_json(&json!({
             "host": "h", "dbname": "d", "user": "u", "password": "p", "poolMaxSize": 3, "connectTimeoutMs": 900

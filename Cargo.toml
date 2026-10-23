@@ -85,7 +85,7 @@ tokio-cron-scheduler = "^0.14"
 # convert through serde_json, so simd-json would only add weight to the binary.
 jsonata-core = { version = "2.2", default-features = false }
 dirs-next = "2"
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 itertools = "^0.14"
 arrayvec = "0.7"
@@ -129,6 +129,8 @@ log4rs = { version = "1", features = [
 ], default-features = false }
 ctor = "^0.2"
 sha2 = "0.10"
+aes = "0.8"
+ctr = "0.9"
 hex = "0.4"
 reqwest = { version = "0.11", features = [
     "json",

@@ -1,6 +1,7 @@
 // REMOVED: clone_for_update. All mutation must use interior mutability (Mutex/RwLock) on fields.
 use axum::Router;
 use rust_red_core::runtime::audit::AuditLogger;
+use rust_red_core::runtime::credentials::{CredentialSettings, CredentialStore};
 use rust_red_core::runtime::paths;
 
 use crate::auth::AuthConfig;
@@ -38,6 +39,7 @@ pub struct WebState {
     pub frontend_plugins: FrontendPluginRegistry, // Pluggable frontend registry
     pub audit_logger: Option<Arc<dyn AuditLogger>>, // Audit logger for security events
     pub auth_config: AuthConfig,                  // Authentication/RBAC configuration
+    pub credential_settings: CredentialSettings,  // Credential secret and user directory (flows_cred.json)
     #[cfg(feature = "cluster")]
     pub cluster_manager: std::sync::RwLock<Option<Arc<rust_red_cluster::ClusterManager>>>,
 }
@@ -83,9 +85,18 @@ impl WebState {
             frontend_plugins: FrontendPluginRegistry::default(), // Collect compile-time plugins
             audit_logger: None,
             auth_config: AuthConfig::default(),
+            credential_settings: CredentialSettings::default(),
             #[cfg(feature = "cluster")]
             cluster_manager: std::sync::RwLock::new(None),
         })
+    }
+}
+
+impl WebState {
+    /// The credentials file next to the flows file, if a flows file is configured.
+    pub async fn credential_store(&self) -> Option<CredentialStore> {
+        let flows_path = self.flows_file_path.read().await;
+        flows_path.as_deref().map(|p| CredentialStore::for_flows_file(p, &self.credential_settings))
     }
 }
 

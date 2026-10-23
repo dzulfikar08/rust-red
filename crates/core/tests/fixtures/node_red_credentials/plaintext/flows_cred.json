@@ -1,0 +1,14 @@
+{
+    "4c8a1f6e3b7d0925": {
+        "user": "plant",
+        "password": "päss/wörd\"1\\x"
+    },
+    "a81d5f3c9e2b6047": {
+        "user": "scada",
+        "password": "pg-secret-1"
+    },
+    "0b5e9c2d7a4f1836": {
+        "user": "api-user",
+        "password": "api-pass"
+    }
+}

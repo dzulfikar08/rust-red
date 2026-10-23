@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod context;
+pub mod credentials;
 pub mod dashboard_channel;
 pub mod debug_channel;
 pub mod engine;

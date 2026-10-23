@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 use tokio_util::sync::CancellationToken;
 
 use super::context::{Context, ContextManager, ContextManagerBuilder};
+use super::credentials::{CredentialSettings, CredentialStore};
 use super::dashboard_channel::DashboardChannel;
 use super::debug_channel::DebugChannel;
 use super::engine_events::{EngineEvent, EngineEventBus};
@@ -180,13 +181,19 @@ impl Engine {
         *self.inner.cluster_partitioner.write().unwrap() = Some(partitioner);
     }
 
+    /// Load a flows file, merging the credentials Node-RED keeps next to it (`<basename>_cred.json`)
+    /// into each node's `credentials` first. See [`super::credentials`].
     pub async fn with_flows_file(
         reg: &RegistryHandle,
         flows_json_path: &str,
         elcfg: Option<config::Config>,
     ) -> crate::Result<Engine> {
         let json_str = tokio::fs::read_to_string(flows_json_path).await?;
-        Self::with_json_string(reg, json_str, elcfg)
+        let mut json: serde_json::Value = serde_json::from_str(&json_str)?;
+        let settings = elcfg.as_ref().map(CredentialSettings::from_config).unwrap_or_default();
+        CredentialStore::for_flows_file(std::path::Path::new(flows_json_path), &settings)
+            .merge_into_flows(&mut json)?;
+        Self::with_json(reg, json, elcfg)
     }
 
     pub fn with_json_string(
